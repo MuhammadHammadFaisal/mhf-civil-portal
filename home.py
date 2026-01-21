@@ -25,15 +25,12 @@ def main():
     st.markdown("---")
     st.subheader("👨‍💻 About MHF Civil")
     
-    dev_col1, dev_col2 = st.columns([1, 1])
     
-    with dev_col1:
-        st.markdown("""
-        **Muhammad Hammad Faisal** *Final Year Civil Engineering Student (METU) | Founder, MHF Civil*
-        
-        This portal was developed to bridge the gap between theoretical soil mechanics and practical application.
-        """)
-        st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/") 
+    st.markdown("""
+    **Muhammad Hammad Faisal** *Final Year Civil Engineering Student (METU) | Founder, MHF Civil*
+    This portal was developed to bridge the gap between theoretical soil mechanics and practical application.
+    """)
+    st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/") 
 
     # --- FOOTER ---
     st.markdown("---")
@@ -49,6 +46,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
