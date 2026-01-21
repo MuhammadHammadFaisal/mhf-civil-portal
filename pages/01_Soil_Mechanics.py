@@ -2,9 +2,9 @@ import streamlit as st
 # This connects the "Hub" (Sidebar) to the "Spoke" (Calculators)
 from topics import soil_phase
 
-st.set_page_config(page_title="Soil Mechanics", page_icon="🪨", layout="wide")
+st.set_page_config(page_title="Soil Mechanics", page_icon="", layout="wide")
 
-st.header("🪨 CE 363: Soil Mechanics")
+st.header("CE 363: Soil Mechanics")
 
 # THE MENU
 # This dropdown lets the user switch questions WITHOUT leaving the Soil Mechanics page
