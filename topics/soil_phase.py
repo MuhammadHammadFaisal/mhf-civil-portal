@@ -144,7 +144,7 @@ def app():
         if gamma_bulk_in > 0: solver.set_param('gamma_bulk', gamma_bulk_in)
         if gamma_dry_in > 0: solver.set_param('gamma_dry', gamma_dry_in)
         
-        if st.button("🚀 Solve Numeric Problem", type="primary"):
+        if st.button("Solve Numeric Problem", type="primary"):
             solver.solve()
             st.success("Calculation Complete!")
             
@@ -188,7 +188,7 @@ def app():
         with c2: e_max = st.number_input("Max Void Ratio (e_max)", 0.0, step=0.01, key="dr_emax")
         with c3: e_min = st.number_input("Min Void Ratio (e_min)", 0.0, step=0.01, key="dr_emin")
         
-        if st.button("Calculate Relative Density"):
+        if st.button("Calculate Relative Density", type="primary"):
             if e_max > e_min and e_max > 0:
                 Dr = (e_max - e_curr) / (e_max - e_min)
                 st.latex(r"D_r = \frac{e_{max} - e}{e_{max} - e_{min}} = " + f"{Dr*100:.1f}\\%")
