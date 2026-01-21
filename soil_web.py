@@ -46,7 +46,7 @@ def home_page():
         This portal was developed to assist students and junior engineers in verifying complex calculations.
         """)
         # Link to your LinkedIn or Email (Change the URL to your actual profile)
-        st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/")
+        st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/")
         # --- PROFESSIONAL FOOTER ---
     st.markdown("---")
     st.markdown(
@@ -256,6 +256,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
