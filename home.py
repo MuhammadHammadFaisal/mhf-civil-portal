@@ -25,7 +25,7 @@ def main():
     st.markdown("---")
     st.subheader("👨‍💻 About MHF Civil")
     
-    dev_col1, dev_col2 = st.columns([1, 3])
+    dev_col1, dev_col2 = st.columns([1, 1])
     
     with dev_col1:
         st.markdown("""
@@ -49,6 +49,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
