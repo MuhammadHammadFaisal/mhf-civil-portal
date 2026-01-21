@@ -34,9 +34,6 @@ def main():
         This portal was developed to bridge the gap between theoretical soil mechanics and practical application.
         """)
         st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/") 
-    
-    with dev_col2:
-
 
     # --- FOOTER ---
     st.markdown("---")
@@ -52,5 +49,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
