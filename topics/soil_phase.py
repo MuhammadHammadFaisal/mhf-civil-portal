@@ -27,10 +27,16 @@ def app():
 
                 # Dictionary to make variables look like Math Symbols
                 self.latex_map = {
-                    'w': 'w', 'Gs': 'G_s', 'e': 'e', 'n': 'n', 'S': 'S',
-                    'rho_bulk': r'\rho_{bulk}', 'rho_dry': r'\rho_{dry}',
-                    'gamma_bulk': r'\gamma_{bulk}', 'gamma_dry': r'\gamma_{dry}', 
-                    'gamma_sat': r'\gamma_{sat}'
+                    'w': 'w (Water Content)', 
+                    'Gs': 'G_s (Specific Gravity)', 
+                    'e': 'e (Void Ratio)', 
+                    'n': 'n (Porosity)', 
+                    'S': 'S (Saturation)',
+                    'rho_bulk': r'\rho_{bulk} (Bulk Density)', 
+                    'rho_dry': r'\rho_{dry} (Dry Density)',
+                    'gamma_bulk': r'\gamma_{bulk} (Bulk Unit Wt)', 
+                    'gamma_dry': r'\gamma_{dry} (Dry Unit Wt)', 
+                    'gamma_sat': r'\gamma_{sat} (Sat Unit Wt)'
                 }
 
             def set_param(self, key, value):
@@ -38,8 +44,10 @@ def app():
                     self.params[key] = float(value)
 
             def add_log(self, target_key, formula_latex, sub_latex, result):
-                # Convert the target variable key (e.g., 'rho_dry') to symbol (\rho_{dry})
-                symbol = self.latex_map.get(target_key, target_key)
+                # Convert the target variable key to symbol
+                # We split the map to get just the symbol part for the log
+                full_label = self.latex_map.get(target_key, target_key)
+                symbol = full_label.split(' ')[0] 
                 
                 self.log.append({
                     "Variable": symbol,
@@ -56,92 +64,54 @@ def app():
                 while changed and iterations < 10:
                     changed = False
                     
-                    # 1. Gamma -> Rho (Using Fractions)
+                    # 1. Gamma -> Rho
                     if p['gamma_bulk'] and not p['rho_bulk']:
                         p['rho_bulk'] = p['gamma_bulk'] / self.gamma_w
-                        self.add_log('rho_bulk', 
-                                     r'\frac{\gamma_{bulk}}{\gamma_w}', 
-                                     r'\frac{' + f"{p['gamma_bulk']}" + r'}{9.81}', 
-                                     p['rho_bulk'])
+                        self.add_log('rho_bulk', r'\frac{\gamma_{bulk}}{\gamma_w}', r'\frac{' + f"{p['gamma_bulk']}" + r'}{9.81}', p['rho_bulk'])
                         changed = True
-                        
                     if p['gamma_dry'] and not p['rho_dry']:
                         p['rho_dry'] = p['gamma_dry'] / self.gamma_w
-                        self.add_log('rho_dry', 
-                                     r'\frac{\gamma_{dry}}{\gamma_w}', 
-                                     r'\frac{' + f"{p['gamma_dry']}" + r'}{9.81}', 
-                                     p['rho_dry'])
+                        self.add_log('rho_dry', r'\frac{\gamma_{dry}}{\gamma_w}', r'\frac{' + f"{p['gamma_dry']}" + r'}{9.81}', p['rho_dry'])
                         changed = True
 
                     # 2. n <-> e
                     if p['n'] and not p['e']:
                         p['e'] = p['n'] / (1 - p['n'])
-                        self.add_log('e', 
-                                     r'\frac{n}{1 - n}', 
-                                     r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}', 
-                                     p['e'])
+                        self.add_log('e', r'\frac{n}{1 - n}', r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}', p['e'])
                         changed = True
-                        
                     if p['e'] and not p['n']:
                         p['n'] = p['e'] / (1 + p['e'])
-                        self.add_log('n', 
-                                     r'\frac{e}{1 + e}', 
-                                     r'\frac{' + f"{p['e']:.3f}" + r'}{1 + ' + f"{p['e']:.3f}" + r'}', 
-                                     p['n'])
+                        self.add_log('n', r'\frac{e}{1 + e}', r'\frac{' + f"{p['e']:.3f}" + r'}{1 + ' + f"{p['e']:.3f}" + r'}', p['n'])
                         changed = True
 
                     # 3. Se = wGs
-                    # Solve for S
                     if p['w'] and p['Gs'] and p['e'] and p['S'] is None:
                         p['S'] = (p['w'] * p['Gs']) / p['e']
-                        self.add_log('S', 
-                                     r'\frac{w \cdot G_s}{e}', 
-                                     r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}', 
-                                     p['S'])
+                        self.add_log('S', r'\frac{w \cdot G_s}{e}', r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}', p['S'])
                         changed = True
-                    
-                    # Solve for e (from w, Gs, S)
                     if p['w'] and p['Gs'] and p['S'] and p['e'] is None and p['S'] != 0:
                         p['e'] = (p['w'] * p['Gs']) / p['S']
-                        self.add_log('e', 
-                                     r'\frac{w \cdot G_s}{S}', 
-                                     r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['S']:.3f}" + r'}', 
-                                     p['e'])
+                        self.add_log('e', r'\frac{w \cdot G_s}{S}', r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['S']:.3f}" + r'}', p['e'])
                         changed = True
-                    
-                    # Solve for w
                     if p['S'] and p['e'] and p['Gs'] and p['w'] is None:
                         p['w'] = (p['S'] * p['e']) / p['Gs']
-                        self.add_log('w', 
-                                     r'\frac{S \cdot e}{G_s}', 
-                                     r'\frac{' + f"{p['S']:.3f} \cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}', 
-                                     p['w'])
+                        self.add_log('w', r'\frac{S \cdot e}{G_s}', r'\frac{' + f"{p['S']:.3f} \cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}', p['w'])
                         changed = True
                     
                     # 4. Rho relationships
                     if p['rho_bulk'] and p['w'] and not p['rho_dry']:
                         p['rho_dry'] = p['rho_bulk'] / (1 + p['w'])
-                        self.add_log('rho_dry', 
-                                     r'\frac{\rho_{bulk}}{1 + w}', 
-                                     r'\frac{' + f"{p['rho_bulk']:.3f}" + r'}{1 + ' + f"{p['w']:.3f}" + r'}', 
-                                     p['rho_dry'])
-                        changed = True
-                        
+                        self.add_log('rho_dry', r'\frac{\rho_{bulk}}{1 + w}', r'\frac{' + f"{p['rho_bulk']:.3f}" + r'}{1 + ' + f"{p['w']:.3f}" + r'}', p['rho_dry'])
+                        changed = True 
                     if p['rho_dry'] and p['w'] and not p['rho_bulk']:
                         p['rho_bulk'] = p['rho_dry'] * (1 + p['w'])
-                        self.add_log('rho_bulk', 
-                                     r'\rho_{dry}(1 + w)', 
-                                     f"{p['rho_dry']:.3f}(1 + {p['w']:.3f})", 
-                                     p['rho_bulk'])
+                        self.add_log('rho_bulk', r'\rho_{dry}(1 + w)', f"{p['rho_dry']:.3f}(1 + {p['w']:.3f})", p['rho_bulk'])
                         changed = True
                     
                     # 5. Fundamental Rho Dry
                     if p['Gs'] and p['e'] and not p['rho_dry']:
                         p['rho_dry'] = (p['Gs'] * self.rho_w) / (1 + p['e'])
-                        self.add_log('rho_dry', 
-                                     r'\frac{G_s \rho_w}{1 + e}', 
-                                     r'\frac{' + f"{p['Gs']:.2f} \cdot 1" + r'}{1 + ' + f"{p['e']:.3f}" + r'}', 
-                                     p['rho_dry'])
+                        self.add_log('rho_dry', r'\frac{G_s \rho_w}{1 + e}', r'\frac{' + f"{p['Gs']:.2f} \cdot 1" + r'}{1 + ' + f"{p['e']:.3f}" + r'}', p['rho_dry'])
                         changed = True
                         
                     iterations += 1
@@ -193,8 +163,23 @@ def app():
                 st.error("Not enough info to solve.")
                 
             st.caption("Final Results Summary")
-            results = {k: v for k, v in solver.params.items() if v is not None}
-            st.dataframe(pd.DataFrame.from_dict(results, orient='index', columns=['Value']))
+            
+            # --- THE FIX: RENAME VARIABLES FOR THE TABLE ---
+            clean_results = {}
+            for k, v in solver.params.items():
+                if v is not None:
+                    # Get the fancy name (e.g., "ρ_bulk (Bulk Density)")
+                    # We strip the LaTeX code slightly to make it readable in a simple table if needed,
+                    # but Streamlit dataframes render LaTeX if you use st.data_editor or similar.
+                    # For a simple view, let's just use the Key + Description.
+                    label = solver.latex_map.get(k, k)
+                    # Remove the $ signs if they were there (our map has raw latex r'\rho')
+                    # We can format the value nicely too
+                    clean_results[label] = f"{v:.4f}"
+
+            # Create DataFrame with Index as "Property" and Value as "Result"
+            df = pd.DataFrame.from_dict(clean_results, orient='index', columns=['Value'])
+            st.dataframe(df, use_container_width=True)
 
     # ==========================
     # MODE B: SYMBOLIC
