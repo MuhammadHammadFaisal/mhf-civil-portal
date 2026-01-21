@@ -3,21 +3,33 @@ import pandas as pd
 import numpy as np
 
 # ==========================================
-# 🏠 PAGE 1: THE HOME PAGE
+# 🏠 PAGE 1: THE MHF HOME PAGE (Rebranded)
 # ==========================================
 def home_page():
-    st.title("🏛️ Civil Engineering Student Portal")
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Middle_East_Technical_University_logo.svg/1200px-Middle_East_Technical_University_logo.svg.png", width=150)
-    st.header("Welcome, Student!")
+    # Header Section
+    st.title("🏗️ MHF Civil Portal")
+    st.caption("Advanced Engineering Tools | Developed by Muhammad Hammad Faisal")
+    st.markdown("---")
+
+    # Welcome Message
     st.markdown("""
-    Select your course from the sidebar to begin practicing.
+    ### **Precision. Logic. Infrastructure.**
+    Welcome to the official digital workspace of **MHF Civil**. This platform bridges the gap between complex textbook theory and real-world structural problem solving.
     
-    **Available Courses:**
-    * ✅ **CE 363:** Soil Mechanics (Phase Relations, Stress, Classification)
-    * 🚧 **CE 366:** Foundation Engineering (Coming Soon)
-    * 🚧 **CE 221:** Mechanics of Materials (Coming Soon)
+    #### **🚀 Available Modules**
     """)
-    st.info("👈 Open the Sidebar menu to navigate!")
+
+    # Course Cards (Using Columns for a professional look)
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.info("**🪨 Soil Mechanics (CE 363)**\n\nActive module for phase relationships, soil classification, and stress analysis.")
+    
+    with col2:
+        st.warning("**🏗️ Structural Analysis**\n\n*Coming Soon*\n\nModules for beam deflection and moment distribution.")
+
+    st.markdown("---")
+    st.success("👈 **Get Started:** Open the Sidebar menu on the left to select a module.")
 
 # ==========================================
 # 🧠 LOGIC ENGINE (The Brain)
@@ -60,6 +72,10 @@ class SoilState:
                 p['rho_bulk'] = p['gamma_bulk'] / self.gamma_w
                 self.add_log('rho_bulk', 'gamma_bulk / 9.81', f"{p['gamma_bulk']} / 9.81", p['rho_bulk'])
                 changed = True
+            if p['gamma_dry'] and not p['rho_dry']:
+                p['rho_dry'] = p['gamma_dry'] / self.gamma_w
+                self.add_log('rho_dry', 'gamma_dry / 9.81', f"{p['gamma_dry']} / 9.81", p['rho_dry'])
+                changed = True
 
             # n <-> e
             if p['n'] and not p['e']:
@@ -80,15 +96,35 @@ class SoilState:
                 p['e'] = (p['w'] * p['Gs']) / p['S']
                 self.add_log('e', 'w * Gs / S', f"({p['w']} * {p['Gs']}) / {p['S']}", p['e'])
                 changed = True
+            if p['S'] and p['e'] and p['Gs'] and p['w'] is None:
+                p['w'] = (p['S'] * p['e']) / p['Gs']
+                self.add_log('w', 'S * e / Gs', f"({p['S']} * {p['e']}) / {p['Gs']}", p['w'])
+                changed = True
             
             # Rho relationships
             if p['rho_bulk'] and p['w'] and not p['rho_dry']:
                 p['rho_dry'] = p['rho_bulk'] / (1 + p['w'])
                 self.add_log('rho_dry', 'rho_bulk / (1+w)', f"{p['rho_bulk']} / (1+{p['w']})", p['rho_dry'])
                 changed = True
+            if p['rho_dry'] and p['w'] and not p['rho_bulk']:
+                p['rho_bulk'] = p['rho_dry'] * (1 + p['w'])
+                self.add_log('rho_bulk', 'rho_dry * (1+w)', f"{p['rho_dry']} * (1+{p['w']})", p['rho_bulk'])
+                changed = True
+            
+            # Fundamental Rho Dry
             if p['Gs'] and p['e'] and not p['rho_dry']:
                 p['rho_dry'] = (p['Gs'] * self.rho_w) / (1 + p['e'])
                 self.add_log('rho_dry', 'Gs * rho_w / (1+e)', f"{p['Gs']} * 1 / (1+{p['e']:.3f})", p['rho_dry'])
+                changed = True
+            if p['Gs'] and p['rho_dry'] and not p['e']:
+                p['e'] = ((p['Gs'] * self.rho_w) / p['rho_dry']) - 1
+                self.add_log('e', '(Gs * rho_w / rho_dry) - 1', f"({p['Gs']} * 1 / {p['rho_dry']:.3f}) - 1", p['e'])
+                changed = True
+
+            # Fundamental Rho Bulk -> e (Direct)
+            if p['rho_bulk'] and p['Gs'] and p['w'] and not p['e']:
+                p['e'] = (p['Gs'] * (1 + p['w']) * self.rho_w / p['rho_bulk']) - 1
+                self.add_log('e', '(Gs(1+w)/rho_bulk) - 1', f"({p['Gs']}*(1+{p['w']})/{p['rho_bulk']:.3f}) - 1", p['e'])
                 changed = True
                 
             iterations += 1
@@ -148,6 +184,9 @@ def render_phase_solver():
     if e > 0: solver.set_param('e', e)
     if n > 0: solver.set_param('n', n)
     if gamma_bulk > 0: solver.set_param('gamma_bulk', gamma_bulk)
+    if gamma_dry > 0: solver.set_param('gamma_dry', gamma_dry)
+    if rho_bulk > 0: solver.set_param('rho_bulk', rho_bulk)
+    if rho_dry > 0: solver.set_param('rho_dry', rho_dry)
     
     # 3. SOLVE BUTTON
     if st.button("🚀 Solve Problem", type="primary"):
@@ -173,10 +212,10 @@ def render_phase_solver():
 # 🧭 MAIN APP NAVIGATION
 # ==========================================
 def main():
-    st.set_page_config(page_title="Uni Portal", page_icon="🎓", layout="wide")
+    st.set_page_config(page_title="MHF Civil", page_icon="🏗️", layout="wide")
     
     # SIDEBAR MENU
-    st.sidebar.title("🎓 University Portal")
+    st.sidebar.title("🏗️ MHF Civil")
     page = st.sidebar.radio("Navigate to:", ["🏠 Home", "🪨 Soil Mechanics", "🏗️ Structures"])
     
     # PAGE ROUTING
