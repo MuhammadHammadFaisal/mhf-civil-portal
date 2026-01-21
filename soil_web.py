@@ -7,23 +7,23 @@ import numpy as np
 # ==========================================
 def home_page():
     # Header Section
-    st.title("🏗️ MHF Civil Portal")
-    st.caption("Advanced Engineering Tools | Developed by Muhammad Hammad Faisal")
+    st.title(" MHF Civil Portal")
+    st.caption("Advanced Civil Engineering Question Solver | Developed by Muhammad Hammad Faisal")
     st.markdown("---")
 
     # Welcome Message
     st.markdown("""
-    ### **Precision. Logic. Infrastructure.**
-    Welcome to the official digital workspace of **MHF Civil**. This platform bridges the gap between complex textbook theory and real-world structural problem solving.
+    ### **Precision. Logic. Deterministic.**
+    Welcome to the official digital workspace of **MHF Civil**. This platform solve complex civil enginerring question and give you correct answer every time.
     
-    #### **🚀 Available Modules**
+    #### **Available Modules**
     """)
 
     # Course Cards (Using Columns for a professional look)
     col1, col2 = st.columns(2)
     
     with col1:
-        st.info("**🪨 Soil Mechanics (CE 363)**\n\nActive module for phase relationships, soil classification, and stress analysis.")
+        st.info("**Soil Mechanics**\n\nActive module for phase relationships.")
     
     with col2:
         st.warning("**🏗️ Structural Analysis**\n\n*Coming Soon*\n\nModules for beam deflection and moment distribution.")
@@ -229,3 +229,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
