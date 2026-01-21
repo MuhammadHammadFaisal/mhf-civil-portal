@@ -37,7 +37,7 @@ def home_page():
     
     with dev_col1:
         # Placeholder professional icon (You can change this link later)
-    st.image("https://github.com/MuhammadHammadFaisal/mhf-civil-portal/blob/main/profile.png?raw=true", width=100)
+        st.image("https://github.com/MuhammadHammadFaisal/mhf-civil-portal/blob/main/profile.png?raw=true", width=100)
     
     with dev_col2:
         st.markdown("""
@@ -256,6 +256,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
