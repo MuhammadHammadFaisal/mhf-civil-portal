@@ -246,16 +246,17 @@ def main():
     page = st.sidebar.radio("Navigate to:", ["🏠 Home", "🪨 Soil Mechanics", "🏗️ Structures"])
     
     # PAGE ROUTING
-    if page == "🏠 Home":
+    if page == "Home":
         home_page()
-    elif page == "🪨 Soil Mechanics":
+    elif page == "Soil Mechanics":
         soil_mechanics_page()
-    elif page == "🏗️ Structures":
-        st.title("🏗️ Structural Analysis")
+    elif page == "Structures":
+        st.title("Structural Analysis")
         st.info("This course is not active yet.")
 
 if __name__ == "__main__":
     main()
+
 
 
 
