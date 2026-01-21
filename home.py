@@ -26,10 +26,13 @@ def main():
     st.subheader("👨‍💻 About MHF Civil")
     
     
-    st.markdown("""
-    **Muhammad Hammad Faisal** *Final Year Civil Engineering Student (METU) | Founder, MHF Civil*
-    This portal was developed to bridge the gap between theoretical soil mechanics and practical application.
-    """)
+   st.markdown("""
+### Muhammad Hammad Faisal
+**Final Year Civil Engineering Student (METU) | Founder, MHF Civil**
+
+**Precision over Estimation.**
+This portal eliminates the uncertainty of AI predictions and manual errors. It uses deterministic engineering algorithms to provide **100% mathematically correct values**, every time.
+""")
     st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/") 
 
     # --- FOOTER ---
@@ -46,6 +49,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
