@@ -242,8 +242,8 @@ def main():
     st.set_page_config(page_title="MHF Civil", page_icon="🏗️", layout="wide")
     
     # SIDEBAR MENU
-    st.sidebar.title("🏗️ MHF Civil")
-    page = st.sidebar.radio("Navigate to:", ["🏠 Home", "🪨 Soil Mechanics", "🏗️ Structures"])
+    st.sidebar.title("MHF Civil")
+    page = st.sidebar.radio("Navigate to:", ["Home", "Soil Mechanics", "Structures"])
     
     # PAGE ROUTING
     if page == "Home":
@@ -256,6 +256,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
