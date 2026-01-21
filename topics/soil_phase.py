@@ -6,7 +6,7 @@ def app():
     st.markdown("---")
     
     # 1. SELECT MODE
-    mode = st.radio("Select Solver Mode:", ["🔢 Numeric Calculation", "abc Symbolic / Formula Finder"], horizontal=True)
+    mode = st.radio("Select Solver Mode:", ["Numeric Calculation", "Symbolic / Formula Finder"], horizontal=True)
 
     # ==========================
     # MODE A: NUMERIC
