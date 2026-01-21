@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 
-# We wrap the logic in a function so we can call it from the main page
 def app():
     st.markdown("---")
     
@@ -26,70 +25,125 @@ def app():
                 self.gamma_w = 9.81
                 self.log = [] 
 
+                # Dictionary to make variables look like Math Symbols
+                self.latex_map = {
+                    'w': 'w', 'Gs': 'G_s', 'e': 'e', 'n': 'n', 'S': 'S',
+                    'rho_bulk': r'\rho_{bulk}', 'rho_dry': r'\rho_{dry}',
+                    'gamma_bulk': r'\gamma_{bulk}', 'gamma_dry': r'\gamma_{dry}', 
+                    'gamma_sat': r'\gamma_{sat}'
+                }
+
             def set_param(self, key, value):
                 if value is not None and value != 0: 
                     self.params[key] = float(value)
 
-            def add_log(self, target, formula, sub, result):
+            def add_log(self, target_key, formula_latex, sub_latex, result):
+                # Convert the target variable key (e.g., 'rho_dry') to symbol (\rho_{dry})
+                symbol = self.latex_map.get(target_key, target_key)
+                
                 self.log.append({
-                    "Variable": target, "Formula": formula, "Substitution": sub, "Result": result
+                    "Variable": symbol,
+                    "Formula": formula_latex,
+                    "Substitution": sub_latex,
+                    "Result": result
                 })
 
             def solve(self):
                 changed = True
                 iterations = 0
                 p = self.params
+                
                 while changed and iterations < 10:
                     changed = False
-                    # Gamma -> Rho
+                    
+                    # 1. Gamma -> Rho (Using Fractions)
                     if p['gamma_bulk'] and not p['rho_bulk']:
                         p['rho_bulk'] = p['gamma_bulk'] / self.gamma_w
-                        self.add_log('rho_bulk', 'gamma_bulk / 9.81', f"{p['gamma_bulk']} / 9.81", p['rho_bulk'])
+                        self.add_log('rho_bulk', 
+                                     r'\frac{\gamma_{bulk}}{\gamma_w}', 
+                                     r'\frac{' + f"{p['gamma_bulk']}" + r'}{9.81}', 
+                                     p['rho_bulk'])
                         changed = True
+                        
                     if p['gamma_dry'] and not p['rho_dry']:
                         p['rho_dry'] = p['gamma_dry'] / self.gamma_w
-                        self.add_log('rho_dry', 'gamma_dry / 9.81', f"{p['gamma_dry']} / 9.81", p['rho_dry'])
+                        self.add_log('rho_dry', 
+                                     r'\frac{\gamma_{dry}}{\gamma_w}', 
+                                     r'\frac{' + f"{p['gamma_dry']}" + r'}{9.81}', 
+                                     p['rho_dry'])
                         changed = True
-                    # n <-> e
+
+                    # 2. n <-> e
                     if p['n'] and not p['e']:
                         p['e'] = p['n'] / (1 - p['n'])
-                        self.add_log('e', 'n / (1 - n)', f"{p['n']} / (1 - {p['n']})", p['e'])
+                        self.add_log('e', 
+                                     r'\frac{n}{1 - n}', 
+                                     r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}', 
+                                     p['e'])
                         changed = True
+                        
                     if p['e'] and not p['n']:
                         p['n'] = p['e'] / (1 + p['e'])
-                        self.add_log('n', 'e / (1 + e)', f"{p['e']} / (1 + {p['e']})", p['n'])
+                        self.add_log('n', 
+                                     r'\frac{e}{1 + e}', 
+                                     r'\frac{' + f"{p['e']:.3f}" + r'}{1 + ' + f"{p['e']:.3f}" + r'}', 
+                                     p['n'])
                         changed = True
-                    # Se = wGs
+
+                    # 3. Se = wGs
+                    # Solve for S
                     if p['w'] and p['Gs'] and p['e'] and p['S'] is None:
                         p['S'] = (p['w'] * p['Gs']) / p['e']
-                        self.add_log('S', 'w * Gs / e', f"({p['w']} * {p['Gs']}) / {p['e']}", p['S'])
+                        self.add_log('S', 
+                                     r'\frac{w \cdot G_s}{e}', 
+                                     r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}', 
+                                     p['S'])
                         changed = True
+                    
+                    # Solve for e (from w, Gs, S)
                     if p['w'] and p['Gs'] and p['S'] and p['e'] is None and p['S'] != 0:
                         p['e'] = (p['w'] * p['Gs']) / p['S']
-                        self.add_log('e', 'w * Gs / S', f"({p['w']} * {p['Gs']}) / {p['S']}", p['e'])
+                        self.add_log('e', 
+                                     r'\frac{w \cdot G_s}{S}', 
+                                     r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['S']:.3f}" + r'}', 
+                                     p['e'])
                         changed = True
+                    
+                    # Solve for w
                     if p['S'] and p['e'] and p['Gs'] and p['w'] is None:
                         p['w'] = (p['S'] * p['e']) / p['Gs']
-                        self.add_log('w', 'S * e / Gs', f"({p['S']} * {p['e']}) / {p['Gs']}", p['w'])
+                        self.add_log('w', 
+                                     r'\frac{S \cdot e}{G_s}', 
+                                     r'\frac{' + f"{p['S']:.3f} \cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}', 
+                                     p['w'])
                         changed = True
-                    # Rho relationships
+                    
+                    # 4. Rho relationships
                     if p['rho_bulk'] and p['w'] and not p['rho_dry']:
                         p['rho_dry'] = p['rho_bulk'] / (1 + p['w'])
-                        self.add_log('rho_dry', 'rho_bulk / (1+w)', f"{p['rho_bulk']} / (1+{p['w']})", p['rho_dry'])
+                        self.add_log('rho_dry', 
+                                     r'\frac{\rho_{bulk}}{1 + w}', 
+                                     r'\frac{' + f"{p['rho_bulk']:.3f}" + r'}{1 + ' + f"{p['w']:.3f}" + r'}', 
+                                     p['rho_dry'])
                         changed = True
+                        
                     if p['rho_dry'] and p['w'] and not p['rho_bulk']:
                         p['rho_bulk'] = p['rho_dry'] * (1 + p['w'])
-                        self.add_log('rho_bulk', 'rho_dry * (1+w)', f"{p['rho_dry']} * (1+{p['w']})", p['rho_bulk'])
+                        self.add_log('rho_bulk', 
+                                     r'\rho_{dry}(1 + w)', 
+                                     f"{p['rho_dry']:.3f}(1 + {p['w']:.3f})", 
+                                     p['rho_bulk'])
                         changed = True
-                    # Fundamental Rho Dry
+                    
+                    # 5. Fundamental Rho Dry
                     if p['Gs'] and p['e'] and not p['rho_dry']:
                         p['rho_dry'] = (p['Gs'] * self.rho_w) / (1 + p['e'])
-                        self.add_log('rho_dry', 'Gs * rho_w / (1+e)', f"{p['Gs']} * 1 / (1+{p['e']:.3f})", p['rho_dry'])
+                        self.add_log('rho_dry', 
+                                     r'\frac{G_s \rho_w}{1 + e}', 
+                                     r'\frac{' + f"{p['Gs']:.2f} \cdot 1" + r'}{1 + ' + f"{p['e']:.3f}" + r'}', 
+                                     p['rho_dry'])
                         changed = True
-                    if p['Gs'] and p['rho_dry'] and not p['e']:
-                        p['e'] = ((p['Gs'] * self.rho_w) / p['rho_dry']) - 1
-                        self.add_log('e', '(Gs * rho_w / rho_dry) - 1', f"({p['Gs']} * 1 / {p['rho_dry']:.3f}) - 1", p['e'])
-                        changed = True
+                        
                     iterations += 1
 
         # --- UI INPUTS ---
@@ -128,13 +182,16 @@ def app():
         if st.button("🚀 Solve Numeric Problem", type="primary"):
             solver.solve()
             st.success("Calculation Complete!")
+            
             if solver.log:
                 with st.expander("📝 View Step-by-Step Solution", expanded=True):
                     for step in solver.log:
-                        st.markdown(f"**Found `{step['Variable']}`:**")
+                        # Professional LaTeX Formatting
+                        st.markdown(f"**Found ${step['Variable']}$:**")
                         st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.3f}}}")
             else:
                 st.error("Not enough info to solve.")
+                
             st.caption("Final Results Summary")
             results = {k: v for k, v in solver.params.items() if v is not None}
             st.dataframe(pd.DataFrame.from_dict(results, orient='index', columns=['Value']))
@@ -148,11 +205,12 @@ def app():
         with col1:
             target = st.selectbox("Find Variable:", ["Void Ratio (e)", "Porosity (n)", "Dry Unit Wt (γ_dry)", "Degree of Saturation (S)", "Bulk Unit Wt (γ_bulk)"])
         with col2:
-            knowns = st.multiselect("Given / Known Variables:", ["w (Water Content)", "Gs (Specific Gravity)", "e (Void Ratio)", "n (Porosity)", "S (Saturation)", "γ_bulk", "γ_dry"])
+            knowns = st.multiselect("Given / Known Variables:", ["w", "Gs", "e", "n", "S", "γ_bulk", "γ_dry"])
 
         if st.button("🔎 Find Formula"):
             k = [x.split(" ")[0] for x in knowns] 
             found = False
+            
             if "Void" in target:
                 if "n" in k:
                     st.latex(r"e = \frac{n}{1 - n}")
@@ -164,5 +222,6 @@ def app():
                 if "e" in k:
                     st.latex(r"n = \frac{e}{1 + e}")
                     found = True
+            
             if not found:
                 st.warning("No direct formula found. Try adding more known variables.")
