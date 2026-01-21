@@ -27,12 +27,12 @@ def main():
     
     
    st.markdown("""
-        ### Muhammad Hammad Faisal
-        **Final Year Civil Engineering Student (METU) | Founder, MHF Civil**
+    ### Muhammad Hammad Faisal
+    **Final Year Civil Engineering Student (METU) | Founder, MHF Civil**
         
-        **Precision over Estimation.**
-        This portal eliminates the uncertainty of AI predictions and manual errors. It uses deterministic engineering algorithms to provide **100% mathematically correct values**, every time.
-        """)
+    **Precision over Estimation.**
+    This portal eliminates the uncertainty of AI predictions and manual errors. It uses deterministic engineering algorithms to provide **100% mathematically correct values**, every time.
+    """)
     st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/") 
 
     # --- FOOTER ---
@@ -49,6 +49,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
