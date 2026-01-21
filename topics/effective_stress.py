@@ -150,14 +150,13 @@ def app():
             ax.legend()
             st.pyplot(fig)
 
- # ==================================================
+# ==================================================
     # TAB 2: HEAVE & PIPING CHECK
     # ==================================================
     with tab2:
-        st.subheader("🛡️ Excavation Safety (Heave Check)")
-        st.markdown(r"**Principle:** Preventing bottom 'burst' when excavating Clay over an Artesian Sand layer.")
-
-        # SCENARIO SELECTOR
+        st.subheader("🛡️ Detailed Heave Analysis")
+        
+        # Solving Goal
         scenario = st.radio("Select Solving Goal:", 
                             ["Calculate Factor of Safety (FS)", 
                              "Find Max Depth of Excavation", 
@@ -169,12 +168,16 @@ def app():
             h_clay_total = st.number_input("Total Thickness of Clay Layer (m)", 5.0, step=0.1)
             gamma_clay = st.number_input("Unit Wt of Clay (γ_sat) [kN/m³]", 20.0, step=0.1)
         with col2:
-            artesian_head_surface = st.number_input("Piezometric Head (m above surface)", 1.0, step=0.1, 
-                                                   help="Height of water in a standpipe relative to the ground surface.")
-            # Artesian Pressure at Interface
+            artesian_head_surface = st.number_input("Piezometric Head (m above surface)", 1.0, step=0.1)
+            gamma_w = 9.81
+            
+            # --- SHOWING THE ARTESIAN PRESSURE CALCULATION ---
+            st.markdown("**Step 1: Calculate Artesian Pressure**")
             h_p_interface = h_clay_total + artesian_head_surface
-            u_artesian = h_p_interface * 9.81
-            st.metric("Artesian Pressure (at interface)", f"{u_artesian:.2f} kPa")
+            u_artesian = h_p_interface * gamma_w
+            
+            st.latex(rf"h_{{p}} = H_{{clay}} + h_{{piezo}} = {h_clay_total:.2f} + {artesian_head_surface:.2f} = {h_p_interface:.2f} \, \text{{m}}")
+            st.latex(rf"u_{{artesian}} = h_{{p}} \times \gamma_w = {h_p_interface:.2f} \times 9.81 = \mathbf{{{u_artesian:.2f} \, \text{{kPa}}}}")
 
         st.divider()
 
@@ -183,54 +186,59 @@ def app():
             current_exc = st.number_input("Current Excavation Depth (m)", 2.0, step=0.5)
             remaining_clay = h_clay_total - current_exc
             
-            if st.button("Calculate FS"):
+            if st.button("🚀 Calculate Step-by-Step FS"):
                 downward_wt = remaining_clay * gamma_clay
                 fs_calc = downward_wt / u_artesian
                 
-                st.markdown(f"### Result: FS = {fs_calc:.3f}")
-                st.latex(rf"FS = \frac{{\text{{Downward Weight}}}}{{\text{{Artesian Pressure}}}} = \frac{{{remaining_clay:.2f} \times {gamma_clay}}}{{{u_artesian:.2f}}}")
+                with st.expander("📝 View Detailed Calculation", expanded=True):
+                    st.markdown("**Step 2: Downward Force (Remaining Clay Weight)**")
+                    st.latex(rf"T_{{remaining}} = H_{{total}} - H_{{exc}} = {h_clay_total:.2f} - {current_exc:.2f} = {remaining_clay:.2f} \, \text{{m}}")
+                    st.latex(rf"\sigma_{{down}} = T_{{remaining}} \times \gamma_{{clay}} = {remaining_clay:.2f} \times {gamma_clay:.1f} = {downward_wt:.2f} \, \text{{kPa}}")
+                    
+                    st.markdown("**Step 3: Factor of Safety**")
+                    st.latex(rf"FS = \frac{{\sigma_{{down}}}}{{u_{{artesian}}}} = \frac{{{downward_wt:.2f}}}{{{u_artesian:.2f}}} = \mathbf{{{fs_calc:.3f}}}")
                 
-                if fs_calc < 1.0:
-                    st.error("❌ FAILURE: The bottom will heave/burst!")
-                elif fs_calc < 1.2:
-                    st.warning("⚠️ CRITICAL: Factor of safety is very low.")
-                else:
-                    st.success("✅ SAFE: The excavation is stable.")
+                if fs_calc < 1.0: st.error("❌ FAILURE: Bottom will heave.")
+                else: st.success(f"✅ Safe! FS = {fs_calc:.3f}")
 
         # --- 2. FIND MAX EXCAVATION DEPTH ---
         elif "Max Depth" in scenario:
             fs_req = st.number_input("Required Factor of Safety", 1.2, step=0.1)
             
-            if st.button("Calculate Max Depth"):
-                # Downward = Upward * FS
-                # (H_total - X) * Gamma = u_artesian * FS
-                # X = H_total - (FS * u_artesian / Gamma)
-                max_x = h_clay_total - (fs_req * u_artesian / gamma_clay)
+            if st.button("🚀 Derive Max Depth"):
+                # Calculation: (H - X) * G = FS * U  => X = H - (FS * U / G)
+                required_downward = fs_req * u_artesian
+                min_thickness = required_downward / gamma_clay
+                max_x = h_clay_total - min_thickness
                 
-                if max_x < 0:
-                    st.error("Artesian pressure is too high. You cannot excavate at all without pumping.")
-                else:
-                    st.success(f"✅ Max Safe Excavation Depth: **{max_x:.2f} m**")
-                    st.latex(rf"H_{{exc}} = H_{{total}} - \frac{{FS \times u_{{artesian}}}}{{\gamma_{{clay}}}}")
+                with st.expander("📝 View Detailed Derivation", expanded=True):
+                    st.markdown("**Step 2: Required Downward Resistance**")
+                    st.latex(rf"\sigma_{{req}} = FS \times u_{{artesian}} = {fs_req:.1f} \times {u_artesian:.2f} = {required_downward:.2f} \, \text{{kPa}}")
+                    
+                    st.markdown("**Step 3: Minimum Clay Thickness Needed**")
+                    st.latex(rf"T_{{min}} = \frac{{\sigma_{{req}}}}{{\gamma_{{clay}}}} = \frac{{{required_downward:.2f}}}{{{gamma_clay:.1f}}} = {min_thickness:.2f} \, \text{{m}}")
+                    
+                    st.markdown("**Step 4: Max Excavation Depth**")
+                    st.latex(rf"H_{{exc}} = H_{{total}} - T_{{min}} = {h_clay_total:.2f} - {min_thickness:.2f} = \mathbf{{{max_x:.2f} \, \text{{m}}}}")
 
         # --- 3. REQUIRED PUMPING ---
         else:
             planned_x = st.number_input("Planned Excavation Depth (m)", 4.0)
             fs_target = st.number_input("Target Factor of Safety", 1.2)
             
-            if st.button("Calculate Required Drawdown"):
+            if st.button("🚀 Calculate Pumping Requirements"):
                 remaining_t = h_clay_total - planned_x
-                allowable_u = (remaining_t * gamma_clay) / fs_target
-                allowable_head = allowable_u / 9.81 # Head relative to interface
+                sigma_down = remaining_t * gamma_clay
+                allowable_u = sigma_down / fs_target
+                allowable_hp = allowable_u / 9.81
+                drawdown = h_p_interface - allowable_hp
                 
-                # Current head relative to interface is h_p_interface
-                drawdown_needed = h_p_interface - allowable_head
-                
-                st.markdown("### Analysis")
-                st.write(f"Remaining Clay: {remaining_t:.2f} m")
-                st.write(f"Allowable Artesian Pressure: {allowable_u:.2f} kPa")
-                
-                if drawdown_needed > 0:
-                    st.error(f"⚠️ Lower the Artesian Head by **{drawdown_needed:.2f} meters** via pumping.")
-                else:
-                    st.success("✅ Safe as is. No pumping required.")
+                with st.expander("📝 View Pumping Logic", expanded=True):
+                    st.markdown("**Step 2: Current Downward Pressure**")
+                    st.latex(rf"\sigma_{{down}} = ({h_clay_total:.2f} - {planned_x:.2f}) \times {gamma_clay} = {sigma_down:.2f} \, \text{{kPa}}")
+                    
+                    st.markdown("**Step 3: Allowable Artesian Pressure for Target FS**")
+                    st.latex(rf"u_{{allow}} = \frac{{\sigma_{{down}}}}{{FS}} = \frac{{{sigma_down:.2f}}}{{{fs_target:.1f}}} = {allowable_u:.2f} \, \text{{kPa}}")
+                    
+                    st.markdown("**Step 4: Required Water Level Drop**")
+                    st.latex(rf"\text{{Drawdown}} = h_{{p(current)}} - \frac{{u_{{allow}}}}{{\gamma_w}} = {h_p_interface:.2f} - {allowable_hp:.2f} = \mathbf{{{drawdown:.2f} \, \text{{m}}}}")
