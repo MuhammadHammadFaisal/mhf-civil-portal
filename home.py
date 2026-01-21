@@ -3,7 +3,7 @@ import streamlit as st
 # 1. PAGE CONFIG (Must be the first command)
 st.set_page_config(
     page_title="MHF Civil Portal", 
-    page_icon="profile.png", 
+    page_icon="🏗️", 
     layout="wide"
 )
 
@@ -53,3 +53,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
