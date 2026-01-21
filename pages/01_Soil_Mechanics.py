@@ -1,26 +1,25 @@
 import streamlit as st
-# This connects the "Hub" (Sidebar) to the "Spoke" (Calculators)
+# IMPORT MODULES
 from topics import soil_phase
+from topics import effective_stress  # <-- NEW IMPORT
 
-st.set_page_config(page_title="Soil Mechanics", page_icon="", layout="wide")
+st.set_page_config(page_title="Soil Mechanics", page_icon="🪨", layout="wide")
 
-st.header("CE 363: Soil Mechanics")
+st.header("🪨 CE 363: Soil Mechanics")
 
 # THE MENU
-# This dropdown lets the user switch questions WITHOUT leaving the Soil Mechanics page
 topic = st.selectbox("Select Topic:", [
     "Phase Relationships",
-    "Soil Classification",
-    "Stress Analysis"
+    "Effective Stress",  # <-- Renamed for clarity
+    "Soil Classification" # Moved down as we are skipping it
 ])
 
 # THE ROUTER
 if topic == "Phase Relationships":
-    # Calls the logic function we just made in Step 1
     soil_phase.app()
 
-elif topic == "Soil Classification":
-    st.info("🚧 This module is under construction.")
+elif topic == "Effective Stress":
+    effective_stress.app()  # <-- Activates the new file
 
-elif topic == "Stress Analysis":
-    st.info("🚧 This module is under construction.")
+elif topic == "Soil Classification":
+    st.info("🚧 This module is skipped for now. Will be added later.")
