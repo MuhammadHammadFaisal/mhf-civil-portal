@@ -178,63 +178,139 @@ def soil_mechanics_page():
 def render_phase_solver():
     st.markdown("---")
     st.subheader("Phase Relationship Solver")
-    st.caption("Enter what you know. I will calculate the rest.")
 
-    # 1. SETTINGS
-    col_state, col_blank = st.columns([1, 2])
-    with col_state:
-        condition = st.radio("Soil State:", ["Partially Saturated", "Fully Saturated (S=1)", "Dry (S=0)"])
-    
-    solver = SoilState()
-    if condition == "Fully Saturated (S=1)": solver.set_param('S', 1.0)
-    if condition == "Dry (S=0)": solver.set_param('S', 0.0)
+    # 1. SELECT MODE
+    mode = st.radio("Select Solver Mode:", ["🔢 Numeric Calculation", "abc Symbolic / Formula Finder"], horizontal=True)
 
-    # 2. INPUTS
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**Basic Properties**")
-        w = st.number_input("Water Content (w) [decimal]", 0.0, step=0.01, format="%.3f")
-        Gs = st.number_input("Specific Gravity (Gs)", 0.0, step=0.01, format="%.2f")
-        e = st.number_input("Void Ratio (e)", 0.0, step=0.01)
-        n = st.number_input("Porosity (n)", 0.0, step=0.01)
+    # ==========================
+    # MODE A: NUMERIC (Original)
+    # ==========================
+    if "Numeric" in mode:
+        st.caption("Enter what you know. I will calculate the rest.")
 
-    with col2:
-        st.markdown("**Unit Weights**")
-        gamma_bulk = st.number_input("Bulk Unit Wt (kN/m³)", 0.0, step=0.1)
-        gamma_dry = st.number_input("Dry Unit Wt (kN/m³)", 0.0, step=0.1)
-        rho_bulk = st.number_input("Bulk Density (g/cm³)", 0.0, step=0.01)
-        rho_dry = st.number_input("Dry Density (g/cm³)", 0.0, step=0.01)
-
-    # Load inputs
-    if w > 0: solver.set_param('w', w)
-    if Gs > 0: solver.set_param('Gs', Gs)
-    if e > 0: solver.set_param('e', e)
-    if n > 0: solver.set_param('n', n)
-    if gamma_bulk > 0: solver.set_param('gamma_bulk', gamma_bulk)
-    if gamma_dry > 0: solver.set_param('gamma_dry', gamma_dry)
-    if rho_bulk > 0: solver.set_param('rho_bulk', rho_bulk)
-    if rho_dry > 0: solver.set_param('rho_dry', rho_dry)
-    
-    # 3. SOLVE BUTTON
-    if st.button("🚀 Solve Problem", type="primary"):
-        solver.solve()
+        # 1. SETTINGS
+        col_state, col_blank = st.columns([1, 2])
+        with col_state:
+            condition = st.radio("Soil State:", ["Partially Saturated", "Fully Saturated (S=1)", "Dry (S=0)"])
         
-        st.success("Calculation Complete!")
+        solver = SoilState()
+        if condition == "Fully Saturated (S=1)": solver.set_param('S', 1.0)
+        if condition == "Dry (S=0)": solver.set_param('S', 0.0)
+
+        # 2. INPUTS
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Basic Properties**")
+            w = st.number_input("Water Content (w) [decimal]", 0.0, step=0.01, format="%.3f")
+            Gs = st.number_input("Specific Gravity (Gs)", 0.0, step=0.01, format="%.2f")
+            e = st.number_input("Void Ratio (e)", 0.0, step=0.01)
+            n = st.number_input("Porosity (n)", 0.0, step=0.01)
+
+        with col2:
+            st.markdown("**Unit Weights**")
+            gamma_bulk = st.number_input("Bulk Unit Wt (kN/m³)", 0.0, step=0.1)
+            gamma_dry = st.number_input("Dry Unit Wt (kN/m³)", 0.0, step=0.1)
+            rho_bulk = st.number_input("Bulk Density (g/cm³)", 0.0, step=0.01)
+            rho_dry = st.number_input("Dry Density (g/cm³)", 0.0, step=0.01)
+
+        # Load inputs
+        if w > 0: solver.set_param('w', w)
+        if Gs > 0: solver.set_param('Gs', Gs)
+        if e > 0: solver.set_param('e', e)
+        if n > 0: solver.set_param('n', n)
+        if gamma_bulk > 0: solver.set_param('gamma_bulk', gamma_bulk)
+        if gamma_dry > 0: solver.set_param('gamma_dry', gamma_dry)
+        if rho_bulk > 0: solver.set_param('rho_bulk', rho_bulk)
+        if rho_dry > 0: solver.set_param('rho_dry', rho_dry)
         
-        # LOGIC STEPS
-        if solver.log:
-            with st.expander("📝 View Step-by-Step Solution", expanded=True):
-                for step in solver.log:
-                    st.markdown(f"**Found `{step['Variable']}`:**")
-                    st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.3f}}}")
-        else:
-            st.error("Not enough info to solve.")
+        # 3. SOLVE BUTTON
+        if st.button("🚀 Solve Numeric Problem", type="primary"):
+            solver.solve()
+            
+            st.success("Calculation Complete!")
+            
+            # LOGIC STEPS
+            if solver.log:
+                with st.expander("📝 View Step-by-Step Solution", expanded=True):
+                    for step in solver.log:
+                        st.markdown(f"**Found `{step['Variable']}`:**")
+                        st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.3f}}}")
+            else:
+                st.error("Not enough info to solve.")
 
-        # FINAL TABLE
-        st.caption("Final Results Summary")
-        results = {k: v for k, v in solver.params.items() if v is not None}
-        st.dataframe(pd.DataFrame.from_dict(results, orient='index', columns=['Value']))
+            # FINAL TABLE
+            st.caption("Final Results Summary")
+            results = {k: v for k, v in solver.params.items() if v is not None}
+            st.dataframe(pd.DataFrame.from_dict(results, orient='index', columns=['Value']))
 
+    # ==========================
+    # MODE B: SYMBOLIC (New)
+    # ==========================
+    else:
+        st.caption("Select variables to find the correct formula without numbers.")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            target = st.selectbox("Find Variable:", ["Void Ratio (e)", "Porosity (n)", "Dry Unit Wt (γ_dry)", "Degree of Saturation (S)", "Bulk Unit Wt (γ_bulk)"])
+        
+        with col2:
+            knowns = st.multiselect("Given / Known Variables:", ["w (Water Content)", "Gs (Specific Gravity)", "e (Void Ratio)", "n (Porosity)", "S (Saturation)", "γ_bulk", "γ_dry"])
+
+        if st.button("🔎 Find Formula"):
+            # Normalize inputs for checking
+            k = [x.split(" ")[0] for x in knowns] # extracting just the symbol 'w', 'Gs', etc.
+            
+            found = False
+            
+            # --- LOGIC TREE FOR FORMULAS ---
+            
+            # 1. Target: Void Ratio (e)
+            if "Void" in target:
+                if "n" in k:
+                    st.latex(r"e = \frac{n}{1 - n}")
+                    found = True
+                elif "w" in k and "Gs" in k and "S" in k:
+                    st.latex(r"e = \frac{w G_s}{S}")
+                    found = True
+                elif "γ_dry" in k and "Gs" in k:
+                    st.latex(r"e = \frac{G_s \gamma_w}{\gamma_{dry}} - 1")
+                    found = True
+
+            # 2. Target: Porosity (n)
+            elif "Porosity" in target:
+                if "e" in k:
+                    st.latex(r"n = \frac{e}{1 + e}")
+                    found = True
+
+            # 3. Target: Dry Unit Weight (gamma_dry)
+            elif "Dry Unit Wt" in target:
+                if "γ_bulk" in k and "w" in k:
+                    st.latex(r"\gamma_{dry} = \frac{\gamma_{bulk}}{1 + w}")
+                    found = True
+                elif "Gs" in k and "e" in k:
+                    st.latex(r"\gamma_{dry} = \frac{G_s \gamma_w}{1 + e}")
+                    found = True
+                elif "Gs" in k and "n" in k:
+                    st.latex(r"\gamma_{dry} = G_s \gamma_w (1 - n)")
+                    found = True
+
+            # 4. Target: Saturation (S)
+            elif "Saturation" in target:
+                if "w" in k and "Gs" in k and "e" in k:
+                    st.latex(r"S = \frac{w G_s}{e}")
+                    found = True
+            
+            # 5. Target: Bulk Unit Weight
+            elif "Bulk" in target:
+                if "Gs" in k and "e" in k and "S" in k:
+                     st.latex(r"\gamma_{bulk} = \frac{(G_s + Se)\gamma_w}{1+e}")
+                     found = True
+                elif "Gs" in k and "e" in k and "w" in k:
+                     st.latex(r"\gamma_{bulk} = \frac{G_s(1+w)\gamma_w}{1+e}")
+                     found = True
+
+            if not found:
+                st.warning("No direct formula found for this specific combination. Try adding more known variables (like Gs or e).")
 # ==========================================
 # 🧭 MAIN APP NAVIGATION
 # ==========================================
@@ -256,6 +332,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
