@@ -29,8 +29,35 @@ def home_page():
         st.warning("**🏗️ Structural Analysis**\n\n*Coming Soon*\n\nModules for beam deflection and moment distribution.")
 
     st.markdown("---")
-    st.success("👈 **Get Started:** Open the Sidebar menu on the left to select a module.")
-
+    
+    # --- ABOUT THE DEVELOPER ---
+    st.subheader("👨‍💻 About MHF Civil")
+    
+    dev_col1, dev_col2 = st.columns([1, 3])
+    
+    with dev_col1:
+        # Placeholder professional icon (You can change this link later)
+        st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100)
+    
+    with dev_col2:
+        st.markdown("""
+        **Muhammad Hammad Faisal** *Final Year Civil Engineering Student (METU) | Founder, MHF Civil*
+        
+        This portal was developed to assist students and junior engineers in verifying complex calculations.
+        """)
+        # Link to your LinkedIn or Email (Change the URL to your actual profile)
+        st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/")
+        # --- PROFESSIONAL FOOTER ---
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style='text-align: center; color: #666; font-size: 12px;'>
+        © 2026 MHF Civil Engineering Group. All rights reserved.<br>
+        Version 1.0.2 | Ankara, Turkey
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
 # ==========================================
 # 🧠 LOGIC ENGINE (The Brain)
 # ==========================================
@@ -229,5 +256,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
