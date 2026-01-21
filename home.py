@@ -28,16 +28,15 @@ def main():
     dev_col1, dev_col2 = st.columns([1, 3])
     
     with dev_col1:
-        # Ensure this filename matches exactly what you uploaded
-        st.image("profile.png", width=150)
-    
-    with dev_col2:
         st.markdown("""
         **Muhammad Hammad Faisal** *Final Year Civil Engineering Student (METU) | Founder, MHF Civil*
         
         This portal was developed to bridge the gap between theoretical soil mechanics and practical application.
         """)
         st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/") 
+    
+    with dev_col2:
+
 
     # --- FOOTER ---
     st.markdown("---")
@@ -53,4 +52,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
