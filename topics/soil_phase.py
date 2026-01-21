@@ -27,16 +27,16 @@ def app():
 
                 # Dictionary to make variables look like Math Symbols
                 self.latex_map = {
-                    'w': 'w (Water Content)', 
-                    'Gs': 'G_s (Specific Gravity)', 
-                    'e': 'e (Void Ratio)', 
-                    'n': 'n (Porosity)', 
-                    'S': 'S (Saturation)',
-                    'rho_bulk': r'\rho_{bulk} (Bulk Density)', 
-                    'rho_dry': r'\rho_{dry} (Dry Density)',
-                    'gamma_bulk': r'\gamma_{bulk} (Bulk Unit Wt)', 
-                    'gamma_dry': r'\gamma_{dry} (Dry Unit Wt)', 
-                    'gamma_sat': r'\gamma_{sat} (Sat Unit Wt)'
+                    'w': 'w', 
+                    'Gs': 'G_s', 
+                    'e': 'e', 
+                    'n': 'n', 
+                    'S': 'S',
+                    'rho_bulk': r'\rho_{bulk}', 
+                    'rho_dry': r'\rho_{dry}',
+                    'gamma_bulk': r'\gamma_{bulk}', 
+                    'gamma_dry': r'\gamma_{dry}', 
+                    'gamma_sat': r'\gamma_{sat}'
                 }
 
             def set_param(self, key, value):
@@ -44,11 +44,7 @@ def app():
                     self.params[key] = float(value)
 
             def add_log(self, target_key, formula_latex, sub_latex, result):
-                # Convert the target variable key to symbol
-                # We split the map to get just the symbol part for the log
-                full_label = self.latex_map.get(target_key, target_key)
-                symbol = full_label.split(' ')[0] 
-                
+                symbol = self.latex_map.get(target_key, target_key)
                 self.log.append({
                     "Variable": symbol,
                     "Formula": formula_latex,
@@ -153,33 +149,37 @@ def app():
             solver.solve()
             st.success("Calculation Complete!")
             
+            # --- DISPLAY STEPS ---
             if solver.log:
                 with st.expander("📝 View Step-by-Step Solution", expanded=True):
                     for step in solver.log:
-                        # Professional LaTeX Formatting
                         st.markdown(f"**Found ${step['Variable']}$:**")
                         st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.3f}}}")
             else:
                 st.error("Not enough info to solve.")
                 
-            st.caption("Final Results Summary")
+            # --- FINAL RESULTS (FIXED) ---
+            st.markdown("### ✅ Final Results")
+            res_col1, res_col2 = st.columns(2)
             
-            # --- THE FIX: RENAME VARIABLES FOR THE TABLE ---
-            clean_results = {}
-            for k, v in solver.params.items():
-                if v is not None:
-                    # Get the fancy name (e.g., "ρ_bulk (Bulk Density)")
-                    # We strip the LaTeX code slightly to make it readable in a simple table if needed,
-                    # but Streamlit dataframes render LaTeX if you use st.data_editor or similar.
-                    # For a simple view, let's just use the Key + Description.
-                    label = solver.latex_map.get(k, k)
-                    # Remove the $ signs if they were there (our map has raw latex r'\rho')
-                    # We can format the value nicely too
-                    clean_results[label] = f"{v:.4f}"
+            # Helper to check if a param has a value
+            def get_val(key): return solver.params.get(key)
 
-            # Create DataFrame with Index as "Property" and Value as "Result"
-            df = pd.DataFrame.from_dict(clean_results, orient='index', columns=['Value'])
-            st.dataframe(df, use_container_width=True)
+            with res_col1:
+                st.markdown("**Physical Properties**")
+                # We check each key manually to render it beautifully
+                if get_val('w') is not None: st.latex(f"w = {get_val('w'):.4f}")
+                if get_val('Gs') is not None: st.latex(f"G_s = {get_val('Gs'):.3f}")
+                if get_val('e') is not None: st.latex(f"e = {get_val('e'):.4f}")
+                if get_val('n') is not None: st.latex(f"n = {get_val('n'):.4f}")
+                if get_val('S') is not None: st.latex(f"S = {get_val('S'):.4f}")
+            
+            with res_col2:
+                st.markdown("**Unit Weights & Densities**")
+                if get_val('rho_bulk') is not None: st.latex(r"\rho_{bulk} = " + f"{get_val('rho_bulk'):.4f}")
+                if get_val('rho_dry') is not None: st.latex(r"\rho_{dry} = " + f"{get_val('rho_dry'):.4f}")
+                if get_val('gamma_bulk') is not None: st.latex(r"\gamma_{bulk} = " + f"{get_val('gamma_bulk'):.2f}")
+                if get_val('gamma_dry') is not None: st.latex(r"\gamma_{dry} = " + f"{get_val('gamma_dry'):.2f}")
 
     # ==========================
     # MODE B: SYMBOLIC
