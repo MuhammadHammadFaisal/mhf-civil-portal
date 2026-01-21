@@ -150,92 +150,87 @@ def app():
             ax.legend()
             st.pyplot(fig)
 
-    # ==================================================
+ # ==================================================
     # TAB 2: HEAVE & PIPING CHECK
     # ==================================================
     with tab2:
         st.subheader("🛡️ Excavation Safety (Heave Check)")
-        st.markdown(r"**Principle:** When excavating in Clay overlying Sand (Artesian), checking if the bottom will 'heave' or burst.")
-        
+        st.markdown(r"**Principle:** Preventing bottom 'burst' when excavating Clay over an Artesian Sand layer.")
+
         # SCENARIO SELECTOR
-        scenario = st.radio("Select Problem Type:", ["Scenario A: Max Depth of Excavation?", "Scenario B: Reduce Water Table?"], horizontal=True)
+        scenario = st.radio("Select Solving Goal:", 
+                            ["Calculate Factor of Safety (FS)", 
+                             "Find Max Depth of Excavation", 
+                             "Required Pumping (Drawdown)"], 
+                            horizontal=True)
         
         col1, col2 = st.columns(2)
         with col1:
-            h_clay = st.number_input("Total Thickness of Clay Layer (m)", 5.0, step=0.5)
+            h_clay_total = st.number_input("Total Thickness of Clay Layer (m)", 5.0, step=0.1)
             gamma_clay = st.number_input("Unit Wt of Clay (γ_sat) [kN/m³]", 20.0, step=0.1)
         with col2:
-            h_sand_head = st.number_input("Pressure Head in Sand Layer (m)", 0.0, help="Height of water in piezometer tube above the sand/clay interface.")
-            # OR define by Water Table
-            st.caption("Or define by Water Table:")
-            wt_depth = st.number_input("Depth of Water Table from Surface (m)", 1.0, step=0.1, key="wt_heave")
+            artesian_head_surface = st.number_input("Piezometric Head (m above surface)", 1.0, step=0.1, 
+                                                   help="Height of water in a standpipe relative to the ground surface.")
+            # Artesian Pressure at Interface
+            h_p_interface = h_clay_total + artesian_head_surface
+            u_artesian = h_p_interface * 9.81
+            st.metric("Artesian Pressure (at interface)", f"{u_artesian:.2f} kPa")
 
-        st.markdown("---")
-        
-        # --- SOLVER A: MAX EXCAVATION DEPTH ---
-        if "Scenario A" in scenario:
-            st.write("### 🚧 Finding Max Excavation Depth")
-            fs = st.number_input("Desired Factor of Safety (FS)", value=1.1, step=0.1)
+        st.divider()
+
+        # --- 1. CALCULATE FACTOR OF SAFETY ---
+        if "Factor of Safety" in scenario:
+            current_exc = st.number_input("Current Excavation Depth (m)", 2.0, step=0.5)
+            remaining_clay = h_clay_total - current_exc
             
-            # Logic: Downward Weight > Upward Pressure * FS
-            # Let X be excavation depth. Remaining clay = H_clay - X
-            # Downward = (H_clay - X) * Gamma_Clay
-            # Upward = Gamma_w * (Pressure Head relative to bottom of clay)
-            # Wait! We need to know the Artesian head relative to WHERE? 
-            # Usually problem gives WT depth.
-            # Upward Pressure at Clay/Sand Interface = (H_clay - WT_depth) * 9.81
+            if st.button("Calculate FS"):
+                downward_wt = remaining_clay * gamma_clay
+                fs_calc = downward_wt / u_artesian
+                
+                st.markdown(f"### Result: FS = {fs_calc:.3f}")
+                st.latex(rf"FS = \frac{{\text{{Downward Weight}}}}{{\text{{Artesian Pressure}}}} = \frac{{{remaining_clay:.2f} \times {gamma_clay}}}{{{u_artesian:.2f}}}")
+                
+                if fs_calc < 1.0:
+                    st.error("❌ FAILURE: The bottom will heave/burst!")
+                elif fs_calc < 1.2:
+                    st.warning("⚠️ CRITICAL: Factor of safety is very low.")
+                else:
+                    st.success("✅ SAFE: The excavation is stable.")
+
+        # --- 2. FIND MAX EXCAVATION DEPTH ---
+        elif "Max Depth" in scenario:
+            fs_req = st.number_input("Required Factor of Safety", 1.2, step=0.1)
             
             if st.button("Calculate Max Depth"):
-                # U_uplift at interface
-                # Head = Distance from WT to Bottom of Clay
-                h_pressure = h_clay - wt_depth
-                u_uplift = h_pressure * 9.81
+                # Downward = Upward * FS
+                # (H_total - X) * Gamma = u_artesian * FS
+                # X = H_total - (FS * u_artesian / Gamma)
+                max_x = h_clay_total - (fs_req * u_artesian / gamma_clay)
                 
-                # Formula: (H_clay - X) * Gamma_Clay = FS * u_uplift
-                # H_clay*G - X*G = FS * U
-                # H_clay*G - FS*U = X*G
-                # X = (H_clay*G - FS*U) / G
-                
-                max_excavation = ( (h_clay * gamma_clay) - (fs * u_uplift) ) / gamma_clay
-                
-                if max_excavation < 0:
-                    st.error("Impossible! The pressure is already too high to excavate even 1cm.")
+                if max_x < 0:
+                    st.error("Artesian pressure is too high. You cannot excavate at all without pumping.")
                 else:
-                    st.success(f"✅ Max Safe Excavation Depth: **{max_excavation:.2f} m**")
-                    st.latex(rf"H_{{exc}} = \frac{{H_{{clay}}\gamma_{{clay}} - (FS \times u_{{uplift}})}}{{\gamma_{{clay}}}}")
+                    st.success(f"✅ Max Safe Excavation Depth: **{max_x:.2f} m**")
+                    st.latex(rf"H_{{exc}} = H_{{total}} - \frac{{FS \times u_{{artesian}}}}{{\gamma_{{clay}}}}")
 
-        # --- SOLVER B: REDUCE WATER TABLE ---
+        # --- 3. REQUIRED PUMPING ---
         else:
-            st.write("### 💧 Required Pumping (Lowering Water Table)")
-            target_exc = st.number_input("Planned Excavation Depth (m)", 4.0)
-            fs_req = st.number_input("Required Factor of Safety", 1.2)
+            planned_x = st.number_input("Planned Excavation Depth (m)", 4.0)
+            fs_target = st.number_input("Target Factor of Safety", 1.2)
             
-            if st.button("Calculate Drawdown"):
-                # Remaining Clay Thickness
-                T = h_clay - target_exc
-                # Downward Stress
-                sigma_down = T * gamma_clay
+            if st.button("Calculate Required Drawdown"):
+                remaining_t = h_clay_total - planned_x
+                allowable_u = (remaining_t * gamma_clay) / fs_target
+                allowable_head = allowable_u / 9.81 # Head relative to interface
                 
-                # Allowable Uplift Pressure for FS
-                # sigma_down / u_allow = FS  -> u_allow = sigma_down / FS
-                u_allow = sigma_down / fs_req
+                # Current head relative to interface is h_p_interface
+                drawdown_needed = h_p_interface - allowable_head
                 
-                # Allowable Head (h_allow)
-                # u = h_allow * 9.81 -> h_allow = u / 9.81
-                h_allow = u_allow / 9.81
+                st.markdown("### Analysis")
+                st.write(f"Remaining Clay: {remaining_t:.2f} m")
+                st.write(f"Allowable Artesian Pressure: {allowable_u:.2f} kPa")
                 
-                # Current Head (Assuming WT is at wt_depth)
-                # Current Head at bottom = H_clay - wt_depth
-                h_current = h_clay - wt_depth
-                
-                # Difference
-                drop_needed = h_current - h_allow
-                
-                st.markdown(f"**Analysis:**")
-                st.latex(rf"\sigma_{{down}} = {T:.2f} \text{{m}} \times {gamma_clay} = {sigma_down:.2f} \text{{ kPa}}")
-                st.latex(rf"u_{{max}} = \frac{{{sigma_down:.2f}}}{{{fs_req}}} = {u_allow:.2f} \text{{ kPa}}")
-                
-                if drop_needed > 0:
-                    st.error(f"⚠️ You must lower the water table by **{drop_needed:.2f} meters**.")
+                if drawdown_needed > 0:
+                    st.error(f"⚠️ Lower the Artesian Head by **{drawdown_needed:.2f} meters** via pumping.")
                 else:
-                    st.success("✅ Safe! No water table lowering required.")
+                    st.success("✅ Safe as is. No pumping required.")
