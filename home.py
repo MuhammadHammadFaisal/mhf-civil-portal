@@ -21,20 +21,20 @@ def main():
     👈 **Select a Module from the Sidebar** to begin solving.
     """)
 
-    # --- ABOUT THE DEVELOPER ---
+   # --- ABOUT THE DEVELOPER ---
     st.markdown("---")
     st.subheader("👨‍💻 About MHF Civil")
     
-    
-   st.markdown("""
+    # ERROR WAS HERE: The indentation below was inconsistent in your snippet
+    st.markdown("""
     ### Muhammad Hammad Faisal
     **Final Year Civil Engineering Student (METU) | Founder, MHF Civil**
         
     **Precision over Estimation.**
     This portal eliminates the uncertainty of AI predictions and manual errors. It uses deterministic engineering algorithms to provide **100% mathematically correct values**, every time.
     """)
-    st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/") 
-
+    
+    st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/")
     # --- FOOTER ---
     st.markdown("---")
     st.markdown(
@@ -49,6 +49,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
