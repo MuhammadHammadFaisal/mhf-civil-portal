@@ -14,7 +14,7 @@ def home_page():
     # Welcome Message
     st.markdown("""
     ### **Precision. Logic. Deterministic.**
-    Welcome to the official digital workspace of **MHF Civil**. This platform solve complex civil enginerring question and give you correct answer every time.
+    Welcome to the official digital workspace of **MHF Civil**. This platform solves complex Civil Engineering questions and give you correct answer every time.
     
     #### **Available Modules**
     """)
@@ -229,4 +229,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
