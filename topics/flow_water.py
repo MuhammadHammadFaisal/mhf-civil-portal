@@ -41,98 +41,81 @@ def app():
 
       # --- DYNAMIC MATPLOTLIB DIAGRAM (TEXTBOOK STYLE) ---
         with col_plot:
-            fig, ax = plt.subplots(figsize=(6, 7))
-            
-            # Dimensions
-            W = 3.0       # Width of soil sample
             H_s = H_soil
             H_w = H_water
+# ================= TEXTBOOK-STYLE PERMEAMETER =================
             
-           # ================= TEXTBOOK-STYLE PERMEAMETER =================
+            # Define bottom head (needed later)
+            if "Downward" in flow_dir:
+                wl_bot = H_s - h_diff
+            else:
+                wl_bot = H_s + h_diff
+            
+            # --- SOIL BOX ---
+            soil_x = 2.0
+            soil_y = 0.0
+            soil_w = 3.0
+            soil_h = H_s
+            
+            ax.add_patch(patches.Rectangle(
+                (soil_x, soil_y), soil_w, soil_h,
+                edgecolor='black', facecolor='none', linewidth=2
+            ))
+            ax.text(soil_x + soil_w/2, soil_h/2, "SOIL",
+                    ha='center', va='center', fontsize=12)
+            
+            # --- TOP RESERVOIR ---
+            ax.add_patch(patches.Rectangle(
+                (soil_x, soil_h + 1), soil_w, 1,
+                edgecolor='black', facecolor='none', linewidth=2
+            ))
+            ax.plot(
+                [soil_x + 0.2, soil_x + soil_w - 0.2],
+                [soil_h + 1.6, soil_h + 1.6], 'k'
+            )
+            
+            # --- LEFT RESERVOIR ---
+            ax.add_patch(patches.Rectangle(
+                (0.4, soil_h + 0.5), 1.6, 1,
+                edgecolor='black', facecolor='none', linewidth=2
+            ))
+            ax.plot([0.6, 1.8], [soil_h + 1.1, soil_h + 1.1], 'k')
+            
+            # --- PIPES ---
+            ax.plot([soil_x + soil_w/2, soil_x + soil_w/2],
+                    [soil_h + 1, soil_h], 'k', linewidth=2)
+            ax.plot([1.2, 1.2], [soil_h + 0.5, 0.3], 'k', linewidth=2)
+            ax.plot([1.2, soil_x], [0.3, 0.3], 'k', linewidth=2)
+            
+            # --- HEAD LEVELS ---
+            wl_top = soil_h + 1.6
+            X_level = soil_h - 2
+            Y_level = 0
+            
+            ax.hlines(wl_top, 0, 7, linestyles='dashed')
+            ax.text(7.1, wl_top, "Top head")
+            
+            ax.hlines(X_level, 0, 7, linestyles='dashed')
+            ax.text(7.1, X_level, "X–X")
+            
+            ax.hlines(Y_level, 0, 7, linestyles='dashed')
+            ax.text(7.1, Y_level, "Y–Y (Datum)")
+            
+            # --- DIMENSIONS ---
+            ax.annotate("2 m", xy=(6.5, wl_top), xytext=(6.5, X_level),
+                        arrowprops=dict(arrowstyle='<->'))
+            ax.annotate("4 m", xy=(6.5, X_level), xytext=(6.5, Y_level),
+                        arrowprops=dict(arrowstyle='<->'))
+            
+            # --- FLOW LABEL ---
+            flow_symbol = r'$\downarrow$' if "Downward" in flow_dir else r'$\uparrow$'
+            ax.text(soil_x + soil_w/2, soil_h/2,
+                    f"FLOW {flow_symbol}",
+                    ha='center', va='center',
+                    fontsize=12, fontweight='bold')
+            
+            # ================= END TEXTBOOK DIAGRAM =================
 
-# --- SOIL BOX ---
-soil_x = 2.0
-soil_y = 0.0
-soil_w = 3.0
-soil_h = H_s
-
-ax.add_patch(
-    patches.Rectangle(
-        (soil_x, soil_y),
-        soil_w,
-        soil_h,
-        edgecolor='black',
-        facecolor='none',
-        linewidth=2
-    )
-)
-ax.text(soil_x + soil_w/2, soil_h/2, "SOIL",
-        ha='center', va='center', fontsize=12)
-
-# --- TOP RESERVOIR ---
-ax.add_patch(
-    patches.Rectangle(
-        (soil_x, soil_h + 1),
-        soil_w,
-        1,
-        edgecolor='black',
-        facecolor='none',
-        linewidth=2
-    )
-)
-ax.plot(
-    [soil_x + 0.2, soil_x + soil_w - 0.2],
-    [soil_h + 1.6, soil_h + 1.6],
-    'k'
-)
-
-# --- LEFT RESERVOIR ---
-ax.add_patch(
-    patches.Rectangle(
-        (0.4, soil_h + 0.5),
-        1.6,
-        1,
-        edgecolor='black',
-        facecolor='none',
-        linewidth=2
-    )
-)
-ax.plot([0.6, 1.8], [soil_h + 1.1, soil_h + 1.1], 'k')
-
-# --- PIPES ---
-ax.plot([soil_x + soil_w/2, soil_x + soil_w/2],
-        [soil_h + 1, soil_h], 'k', linewidth=2)
-
-ax.plot([1.2, 1.2], [soil_h + 0.5, 0.3], 'k', linewidth=2)
-ax.plot([1.2, soil_x], [0.3, 0.3], 'k', linewidth=2)
-
-# --- HEAD LEVELS ---
-wl_top = soil_h + 1.6
-X_level = soil_h - 2
-Y_level = 0
-
-ax.hlines(wl_top, 0, 7, linestyles='dashed')
-ax.text(7.1, wl_top, "Top head")
-
-ax.hlines(X_level, 0, 7, linestyles='dashed')
-ax.text(7.1, X_level, "X–X")
-
-ax.hlines(Y_level, 0, 7, linestyles='dashed')
-ax.text(7.1, Y_level, "Y–Y (Datum)")
-
-# --- DIMENSIONS ---
-ax.annotate("2 m", xy=(6.5, wl_top), xytext=(6.5, X_level),
-            arrowprops=dict(arrowstyle='<->'))
-ax.annotate("4 m", xy=(6.5, X_level), xytext=(6.5, Y_level),
-            arrowprops=dict(arrowstyle='<->'))
-
-# --- FLOW LABEL ---
-flow_symbol = r'$\downarrow$' if "Downward" in flow_dir else r'$\uparrow$'
-ax.text(soil_x + soil_w/2, soil_h/2,
-        f"FLOW {flow_symbol}",
-        ha='center', va='center', fontsize=12, fontweight='bold')
-
-# ================= END TEXTBOOK DIAGRAM =================
 
             # Settings
             ax.set_xlim(-1, W+4)
