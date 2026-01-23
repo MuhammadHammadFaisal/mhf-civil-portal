@@ -183,4 +183,53 @@ def app():
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("**Method 1: $\sigma - u$**")
-                st.latex(rf"\sigma = {H1}\
+                st.latex(rf"\sigma = {H1}\gamma_w + {z}\gamma_{{sat}} = {sigma_total:.2f}")
+                st.latex(rf"u = ({H1} + {z}) \gamma_w {sign_txt} (i \cdot z \cdot \gamma_w) = {u_val:.2f}")
+                st.latex(rf"\sigma' = {sigma_total:.2f} - {u_val:.2f} = \mathbf{{{sigma_prime_1:.2f} \, kPa}}")
+            
+            with c2:
+                st.markdown("**Method 2: Direct Formula**")
+                st.latex(rf"i = h/L = {h_loss}/{H2} = {i:.3f}")
+                st.latex(formula_latex)
+                st.latex(rf"\sigma' = \mathbf{{{sigma_prime_2:.2f} \, kPa}}")
+
+    # =================================================================
+    # TAB 2: PERMEABILITY (Lab Tests)
+    # =================================================================
+    with tab2:
+        st.subheader("🧪 Permeability Tests")
+        test_type = st.radio("Test Type", ["Constant Head", "Falling Head"], horizontal=True)
+        
+        if "Constant" in test_type:
+            st.latex(r"k = \frac{Q \cdot L}{A \cdot h \cdot t}")
+            c1, c2, c3 = st.columns(3)
+            Q = c1.number_input("Volume (Q) [cm³]", 0.0)
+            L = c2.number_input("Length (L) [cm]", 0.0)
+            h = c3.number_input("Head (h) [cm]", 0.0)
+            c4, c5 = st.columns(2)
+            A = c4.number_input("Area (A) [cm²]", 0.0)
+            t = c5.number_input("Time (t) [sec]", 0.0)
+            if st.button("Calculate k"):
+                if A*h*t > 0: st.success(f"k = {(Q*L)/(A*h*t):.4e} cm/sec")
+        else:
+            st.latex(r"k = 2.303 \frac{a \cdot L}{A \cdot t} \log_{10}\left(\frac{h_1}{h_2}\right)")
+            c1, c2 = st.columns(2)
+            a = c1.number_input("Standpipe Area (a)", 0.0, format="%.4f")
+            A_soil = c2.number_input("Soil Area (A)", 0.0)
+            L = c1.number_input("Length (L)", 0.0)
+            t = c2.number_input("Time (t)", 0.0)
+            h1 = c1.number_input("Start Head (h1)", 0.0)
+            h2 = c2.number_input("End Head (h2)", 0.0)
+            if st.button("Calculate k"):
+                if A_soil*t > 0: st.success(f"k = {(2.303*a*L/(A_soil*t))*np.log10(h1/h2):.4e} cm/sec")
+
+    # =================================================================
+    # TAB 3: FLOW NETS
+    # =================================================================
+    with tab3:
+        st.subheader("⚠️ Quick Sand & Seepage")
+        st.latex(r"i_{cr} = \frac{G_s - 1}{1+e}")
+        Gs = st.number_input("Gs", 2.65)
+        e = st.number_input("Void Ratio e", 0.6)
+        if st.button("Calculate Critical Gradient"):
+            st.metric("i_critical", f"{(Gs-1)/(1+e):.3f}")
