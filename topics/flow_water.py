@@ -89,19 +89,21 @@ def app():
                 TH_bot = TH_top + h_loss
                 grad_color = 'green'
             
-            # LEFT PIEZOMETER (Top)
+            # LEFT PIEZOMETER (Top connection)
             left_piezo_x = soil_x_start - 1.2
             piezo_width = 0.35
+            connection_height = H2 + 0.15  # Top of soil
             
             # Left tube
-            ax.add_patch(patches.Rectangle((left_piezo_x, bottom_y), piezo_width, TH_top, 
+            ax.add_patch(patches.Rectangle((left_piezo_x, bottom_y-0.5), piezo_width, TH_top+0.5, 
                                           facecolor='white', edgecolor='black', linewidth=2))
             # Water in left tube
-            ax.add_patch(patches.Rectangle((left_piezo_x, bottom_y), piezo_width, TH_top, 
+            ax.add_patch(patches.Rectangle((left_piezo_x, bottom_y-0.5), piezo_width, TH_top+0.5, 
                                           facecolor='#A4D8E8', alpha=0.6))
-            # Connection to top
-            ax.plot([left_piezo_x + piezo_width, soil_x_start], [H2+0.15, H2+0.15], 
-                   'k-', linewidth=1.5)
+            # Connection tube to top of soil (horizontal)
+            ax.plot([left_piezo_x + piezo_width, soil_x_start], 
+                   [connection_height, connection_height], 
+                   'k-', linewidth=2)
             # Funnel top
             ax.plot([left_piezo_x, left_piezo_x-0.15], [TH_top, TH_top+0.3], 'k-', linewidth=2)
             ax.plot([left_piezo_x+piezo_width, left_piezo_x+piezo_width+0.15], 
@@ -109,18 +111,19 @@ def app():
             ax.plot([left_piezo_x-0.15, left_piezo_x+piezo_width+0.15], 
                    [TH_top+0.3, TH_top+0.3], 'k-', linewidth=2)
             
-            # RIGHT PIEZOMETER (Bottom)
+            # RIGHT PIEZOMETER (Bottom connection)
             right_piezo_x = soil_x_start + soil_width + 0.5
             
             # Right tube
-            ax.add_patch(patches.Rectangle((right_piezo_x, bottom_y), piezo_width, TH_bot, 
+            ax.add_patch(patches.Rectangle((right_piezo_x, bottom_y-0.5), piezo_width, TH_bot+0.5, 
                                           facecolor='white', edgecolor='black', linewidth=2))
             # Water in right tube
-            ax.add_patch(patches.Rectangle((right_piezo_x, bottom_y), piezo_width, TH_bot, 
+            ax.add_patch(patches.Rectangle((right_piezo_x, bottom_y-0.5), piezo_width, TH_bot+0.5, 
                                           facecolor='#A4D8E8', alpha=0.6))
-            # Connection to bottom
-            ax.plot([soil_x_start+soil_width, right_piezo_x], [bottom_y, bottom_y], 
-                   'k-', linewidth=1.5)
+            # Connection tube to bottom of soil (horizontal)
+            ax.plot([soil_x_start + soil_width, right_piezo_x], 
+                   [bottom_y, bottom_y], 
+                   'k-', linewidth=2)
             # Funnel top
             ax.plot([right_piezo_x, right_piezo_x-0.15], [TH_bot, TH_bot+0.3], 'k-', linewidth=2)
             ax.plot([right_piezo_x+piezo_width, right_piezo_x+piezo_width+0.15], 
@@ -128,28 +131,28 @@ def app():
             ax.plot([right_piezo_x-0.15, right_piezo_x+piezo_width+0.15], 
                    [TH_bot+0.3, TH_bot+0.3], 'k-', linewidth=2)
             
-            # DIMENSION LABELS
+            # DIMENSION LABELS WITH VALUES
             # χ (chi) - water height above soil
             if H1 > 0:
                 mid_x_left = left_piezo_x - 0.6
-                ax.annotate('', xy=(mid_x_left, H2+0.15), xytext=(mid_x_left, TH_top),
+                ax.annotate('', xy=(mid_x_left, connection_height), xytext=(mid_x_left, TH_top),
                            arrowprops=dict(arrowstyle='<->', color='blue', lw=1.5))
-                ax.text(mid_x_left-0.2, (H2+0.15+TH_top)/2, 'χ', 
-                       fontsize=14, color='blue', fontweight='bold', style='italic')
+                ax.text(mid_x_left-0.35, (connection_height+TH_top)/2, f'χ\n{H1:.1f}m', 
+                       fontsize=11, color='blue', fontweight='bold', ha='center')
             
             # z - soil height
             mid_x_right = right_piezo_x + piezo_width + 0.6
             ax.annotate('', xy=(mid_x_right, bottom_y), xytext=(mid_x_right, H2),
                        arrowprops=dict(arrowstyle='<->', color='black', lw=1.5))
-            ax.text(mid_x_right+0.2, H2/2, 'z', 
-                   fontsize=14, color='black', fontweight='bold', style='italic')
+            ax.text(mid_x_right+0.35, H2/2, f'z\n{H2:.1f}m', 
+                   fontsize=11, color='black', fontweight='bold', ha='center')
             
             # γ (gamma) - head loss
             dim_x = soil_x_start + soil_width + 1.8
             ax.annotate('', xy=(dim_x, TH_top), xytext=(dim_x, TH_bot),
                        arrowprops=dict(arrowstyle='<->', color=grad_color, lw=2))
-            ax.text(dim_x+0.3, (TH_top+TH_bot)/2, 'γ', 
-                   fontsize=14, color=grad_color, fontweight='bold', style='italic')
+            ax.text(dim_x+0.45, (TH_top+TH_bot)/2, f'γ\n{h_loss:.1f}m', 
+                   fontsize=11, color=grad_color, fontweight='bold', ha='center')
             
             # POINT A
             point_a_y = H2 - z
@@ -157,10 +160,11 @@ def app():
             ax.text(soil_x_start + soil_width/2 + 0.3, point_a_y, 'A', 
                    fontsize=14, fontweight='bold')
             
-            # DATUM LINE
-            ax.hlines(-0.5, 0, soil_x_start + soil_width + 2.5, 
-                     colors='black', linestyle='-.', linewidth=1)
-            ax.text(0.5, -0.7, "Datum", fontsize=10, style='italic')
+            # DATUM LINE (at bottom of apparatus)
+            datum_y = bottom_y - 0.3
+            ax.hlines(datum_y, left_piezo_x - 0.5, soil_x_start + soil_width + 2.5, 
+                     colors='black', linestyle='-.', linewidth=1.5)
+            ax.text(left_piezo_x - 0.3, datum_y - 0.2, "Datum", fontsize=10, style='italic')
             
             # WATER LEVEL INDICATORS
             # Left tube water level
@@ -171,8 +175,8 @@ def app():
                      colors='blue', linewidth=2)
             
             # Plot settings
-            ax.set_xlim(0, 7)
-            ax.set_ylim(-1.5, max(TH_top, TH_bot) + 1.5)
+            ax.set_xlim(left_piezo_x - 1, soil_x_start + soil_width + 3)
+            ax.set_ylim(datum_y - 0.8, max(TH_top, TH_bot) + 1.5)
             ax.set_aspect('equal')
             ax.axis('off')
             ax.set_title('Permeameter Setup', fontsize=12, fontweight='bold', pad=10)
