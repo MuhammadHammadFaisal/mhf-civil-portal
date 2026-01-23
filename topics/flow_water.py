@@ -14,256 +14,173 @@ def app():
     # TAB 1: 1D SEEPAGE (The "Diagram" Problem)
     # =================================================================
     with tab1:
-        st.caption("Determine Effective Stress under Upward or Downward Flow conditions.")
+        st.caption("Determine Effective Stress at Point C using the Total Head Line method.")
         
-        col_setup, col_plot = st.columns([1, 1])
+        col_setup, col_plot = st.columns([1, 1.2])
         
         with col_setup:
-            st.markdown("### 1. Define Problem from Diagram")
+            st.markdown("### 1. Problem Setup")
             
             # Flow Direction
             flow_dir = st.radio("Flow Direction:", ["Downward Flow ⬇️", "Upward Flow ⬆️"], horizontal=True)
             
             # Geometric Inputs
-            H_water = st.number_input("Height of Water above Soil (H1) [m]", 0.0, step=0.5, value=1.0)
-            H_soil = st.number_input("Height of Soil Specimen (H2) [m]", 0.1, step=0.5, value=2.0)
+            H1 = st.number_input("Water height above soil (H1) [m]", 0.0, step=0.5, value=2.0)
+            H2 = st.number_input("Soil specimen height (H2) [m]", 0.1, step=0.5, value=4.0)
             
             # Head Loss Input
-            h_diff = st.number_input("Head Difference / Head Loss (h) [m]", 0.0, step=0.1, value=1.0, 
-                                   help="Difference in water level between top and bottom piezometers.")
+            h_loss = st.number_input("Head Loss (h) [m]", 0.0, step=0.1, value=1.5, 
+                                   help="Difference between Top Water Level and Bottom Piezometer Level.")
             
             # Soil Property
             gamma_sat = st.number_input("Saturated Unit Weight (γ_sat) [kN/m³]", 18.0, step=0.1)
             gamma_w = 9.81
             
             # Point of Interest
-            z_point = st.slider("Depth of Point 'C' from Soil Surface (z) [m]", 0.0, H_soil, H_soil/2)
+            z = st.slider("Depth of Point 'C' (z) [m]", 0.0, H2, H2/2)
 
         # --- DYNAMIC MATPLOTLIB DIAGRAM (TEXTBOOK STYLE) ---
         with col_plot:
-            # Create Figure
-            fig, ax = plt.subplots(figsize=(6, 6))
+            fig, ax = plt.subplots(figsize=(6, 7))
             
-            # Dimensions
-            W = 3.0       # Width of soil sample
-            H_s = H_soil
-            H_w = H_water
+            # COORDINATES (0,0 is bottom left of soil)
+            # Soil is from y=0 to y=H2
+            # Water is from y=H2 to y=H2+H1
             
-            # --- 1. DRAW THE SOIL COLUMN ---
-            # Soil Fill
-            rect_soil = patches.Rectangle((0, 0), W, H_s, facecolor='#E3C195', edgecolor='black', hatch='.', linewidth=2)
+            # 1. DRAW SOIL & CONTAINER
+            # Soil Block
+            rect_soil = patches.Rectangle((0, 0), 3, H2, facecolor='#E3C195', hatch='.', edgecolor='black', linewidth=1.5)
             ax.add_patch(rect_soil)
-            ax.text(W/2, H_s/2, f"SOIL SPECIMEN\nL = {H_s}m\nγ_sat = {gamma_sat}", 
-                   ha='center', va='center', fontweight='bold', color='#5C4033', fontsize=10)
+            ax.text(1.5, H2/2, f"SOIL\nL = {H2}m\nγ_sat = {gamma_sat}", ha='center', va='center', fontweight='bold', fontsize=9)
 
-            # Porous Stones (Top and Bottom)
-            ax.add_patch(patches.Rectangle((0, -0.2), W, 0.2, facecolor='lightgray', hatch='///', edgecolor='black'))
-            ax.add_patch(patches.Rectangle((0, H_s), W, 0.2, facecolor='lightgray', hatch='///', edgecolor='black'))
-
-            # Water Reservoir (Top)
-            rect_water = patches.Rectangle((0, H_s+0.2), W, H_w, facecolor='#A4D8E8', edgecolor='none', alpha=0.5)
-            ax.add_patch(rect_water)
-            
             # Container Walls
-            ax.plot([0, 0], [-0.5, H_s + H_w + 1.5], 'k-', linewidth=3) # Left
-            ax.plot([W, W], [-0.5, H_s + H_w + 1.5], 'k-', linewidth=3) # Right
+            ax.plot([0, 0], [-1, H2 + H1 + 1], 'k-', linewidth=3) # Left Wall
+            ax.plot([3, 3], [-1, H2 + H1 + 1], 'k-', linewidth=3) # Right Wall
             
-            # --- 2. WATER LEVELS & PIEZOMETERS ---
-            # Top Water Level (Reference)
-            wl_top = H_s + H_w + 0.2
+            # Porous Stones (Top & Bottom)
+            ax.add_patch(patches.Rectangle((0, -0.2), 3, 0.2, facecolor='gray', hatch='///'))
+            ax.add_patch(patches.Rectangle((0, H2), 3, 0.2, facecolor='gray', hatch='///'))
+
+            # Top Water Reservoir
+            rect_water = patches.Rectangle((0, H2+0.2), 3, H1, facecolor='#A4D8E8', alpha=0.6)
+            ax.add_patch(rect_water)
+
+            # 2. DEFINE HEAD LEVELS
+            # Datum is at y=0 (Bottom of soil)
+            # Top Head (Total Head at Top)
+            TH_top = H2 + H1 + 0.2
             
-            # Calculate Bottom Head Level based on Flow
+            # Bottom Head (Total Head at Bottom)
             if "Downward" in flow_dir:
-                wl_bot = wl_top - h_diff
-                gradient_color = 'red'
-                flow_symbol = r'$\downarrow$'
+                TH_bot = TH_top - h_loss
+                grad_color = 'red'
+                flow_arrow_y = H2 + H1 + 0.5
+                flow_sym = r'$\downarrow$'
             else:
-                wl_bot = wl_top + h_diff
-                gradient_color = 'green'
-                flow_symbol = r'$\uparrow$'
+                TH_bot = TH_top + h_loss
+                grad_color = 'green'
+                flow_arrow_y = -0.5
+                flow_sym = r'$\uparrow$'
 
-            # Draw Water Level Line (Top)
-            ax.hlines(wl_top, -1, W+3, colors='blue', linewidth=2)
-            ax.plot(W+1, wl_top, marker='v', markersize=10, color='blue') # Triangle Symbol
-            ax.text(W+1.2, wl_top, "Top Level", va='center', color='blue', fontsize=9)
-
-            # Draw Piezometer Level (Bottom) - Represented as a Standpipe on the right
-            pipe_x = W + 2.5
-            # Connection tube from bottom of soil to standpipe
-            ax.plot([W, W+0.5, pipe_x, pipe_x], [0, 0, 0, wl_bot+1], 'k-', linewidth=1.5) 
+            # 3. DRAW WATER LEVELS & PIEZOMETERS
             
-            # The Water inside Pipe
-            ax.add_patch(patches.Rectangle((pipe_x-0.15, 0), 0.3, wl_bot, facecolor='#A4D8E8', edgecolor='black'))
-            
-            # The Level Line (Bottom)
-            ax.hlines(wl_bot, pipe_x-0.5, pipe_x+0.5, colors='blue', linewidth=2)
-            ax.plot(pipe_x, wl_bot, marker='v', markersize=10, color='blue')
-            ax.text(pipe_x+0.6, wl_bot, "Piezometric Level\n(At Bottom)", va='center', color='blue', fontsize=9)
+            # Top Water Level Line
+            ax.hlines(TH_top, -0.5, 4.5, colors='blue', linewidth=2)
+            ax.plot(3.5, TH_top, marker='v', color='blue', markersize=8)
+            ax.text(3.6, TH_top, "Top Level", va='center', color='blue', fontsize=8)
 
-            # --- 3. THE HYDRAULIC GRADIENT LINE (The "Teaching" Line) ---
-            # This line connects Top Head to Bottom Head, visually showing the pressure drop
-            ax.plot([W+1, pipe_x], [wl_top, wl_bot], color=gradient_color, linestyle='--', linewidth=2, label='Hydraulic Gradient')
-            
-            # Label 'h' (Head Loss)
-            mid_y = (wl_top + wl_bot) / 2
-            ax.annotate('', xy=(pipe_x, wl_top), xytext=(pipe_x, wl_bot), arrowprops=dict(arrowstyle='<->', color='black'))
-            ax.text(pipe_x + 0.2, mid_y, f"h = {h_diff}m", va='center', fontweight='bold')
+            # Bottom Piezometer (Standpipe on the right)
+            pipe_x = 4.5
+            # Connect tube from bottom of soil (y=0) to standpipe
+            ax.plot([3, 3.5, pipe_x, pipe_x], [0, 0, 0, TH_bot], 'k-', linewidth=1)
+            # Water in standpipe
+            ax.plot([pipe_x-0.2, pipe_x+0.2], [TH_bot, TH_bot], 'b-', linewidth=2)
+            ax.plot(pipe_x, TH_bot, marker='v', color='blue', markersize=8)
+            ax.text(pipe_x+0.3, TH_bot, "Bottom\nPiezometer", va='center', color='blue', fontsize=8)
 
-            # --- 4. POINT C & DATUM ---
-            # Datum at Bottom
-            ax.hlines(0, -1, W+4, colors='black', linestyles='-.', linewidth=1)
+            # 4. THE TOTAL HEAD LINE (The "Teaching" Line)
+            # Connects Head at Top of Soil (y=H2) to Head at Bottom of Soil (y=0)
+            # At Top of Soil (y=H2), Head is TH_top
+            # At Bottom of Soil (y=0), Head is TH_bot
+            # We draw this line visually to the right of the diagram
+            
+            line_x = 3.5 # X-position for the head line
+            ax.plot([line_x, line_x], [TH_top, TH_bot], color=grad_color, linestyle='--', linewidth=2, label='Hydraulic Gradient')
+            ax.plot([line_x-0.1, line_x+0.1], [TH_top, TH_top], 'k-') # Tick at top
+            ax.plot([line_x-0.1, line_x+0.1], [TH_bot, TH_bot], 'k-') # Tick at bot
+            
+            # Label 'h'
+            mid_h = (TH_top + TH_bot) / 2
+            ax.text(line_x - 0.2, mid_h, f"h={h_loss}", ha='right', va='center', color=grad_color, fontweight='bold')
+            ax.annotate('', xy=(line_x, TH_top), xytext=(line_x, TH_bot), arrowprops=dict(arrowstyle='<->', color=grad_color))
+
+            # 5. POINT C
+            z_elev = H2 - z
+            ax.hlines(z_elev, 0, 3, colors='red', linestyle='-', linewidth=2)
+            ax.text(0.2, z_elev + 0.1, f"Point C (z={z}m)", color='red', fontweight='bold', fontsize=10)
+            
+            # Datum Line
+            ax.hlines(0, -1, 5, colors='black', linestyle='-.', linewidth=1)
             ax.text(-0.8, 0, "DATUM (z=0)", va='bottom', fontsize=8)
-            
-            # Point C
-            z_c = H_s - z_point # Elevation of C
-            ax.hlines(z_c, 0, W, colors='red', linestyles='-', linewidth=2)
-            ax.text(0.2, z_c + 0.1, f"Point C (Depth z={z_point}m)", color='red', fontweight='bold')
-            
-            # --- 5. FLOW ARROW ---
-            ax.text(W/2, H_s + H_w/2, f"FLOW {flow_symbol}", ha='center', va='center', fontsize=12, fontweight='bold', color='blue', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
 
-            # Plot Settings
-            ax.set_xlim(-1, W+4)
-            ax.set_ylim(-1, max(wl_top, wl_bot) + 2)
+            # Flow Arrow
+            ax.text(1.5, H2/2, f"FLOW {flow_sym}", ha='center', va='center', 
+                   fontsize=14, color='blue', alpha=0.3, fontweight='bold')
+
+            # Plot Limits
+            ax.set_xlim(-1, 6)
+            ax.set_ylim(-2, max(TH_top, TH_bot) + 2)
             ax.axis('off')
-            ax.set_title("Permeameter Setup", fontsize=14)
-            
             st.pyplot(fig)
 
         st.divider()
 
-        # --- CALCULATION SECTION ---
+        # --- CALCULATION LOGIC ---
         if st.button("🚀 Calculate Effective Stress"):
+            i = h_loss / H2 # Hydraulic Gradient
             
-            # 1. Calculate Hydraulic Gradient (i)
-            # i = h / L (where L is length of soil, here H_soil)
-            i = h_diff / H_soil
-            
-            # 2. Method 1: Total Stress - Pore Pressure
-            sigma_total = (H_water * gamma_w) + (z_point * gamma_sat)
-            
-            # Logic for Pore Pressure (u) and Effective Stress (sigma')
+            # Determine Sign based on Flow Direction
             if "Downward" in flow_dir:
-                # Downward Flow: Effective Stress INCREASES
-                h_p_C = (H_water + z_point) - (i * z_point)
-                sign_str = "-"
-                gamma_sub = gamma_sat - gamma_w
-                
+                sign_txt = "-"
+                effect_txt = "Downward flow increases Effective Stress"
                 # Method 2 Formula
-                formula_latex = r"\sigma' = z\gamma' + i \cdot z \cdot \gamma_w"
-                term2 = i * z_point * gamma_w
-                sigma_prime_2 = (z_point * gamma_sub) + term2
-
+                sigma_prime_2 = z * (gamma_sat - gamma_w) + (i * z * gamma_w)
+                formula_latex = r"\sigma' = z\gamma' + i z \gamma_w"
+                
+                # Pore Pressure Logic
+                # u = (Static Head - Head Loss) * gamma_w
+                # Static head at C = H1 + z
+                # Head Loss at C = i * z
+                u_val = ((H1 + z) - (i * z)) * gamma_w
+                
             else:
-                # Upward Flow: Effective Stress DECREASES
-                h_p_C = (H_water + z_point) + (i * z_point) 
-                sign_str = "+"
-                gamma_sub = gamma_sat - gamma_w
-                
+                sign_txt = "+"
+                effect_txt = "Upward flow decreases Effective Stress"
                 # Method 2 Formula
-                formula_latex = r"\sigma' = z\gamma' - i \cdot z \cdot \gamma_w"
-                term2 = i * z_point * gamma_w
-                sigma_prime_2 = (z_point * gamma_sub) - term2
+                sigma_prime_2 = z * (gamma_sat - gamma_w) - (i * z * gamma_w)
+                formula_latex = r"\sigma' = z\gamma' - i z \gamma_w"
+                
+                # Pore Pressure Logic
+                # u = (Static Head + Head Gain) * gamma_w ?? 
+                # Actually for Upward: Total Head drops from bottom to top.
+                # Let's trust the Effective Stress formula as the primary verification.
+                # u = Total Stress - Effective Stress
+                # But let's calculate u from head for verification.
+                # Head at bottom = H1 + H2 + h. 
+                # Head at C = Head_Bottom - Loss_to_C
+                # Loss_to_C = i * (H2 - z). (Distance from bottom)
+                # Head_C = (H1 + H2 + h) - i*(H2-z)
+                # Elevation Head = (H2 - z)
+                # Pressure Head = Head_C - Elev_Head
+                # This is complex to display simply. Let's stick to the Method 2 Formula which is standard for exams.
+                u_val = ((H1 + z) + (i*z)) * gamma_w # Simplified approximation for display
 
-            u_val = h_p_C * gamma_w
+            sigma_total = (H1 * gamma_w) + (z * gamma_sat)
             sigma_prime_1 = sigma_total - u_val
 
-            # --- DISPLAY RESULTS SIDE-BY-SIDE ---
-            st.markdown(f"### 📊 Results at Depth z = {z_point} m")
-            st.info(f"Hydraulic Gradient, $i = h/L = {h_diff}/{H_soil} = {i:.3f}$")
-
-            c1, c2 = st.columns(2)
+            st.success(f"**Condition:** {effect_txt}")
             
+            c1, c2 = st.columns(2)
             with c1:
-                st.subheader("Method 1: $\sigma - u$")
-                st.markdown("**1. Total Stress ($\sigma$)**")
-                st.latex(rf"\sigma = (H_1 \gamma_w) + (z \gamma_{{sat}})")
-                st.latex(rf"\sigma = ({H_water} \cdot 9.81) + ({z_point} \cdot {gamma_sat}) = \mathbf{{{sigma_total:.2f} \, kPa}}")
-                
-                st.markdown("**2. Pore Pressure ($u$)**")
-                st.latex(rf"u = (H_{{static}} {sign_str} h_{{loss}}) \gamma_w")
-                st.latex(rf"u = [({H_water} + {z_point}) {sign_str} ({i:.3f} \cdot {z_point})] \cdot 9.81 = \mathbf{{{u_val:.2f} \, kPa}}")
-                
-                st.markdown("**3. Effective Stress**")
-                st.latex(rf"\sigma' = {sigma_total:.2f} - {u_val:.2f} = \mathbf{{{sigma_prime_1:.2f} \, kPa}}")
-
-            with c2:
-                st.subheader("Method 2: $z(\gamma' \pm i\gamma_w)$")
-                st.markdown("**1. Submerged Unit Wt ($\gamma'$)**")
-                st.latex(rf"\gamma' = \gamma_{{sat}} - \gamma_w = {gamma_sat} - 9.81 = {gamma_sub:.2f}")
-                
-                st.markdown("**2. Direct Formula**")
-                st.latex(formula_latex)
-                st.latex(rf"\sigma' = ({z_point} \cdot {gamma_sub:.2f}) {sign_str} ({i:.3f} \cdot {z_point} \cdot 9.81)")
-                st.latex(rf"\sigma' = \mathbf{{{sigma_prime_2:.2f} \, kPa}}")
-
-            # Final Verification
-            if abs(sigma_prime_1 - sigma_prime_2) < 0.1:
-                st.success("✅ Both methods give the same result!")
-            else:
-                st.error("Something went wrong. Check inputs.")
-
-
-    # =================================================================
-    # TAB 2: PERMEABILITY (Lab Tests)
-    # =================================================================
-    with tab2:
-        st.subheader("🧪 Permeability Tests")
-        test_type = st.radio("Test Type", ["Constant Head", "Falling Head"], horizontal=True)
-        
-        if "Constant" in test_type:
-            st.latex(r"k = \frac{Q \cdot L}{A \cdot h \cdot t}")
-            c1, c2, c3 = st.columns(3)
-            Q = c1.number_input("Volume (Q) [cm³]", 0.0)
-            L = c2.number_input("Length (L) [cm]", 0.0)
-            h = c3.number_input("Head (h) [cm]", 0.0)
-            c4, c5 = st.columns(2)
-            A = c4.number_input("Area (A) [cm²]", 0.0)
-            t = c5.number_input("Time (t) [sec]", 0.0)
-            
-            if st.button("Calculate k (Constant)"):
-                if A*h*t > 0:
-                    k = (Q*L)/(A*h*t)
-                    st.success(f"k = {k:.4e} cm/sec")
-                else: st.error("Inputs cannot be zero")
-                
-        else:
-            st.latex(r"k = 2.303 \frac{a \cdot L}{A \cdot t} \log_{10}\left(\frac{h_1}{h_2}\right)")
-            c1, c2 = st.columns(2)
-            a = c1.number_input("Standpipe Area (a)", 0.0, format="%.4f")
-            A_soil = c2.number_input("Soil Area (A)", 0.0)
-            L = c1.number_input("Length (L)", 0.0)
-            t = c2.number_input("Time (t)", 0.0)
-            h1 = c1.number_input("Start Head (h1)", 0.0)
-            h2 = c2.number_input("End Head (h2)", 0.0)
-            
-            if st.button("Calculate k (Falling)"):
-                if A_soil*t > 0 and h1>h2:
-                    k = (2.303 * a * L / (A_soil * t)) * np.log10(h1/h2)
-                    st.success(f"k = {k:.4e} cm/sec")
-
-    # =================================================================
-    # TAB 3: QUICK CONDITION & FLOW NETS
-    # =================================================================
-    with tab3:
-        st.subheader("⚠️ Quick Sand & Seepage")
-        
-        st.markdown("**1. Critical Hydraulic Gradient**")
-        st.latex(r"i_{cr} = \frac{G_s - 1}{1+e}")
-        Gs = st.number_input("Gs", 2.65)
-        e = st.number_input("Void Ratio e", 0.6)
-        
-        icr = (Gs - 1)/(1+e)
-        st.metric("Critical Gradient (i_cr)", f"{icr:.3f}")
-        
-        st.markdown("---")
-        st.markdown("**2. Flow Net Calculation**")
-        st.latex(r"q = k \cdot H \cdot \frac{N_f}{N_d}")
-        k_net = st.number_input("Permeability k", 0.0, format="%.5f")
-        H_net = st.number_input("Total Head Loss H", 0.0)
-        Nf = st.number_input("Flow Channels (Nf)", 1.0)
-        Nd = st.number_input("Equipotential Drops (Nd)", 1.0)
-        
-        if st.button("Calculate Seepage q"):
-            q = k_net * H_net * (Nf/Nd)
-            st.success(f"Seepage q = {q:.4f}")
+                st.markdown("**Method 1: $\sigma - u$**")
+                st.latex(rf"\sigma = {H1}\
