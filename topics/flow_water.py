@@ -48,86 +48,91 @@ def app():
             H_s = H_soil
             H_w = H_water
             
-            # --- 1. DRAW THE SOIL COLUMN ---
-            # Soil Fill
-            rect_soil = patches.Rectangle((0, 0), W, H_s, facecolor='#E3C195', edgecolor='black', hatch='.', linewidth=2)
-            ax.add_patch(rect_soil)
-            ax.text(W/2, H_s/2, f"SOIL SPECIMEN\nLength L = {H_s}m\nγ_sat = {gamma_sat}", 
-                   ha='center', va='center', fontweight='bold', color='#5C4033', fontsize=10)
+           # ================= TEXTBOOK-STYLE PERMEAMETER =================
 
-            # Porous Stones (Top and Bottom)
-            ax.add_patch(patches.Rectangle((0, -0.2), W, 0.2, facecolor='lightgray', hatch='///', edgecolor='black'))
-            ax.add_patch(patches.Rectangle((0, H_s), W, 0.2, facecolor='lightgray', hatch='///', edgecolor='black'))
+# --- SOIL BOX ---
+soil_x = 2.0
+soil_y = 0.0
+soil_w = 3.0
+soil_h = H_s
 
-            # Water Reservoir (Top)
-            rect_water = patches.Rectangle((0, H_s+0.2), W, H_w, facecolor='#A4D8E8', edgecolor='none', alpha=0.5)
-            ax.add_patch(rect_water)
-            
-            # Container Walls
-            ax.plot([0, 0], [-0.5, H_s + H_w + 1.5], 'k-', linewidth=3) # Left
-            ax.plot([W, W], [-0.5, H_s + H_w + 1.5], 'k-', linewidth=3) # Right
-            
-            # --- 2. WATER LEVELS & PIEZOMETERS ---
-            # Top Water Level (Reference)
-            wl_top = H_s + H_w + 0.2
-            
-            # Calculate Bottom Head Level
-            if "Downward" in flow_dir:
-                wl_bot = wl_top - h_diff
-                gradient_color = 'red'
-                flow_symbol = r'$\downarrow$'
-            else:
-                wl_bot = wl_top + h_diff
-                gradient_color = 'green'
-                flow_symbol = r'$\uparrow$'
+ax.add_patch(
+    patches.Rectangle(
+        (soil_x, soil_y),
+        soil_w,
+        soil_h,
+        edgecolor='black',
+        facecolor='none',
+        linewidth=2
+    )
+)
+ax.text(soil_x + soil_w/2, soil_h/2, "SOIL",
+        ha='center', va='center', fontsize=12)
 
-            # Draw Water Level Line (Top)
-            ax.hlines(wl_top, -1, W+3, colors='blue', linewidth=2)
-            ax.plot(W+1, wl_top, marker='v', markersize=10, color='blue') # Triangle Symbol
-            ax.text(W+1.2, wl_top, "Top Level", va='center', color='blue', fontsize=9)
+# --- TOP RESERVOIR ---
+ax.add_patch(
+    patches.Rectangle(
+        (soil_x, soil_h + 1),
+        soil_w,
+        1,
+        edgecolor='black',
+        facecolor='none',
+        linewidth=2
+    )
+)
+ax.plot(
+    [soil_x + 0.2, soil_x + soil_w - 0.2],
+    [soil_h + 1.6, soil_h + 1.6],
+    'k'
+)
 
-            # Draw Piezometer Level (Bottom) - Represented as a Standpipe on the right
-            # The Pipe
-            pipe_x = W + 2.5
-            ax.plot([W, W+0.5, pipe_x, pipe_x], [0, 0, 0, wl_bot+1], 'k-', linewidth=1.5) # Connection tube
-            
-            # The Water inside Pipe
-            ax.add_patch(patches.Rectangle((pipe_x-0.15, 0), 0.3, wl_bot, facecolor='#A4D8E8', edgecolor='black'))
-            
-            # The Level Line (Bottom)
-            ax.hlines(wl_bot, pipe_x-0.5, pipe_x+0.5, colors='blue', linewidth=2)
-            ax.plot(pipe_x, wl_bot, marker='v', markersize=10, color='blue')
-            ax.text(pipe_x+0.6, wl_bot, "Piezometric Level\n(At Bottom)", va='center', color='blue', fontsize=9)
+# --- LEFT RESERVOIR ---
+ax.add_patch(
+    patches.Rectangle(
+        (0.4, soil_h + 0.5),
+        1.6,
+        1,
+        edgecolor='black',
+        facecolor='none',
+        linewidth=2
+    )
+)
+ax.plot([0.6, 1.8], [soil_h + 1.1, soil_h + 1.1], 'k')
 
-            # --- 3. THE HYDRAULIC GRADIENT LINE (The "Teaching" Line) ---
-            # This connects the head at the top of soil to the head at the bottom
-            # Top of soil is at y = H_s. Head there is wl_top.
-            # Bottom of soil is at y = 0. Head there is wl_bot.
-            # We draw a line showing how head drops across the soil length
-            
-            # Visualizing the Head Drop across the soil layer
-            # We plot Head (X-axis) vs Depth (Y-axis) overlay, OR just a diagonal line connecting levels?
-            # Let's draw the "Total Head Line" relative to the piezometers
-            ax.plot([W+1, pipe_x], [wl_top, wl_bot], color=gradient_color, linestyle='--', linewidth=2, label='Hydraulic Gradient')
-            
-            # Label 'h' (Head Loss)
-            mid_x = (W+1 + pipe_x) / 2
-            mid_y = (wl_top + wl_bot) / 2
-            ax.annotate('', xy=(pipe_x, wl_top), xytext=(pipe_x, wl_bot), arrowprops=dict(arrowstyle='<->', color='black'))
-            ax.text(pipe_x + 0.2, mid_y, f"h = {h_diff}m", va='center', fontweight='bold')
+# --- PIPES ---
+ax.plot([soil_x + soil_w/2, soil_x + soil_w/2],
+        [soil_h + 1, soil_h], 'k', linewidth=2)
 
-            # --- 4. POINT C & DATUM ---
-            # Datum at Bottom
-            ax.hlines(0, -1, W+4, colors='black', linestyles='-.', linewidth=1)
-            ax.text(-0.8, 0, "DATUM (z=0)", va='bottom', fontsize=8)
-            
-            # Point C
-            z_c = H_s - z_point # Elevation of C
-            ax.hlines(z_c, 0, W, colors='red', linestyles='-', linewidth=2)
-            ax.text(0.2, z_c + 0.1, f"Point C (Depth z={z_point}m)", color='red', fontweight='bold')
-            
-            # --- 5. FLOW ARROW ---
-            ax.text(W/2, H_s + H_w/2, f"FLOW {flow_symbol}", ha='center', va='center', fontsize=12, fontweight='bold', color='blue', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+ax.plot([1.2, 1.2], [soil_h + 0.5, 0.3], 'k', linewidth=2)
+ax.plot([1.2, soil_x], [0.3, 0.3], 'k', linewidth=2)
+
+# --- HEAD LEVELS ---
+wl_top = soil_h + 1.6
+X_level = soil_h - 2
+Y_level = 0
+
+ax.hlines(wl_top, 0, 7, linestyles='dashed')
+ax.text(7.1, wl_top, "Top head")
+
+ax.hlines(X_level, 0, 7, linestyles='dashed')
+ax.text(7.1, X_level, "X–X")
+
+ax.hlines(Y_level, 0, 7, linestyles='dashed')
+ax.text(7.1, Y_level, "Y–Y (Datum)")
+
+# --- DIMENSIONS ---
+ax.annotate("2 m", xy=(6.5, wl_top), xytext=(6.5, X_level),
+            arrowprops=dict(arrowstyle='<->'))
+ax.annotate("4 m", xy=(6.5, X_level), xytext=(6.5, Y_level),
+            arrowprops=dict(arrowstyle='<->'))
+
+# --- FLOW LABEL ---
+flow_symbol = r'$\downarrow$' if "Downward" in flow_dir else r'$\uparrow$'
+ax.text(soil_x + soil_w/2, soil_h/2,
+        f"FLOW {flow_symbol}",
+        ha='center', va='center', fontsize=12, fontweight='bold')
+
+# ================= END TEXTBOOK DIAGRAM =================
 
             # Settings
             ax.set_xlim(-1, W+4)
