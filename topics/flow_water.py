@@ -25,52 +25,50 @@ def app():
             flow_dir = st.radio("Flow Direction:", ["Downward Flow ⬇️", "Upward Flow ⬆️"], horizontal=True)
             
             # Geometric Inputs
-            H1 = st.number_input("Water height above soil (χ) [m]", 0.0, step=0.5, value=2.0)
-            H2 = st.number_input("Soil specimen height (z) [m]", 0.1, step=0.5, value=4.0)
+            # Renamed to be descriptive so they don't conflict with diagram labels x/y
+            H_water = st.number_input("Water Depth above Soil Surface [m]", 0.0, step=0.5, value=2.0)
+            H_soil = st.number_input("Soil Specimen Height (z) [m]", 0.1, step=0.5, value=4.0)
             
             # Head Loss Input
-            h_loss = st.number_input("Head Loss (γ) [m]", 0.0, step=0.1, value=1.5, 
-                                   help="Difference between Top Water Level and Bottom Piezometer Level.")
+            h_loss = st.number_input("Head Loss / Difference [m]", 0.0, step=0.1, value=1.5, 
+                                   help="Difference between Top and Bottom water levels.")
             
             # Soil Property
             gamma_sat = st.number_input("Saturated Unit Weight (γ_sat) [kN/m³]", 18.0, step=0.1)
             gamma_w = 9.81
             
-            # Point of Interest
-            z = st.slider("Depth of Point 'A' from top [m]", 0.0, H2, H2/2)
+            # Point of Interest - Changed to measure from BOTTOM as requested
+            dist_A = st.slider("Height of Point 'A' from Bottom Datum [m]", 0.0, H_soil, H_soil/2)
 
-# --- DYNAMIC MATPLOTLIB DIAGRAM (CORRECTED DATUM & VALUES) ---
+        # --- DYNAMIC MATPLOTLIB DIAGRAM (CORRECTED) ---
         with col_plot:
             fig, ax = plt.subplots(figsize=(7, 8))
             
             # --- 1. COORDINATE SYSTEM ---
-            # We set the Datum (y=0) at the BOTTOM of the soil
+            # Datum (y=0) is at the BOTTOM of the soil
             soil_w = 2.5
-            soil_h = H2  # Total height of soil
-            soil_x = 3.0 # X-position of soil box
-            datum_y = 0.0 # Datum is exactly at bottom of soil
+            soil_h = H_soil
+            soil_x = 3.0 
+            datum_y = 0.0 
             
-            # --- 2. CALCULATE HEAD VALUES (Relative to Datum) ---
-            # y = Total Head at Top (Elevation Head H2 + Pressure Head H1)
-            val_y = H2 + H1
+            # --- 2. CALCULATE HEAD VALUES (For Diagram Labels) ---
+            # y = Total Head at Top (Elevation Head + Pressure Head)
+            # y = Soil Height + Water Depth
+            val_y = H_soil + H_water
             
             # x = Total Head at Bottom
-            # Downward Flow: Head drops from Top to Bottom (x < y)
-            # Upward Flow: Head drops from Bottom to Top (x > y)
+            # Downward: Top > Bottom -> x = y - loss
+            # Upward: Bottom > Top -> x = y + loss
             if "Downward" in flow_dir:
                 val_x = val_y - h_loss
             else:
                 val_x = val_y + h_loss
                 
-            # Point A (Height from Bottom)
-            # We need to interpret the slider 'z' as 'Height A' or invert it
-            # Let's use the slider value 'z' as the depth from top for calculation (Method 2), 
-            # BUT for the diagram, let's calculate the Height A from bottom.
-            # Height A = Total Soil Height - Depth z
-            height_A = H2 - z 
+            # Point A Height (Directly from slider)
+            height_A = dist_A 
 
             # --- 3. DRAWING SOIL CHAMBER ---
-            # Main Box (Bottom at datum_y)
+            # Main Box
             ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, soil_h, 
                                            facecolor='#E3C195', hatch='...', edgecolor='black', lw=2))
             ax.text(soil_x + soil_w/2, datum_y + soil_h/2, "SOIL", ha='center', fontweight='bold', fontsize=12)
@@ -82,7 +80,7 @@ def app():
             # Tank
             tank_w = 2.0
             tank_x = soil_x + (soil_w - tank_w)/2
-            tank_y_base = val_y - 0.5 # Start tank slightly below water level
+            tank_y_base = val_y - 0.5 
             
             # Draw Neck
             ax.add_patch(patches.Rectangle((neck_x, datum_y + soil_h), neck_w, (tank_y_base - (datum_y + soil_h)) + 0.1, 
@@ -127,7 +125,7 @@ def app():
             ax.plot([left_tank_x, left_tank_x + tank_w], [val_x, val_x], 'b-', lw=2)
             ax.plot(left_tank_x + tank_w/2, val_x, marker='v', color='blue')
 
-            # --- 6. DIMENSIONS & VALUES ---
+            # --- 6. DIMENSIONS & LABELS (MATCHING SKETCH) ---
             
             # DATUM LINE
             ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
@@ -136,15 +134,15 @@ def app():
             # Dimension y (Top Head)
             dim_x_right = soil_x + soil_w + 1.2
             ax.annotate('', xy=(dim_x_right, datum_y), xytext=(dim_x_right, val_y), arrowprops=dict(arrowstyle='<->'))
-            ax.text(dim_x_right + 0.1, val_y/2, f"y\n{val_y:.1f}m", fontsize=11, fontweight='bold', ha='left')
+            ax.text(dim_x_right + 0.1, val_y/2, f"y = {val_y:.2f}m", fontsize=11, fontweight='bold', ha='left')
 
             # Dimension x (Bottom Head)
             ax.annotate('', xy=(left_tank_x - 0.3, datum_y), xytext=(left_tank_x - 0.3, val_x), arrowprops=dict(arrowstyle='<->'))
-            ax.text(left_tank_x - 0.8, val_x/2, f"x\n{val_x:.1f}m", fontsize=11, fontweight='bold', ha='right')
+            ax.text(left_tank_x - 0.4, val_x/2, f"x = {val_x:.2f}m", fontsize=11, fontweight='bold', ha='right')
 
-            # Dimension z (Soil Height) - Note: In your sketch 'z' labeled the soil height
+            # Dimension z (Soil Height)
             ax.annotate('', xy=(soil_x + soil_w + 0.2, datum_y), xytext=(soil_x + soil_w + 0.2, datum_y + soil_h), arrowprops=dict(arrowstyle='<->'))
-            ax.text(soil_x + soil_w + 0.3, soil_h/2, f"z (Soil)\n{H2:.1f}m", fontsize=10)
+            ax.text(soil_x + soil_w + 0.3, soil_h/2, f"z = {H_soil:.2f}m", fontsize=10)
 
             # Point A (Height from Bottom)
             ax.scatter(soil_x + soil_w/2, datum_y + height_A, color='red', zorder=5, s=80)
@@ -153,47 +151,76 @@ def app():
             # Dimension A (From Bottom)
             ax.annotate('', xy=(soil_x + soil_w/2, datum_y), xytext=(soil_x + soil_w/2, datum_y + height_A), 
                         arrowprops=dict(arrowstyle='<->', color='red'))
-            ax.text(soil_x + soil_w/2 + 0.1, height_A/2, f"A = {height_A:.1f}m", color='red', fontweight='bold')
+            ax.text(soil_x + soil_w/2 + 0.1, height_A/2, f"A = {height_A:.2f}m", color='red', fontweight='bold')
 
             ax.set_xlim(-1.5, 9)
             ax.set_ylim(datum_y - 1.5, max(val_x, val_y) + 1)
             ax.axis('off')
             st.pyplot(fig)
+
         # --- CALCULATION LOGIC ---
         if st.button("🚀 Calculate Effective Stress"):
-            i = h_loss / H2 # Hydraulic Gradient
+            i = h_loss / H_soil # Hydraulic Gradient
             
             # Determine Sign based on Flow Direction
             if "Downward" in flow_dir:
-                sign_txt = "-"
                 effect_txt = "Downward flow increases Effective Stress"
-                sigma_prime_2 = z * (gamma_sat - gamma_w) + (i * z * gamma_w)
-                formula_latex = r"\sigma' = z\gamma' + i z \gamma_w"
-                u_val = ((H1 + z) - (i * z)) * gamma_w
+                # Method 2 Formula (Using Z as depth from top for consistency with textbook formula)
+                # But here we have Height_A from bottom. 
+                # Depth z_depth = H_soil - height_A
+                z_depth = H_soil - height_A
                 
-            else:
-                sign_txt = "+"
+                # Formula: sigma' = z_depth * gamma' + i * z_depth * gamma_w
+                gamma_sub = gamma_sat - gamma_w
+                sigma_prime_2 = z_depth * gamma_sub + (i * z_depth * gamma_w)
+                
+                # Method 1: Total Stress - Pore Pressure
+                # Total Stress at A = Water Depth + Depth of Soil to A
+                sigma_total = (H_water * gamma_w) + (z_depth * gamma_sat)
+                
+                # Pore Pressure at A
+                # u = (Head_at_A - Elevation_at_A) * gamma_w
+                # Head at Top = val_y
+                # Head Loss to A = i * z_depth
+                # Head at A = val_y - (i * z_depth)
+                # Elevation at A = height_A
+                h_piezo_A = (val_y - (i * z_depth)) - height_A
+                u_val = h_piezo_A * gamma_w
+                
+            else: # Upward
                 effect_txt = "Upward flow decreases Effective Stress"
-                sigma_prime_2 = z * (gamma_sat - gamma_w) - (i * z * gamma_w)
-                formula_latex = r"\sigma' = z\gamma' - i z \gamma_w"
-                u_val = ((H1 + z) + (i*z)) * gamma_w
+                z_depth = H_soil - height_A
+                gamma_sub = gamma_sat - gamma_w
+                # Formula: sigma' = z_depth * gamma' - i * z_depth * gamma_w
+                sigma_prime_2 = z_depth * gamma_sub - (i * z_depth * gamma_w)
+                
+                # Method 1
+                sigma_total = (H_water * gamma_w) + (z_depth * gamma_sat)
+                # Head at A = val_x - Loss_from_bottom?? 
+                # Easier: Head at A = val_y + (i * z_depth) ?? No.
+                # Upward: Head at Bottom = val_x. Head drops as we go UP.
+                # Distance from bottom = height_A.
+                # Head at A = val_x - (i * height_A).
+                h_total_A = val_x - (i * height_A)
+                h_piezo_A = h_total_A - height_A
+                u_val = h_piezo_A * gamma_w
 
-            sigma_total = (H1 * gamma_w) + (z * gamma_sat)
             sigma_prime_1 = sigma_total - u_val
 
             st.success(f"**Condition:** {effect_txt}")
+            st.info(f"Depth of A from surface = {z_depth:.2f} m")
             
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("**Method 1: σ - u**")
-                st.latex(rf"\sigma = {H1}\gamma_w + {z}\gamma_{{sat}} = {sigma_total:.2f}")
-                st.latex(rf"u = ({H1} + {z}) \gamma_w {sign_txt} (i \cdot z \cdot \gamma_w) = {u_val:.2f}")
+                st.latex(rf"\sigma = {sigma_total:.2f} \, kPa")
+                st.latex(rf"u = {u_val:.2f} \, kPa")
                 st.latex(rf"\sigma' = {sigma_total:.2f} - {u_val:.2f} = \mathbf{{{sigma_prime_1:.2f} \, kPa}}")
             
             with c2:
                 st.markdown("**Method 2: Direct Formula**")
-                st.latex(rf"i = h/L = {h_loss}/{H2} = {i:.3f}")
-                st.latex(formula_latex)
+                st.latex(rf"i = h/L = {h_loss}/{H_soil} = {i:.3f}")
+                st.latex(rf"\sigma' = z \gamma' \pm i z \gamma_w")
                 st.latex(rf"\sigma' = \mathbf{{{sigma_prime_2:.2f} \, kPa}}")
 
     # =================================================================
