@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 
 def app():
     st.markdown("---")
-    st.subheader("⬇️ Advanced Effective Stress & Heave Analysis")
+    st.subheader("Advanced Effective Stress & Heave Analysis")
     
     # TABS for distinct workflows
-    tab1, tab2 = st.tabs(["📝 Stress Profile Calculator", "🛡️ Heave/Piping Check"])
+    tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heaving Check"])
 
     # ==================================================
     # TAB 1: STRESS PROFILE (Dynamic Layers + Capillary)
@@ -28,7 +28,7 @@ def app():
         num_layers = st.number_input("How many Soil Layers?", min_value=1, max_value=10, value=2)
         layers = []
         
-        st.markdown("### 🧱 Define Soil Layers")
+        st.markdown("### Define Soil Layers")
         for i in range(int(num_layers)):
             with st.expander(f"Layer {i+1}", expanded=(i==0)):
                 c1, c2, c3, c4 = st.columns(4)
@@ -55,7 +55,7 @@ def app():
                 })
 
         # 3. CALCULATION ENGINE
-        if st.button("🚀 Calculate Stress Profile", type="primary"):
+        if st.button("Calculate Stress Profile", type="primary"):
             results = []
             # Start at surface
             current_z = 0.0
@@ -134,7 +134,7 @@ def app():
                 })
 
             # --- DISPLAY ---
-            st.markdown("### 📊 Calculation Results")
+            st.markdown("### Calculation Results")
             df = pd.DataFrame(results)
             st.dataframe(df.style.format("{:.2f}"))
             
@@ -154,7 +154,7 @@ def app():
     # TAB 2: HEAVE & PIPING CHECK
     # ==================================================
     with tab2:
-        st.subheader("🛡️ Detailed Heave Analysis")
+        st.subheader("Detailed Heave Analysis")
         
         # Solving Goal
         scenario = st.radio("Select Solving Goal:", 
@@ -186,11 +186,11 @@ def app():
             current_exc = st.number_input("Current Excavation Depth (m)", 2.0, step=0.5)
             remaining_clay = h_clay_total - current_exc
             
-            if st.button("🚀 Calculate Step-by-Step FS"):
+            if st.button("Calculate Step-by-Step FS"):
                 downward_wt = remaining_clay * gamma_clay
                 fs_calc = downward_wt / u_artesian
                 
-                with st.expander("📝 View Detailed Calculation", expanded=True):
+                with st.expander("View Detailed Calculation", expanded=True):
                     st.markdown("**Step 2: Downward Force (Remaining Clay Weight)**")
                     st.latex(rf"T_{{remaining}} = H_{{total}} - H_{{exc}} = {h_clay_total:.2f} - {current_exc:.2f} = {remaining_clay:.2f} \, \text{{m}}")
                     st.latex(rf"\sigma_{{down}} = T_{{remaining}} \times \gamma_{{clay}} = {remaining_clay:.2f} \times {gamma_clay:.1f} = {downward_wt:.2f} \, \text{{kPa}}")
@@ -198,20 +198,20 @@ def app():
                     st.markdown("**Step 3: Factor of Safety**")
                     st.latex(rf"FS = \frac{{\sigma_{{down}}}}{{u_{{artesian}}}} = \frac{{{downward_wt:.2f}}}{{{u_artesian:.2f}}} = \mathbf{{{fs_calc:.3f}}}")
                 
-                if fs_calc < 1.0: st.error("❌ FAILURE: Bottom will heave.")
-                else: st.success(f"✅ Safe! FS = {fs_calc:.3f}")
+                if fs_calc < 1.0: st.error("FAILURE: Bottom will heave.")
+                else: st.success(f"Safe! FS = {fs_calc:.3f}")
 
         # --- 2. FIND MAX EXCAVATION DEPTH ---
         elif "Max Depth" in scenario:
             fs_req = st.number_input("Required Factor of Safety", 1.2, step=0.1)
             
-            if st.button("🚀 Derive Max Depth"):
+            if st.button("Derive Max Depth"):
                 # Calculation: (H - X) * G = FS * U  => X = H - (FS * U / G)
                 required_downward = fs_req * u_artesian
                 min_thickness = required_downward / gamma_clay
                 max_x = h_clay_total - min_thickness
                 
-                with st.expander("📝 View Detailed Derivation", expanded=True):
+                with st.expander("View Detailed Derivation", expanded=True):
                     st.markdown("**Step 2: Required Downward Resistance**")
                     st.latex(rf"\sigma_{{req}} = FS \times u_{{artesian}} = {fs_req:.1f} \times {u_artesian:.2f} = {required_downward:.2f} \, \text{{kPa}}")
                     
@@ -226,14 +226,14 @@ def app():
             planned_x = st.number_input("Planned Excavation Depth (m)", 4.0)
             fs_target = st.number_input("Target Factor of Safety", 1.2)
             
-            if st.button("🚀 Calculate Pumping Requirements"):
+            if st.button("Calculate Pumping Requirements"):
                 remaining_t = h_clay_total - planned_x
                 sigma_down = remaining_t * gamma_clay
                 allowable_u = sigma_down / fs_target
                 allowable_hp = allowable_u / 9.81
                 drawdown = h_p_interface - allowable_hp
                 
-                with st.expander("📝 View Pumping Logic", expanded=True):
+                with st.expander("View Pumping Logic", expanded=True):
                     st.markdown("**Step 2: Current Downward Pressure**")
                     st.latex(rf"\sigma_{{down}} = ({h_clay_total:.2f} - {planned_x:.2f}) \times {gamma_clay} = {sigma_down:.2f} \, \text{{kPa}}")
                     
