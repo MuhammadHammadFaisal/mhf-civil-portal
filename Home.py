@@ -3,15 +3,15 @@ import streamlit as st
 # 1. PAGE CONFIG (Must be the first command)
 st.set_page_config(
     page_title="MHF Civil Portal", 
-    page_icon="assets/logo.png",  # <--- [CHANGE 1] Replaced emoji with your logo path
+    page_icon="assets/Logo.png",  # <--- [CHANGE 1] Replaced emoji with your Logo path
     layout="wide"
 )
 
 # 2. THE BRANDING & BIO
 def main():
-    # --- [CHANGE 2] ADD SIDEBAR LOGO HERE ---
-    # This puts the logo nicely at the top left of the sidebar
-    st.logo("assets/logo.png", icon_image="assets/logo.png")
+    # --- [CHANGE 2] ADD SIDEBAR Logo HERE ---
+    # This puts the Logo nicely at the top left of the sidebar
+    st.Logo("assets/Logo.png", icon_image="assets/Logo.png")
     # ----------------------------------------
 
     st.markdown("# MHF Civil Portal")
@@ -58,3 +58,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
