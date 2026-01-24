@@ -1,19 +1,29 @@
 import streamlit as st
 
-# 1. PAGE CONFIG (Must be the first command)
+# 1. PAGE CONFIG
 st.set_page_config(
     page_title="MHF Civil Portal", 
-    page_icon="assets/logo.png",  # <--- [CHANGE 1] Replaced emoji with your logo path
+    page_icon="assets/logo.png", 
     layout="wide"
 )
 
 # 2. THE BRANDING & BIO
 def main():
-    # --- [CHANGE 2] ADD SIDEBAR logo HERE ---
-    # This puts the logo nicely at the top left of the sidebar
-    st.logo("assets/logo.png", icon_image="assets/logo.png")
-    # ----------------------------------------
+    # --- [CHANGE 1] HIDE DEFAULT MENU ---
+    # This removes the automatic list of files so your logo is the only thing at the top
+    st.markdown("""
+        <style>
+            [data-testid="stSidebarNav"] {display: none;}
+        </style>
+    """, unsafe_allow_html=True)
 
+    # --- [CHANGE 2] BIG SIDEBAR LOGO ---
+    # We use st.sidebar.image instead of st.logo to make it BIG.
+    with st.sidebar:
+        st.image("assets/logo.png", use_container_width=True)
+        st.markdown("---") # Adds a nice divider line below the logo
+
+    # --- MAIN PAGE CONTENT ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
@@ -58,5 +68,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
