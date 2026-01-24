@@ -39,93 +39,138 @@ def app():
             # Point of Interest
             z = st.slider("Depth of Point 'A' from top [m]", 0.0, H2, H2/2)
 
-# --- DYNAMIC MATPLOTLIB DIAGRAM (PROFESSIONAL TEXTBOOK STYLE) ---
+# --- DYNAMIC MATPLOTLIB DIAGRAM (RESERVOIR STYLE) ---
         with col_plot:
-            fig, ax = plt.subplots(figsize=(6, 7))
+            fig, ax = plt.subplots(figsize=(7, 8))
             
-            # --- SETUP COORDINATES ---
-            soil_w = 3.5
-            soil_x = 2.0
-            S_bot = 0.0
-            S_top = H2
-            W_top = S_top + H1
+            # --- COORDINATES ---
+            # Soil Box (Center)
+            soil_w = 2.5
+            soil_h = H2
+            soil_x = 3.0
+            soil_y = 2.0  # Elevate soil so we can draw tubes below
             
-            # Calculate Head Levels
-            TH_top = W_top
+            # Water Heights (Relative to Datum at y=0)
+            # In your sketch: 
+            # 'y' is the total head at the top (measured from datum)
+            # 'x' is the total head at the bottom (measured from datum)
+            # Let's map inputs: H1 = Head Difference, H2 = Soil Height.
+            # We need to assume a Datum. Let's say Datum is at bottom of soil tube.
+            
+            # For drawing, let's just use the visual proportions from your sketch
+            # Top Water Level (Head y)
+            wl_top = soil_y + soil_h + H1 
+            # Bottom Water Level (Head x) -> If flow is downward, x < y
+            # If flow is upward, x > y.
             if "Downward" in flow_dir:
-                TH_bot = TH_top - h_loss
-                grad_color = '#E74C3C' # Red for loss
-                flow_sym = "⬇️"
+                wl_bot = wl_top - h_loss
             else:
-                TH_bot = TH_top + h_loss
-                grad_color = '#27AE60' # Green for upward gain
-                flow_sym = "⬆️"
-
-            # --- 1. DRAW SOIL COLUMN & COMPONENTS ---
-            # Main Glass Cylinder (Behind everything)
-            ax.add_patch(patches.Rectangle((soil_x, -0.5), soil_w, S_top + H1 + 1.5, 
-                                           facecolor='#F8F9F9', edgecolor='#2C3E50', linewidth=2.5))
+                wl_bot = wl_top + h_loss
+                
+            # --- 1. DRAW SOIL CHAMBER ---
+            # Main Box
+            ax.add_patch(patches.Rectangle((soil_x, soil_y), soil_w, soil_h, 
+                                           facecolor='#E3C195', hatch='...', edgecolor='black', lw=2))
+            ax.text(soil_x + soil_w/2, soil_y + soil_h/2, "SOIL", ha='center', fontweight='bold')
             
-            # Soil Specimen with professional hatching
-            rect_soil = patches.Rectangle((soil_x, S_bot), soil_w, H2, 
-                                           facecolor='#D2B48C', hatch='...', edgecolor='#5D4037', alpha=0.9, linewidth=1.5)
-            ax.add_patch(rect_soil)
+            # --- 2. TOP RESERVOIR (Head 'y') ---
+            # Neck connecting soil to top tank
+            neck_w = 0.8
+            neck_x = soil_x + (soil_w - neck_w)/2
+            neck_h = wl_top - (soil_y + soil_h) - 0.5 # Stop a bit before water level
             
-            # Porous Stones (Top & Bottom)
-            ax.add_patch(patches.Rectangle((soil_x, S_bot-0.2), soil_w, 0.2, facecolor='#7F8C8D', hatch='///', edgecolor='black'))
-            ax.add_patch(patches.Rectangle((soil_x, S_top), soil_w, 0.2, facecolor='#7F8C8D', hatch='///', edgecolor='black'))
-
-            # Water Layer Above Soil
-            ax.add_patch(patches.Rectangle((soil_x, S_top+0.2), soil_w, H1-0.2, facecolor='#AED6F1', alpha=0.6))
-
-            # --- 2. PIEZOMETER STANDPIPES ---
-            # Left Piezometer (Connected to Top of Soil)
-            px_left = soil_x - 1.5
-            ax.add_patch(patches.Rectangle((px_left, S_bot), 0.4, TH_top + 0.5, facecolor='white', edgecolor='black', alpha=0.3))
-            ax.add_patch(patches.Rectangle((px_left, S_bot), 0.4, TH_top, facecolor='#3498DB', alpha=0.5))
-            ax.plot([px_left, px_left+0.4], [TH_top, TH_top], 'b-', lw=2) # Water surface
-            ax.plot(px_left+0.2, TH_top, marker='v', color='blue', markersize=8) # Triangle
+            # Draw Neck
+            ax.add_patch(patches.Rectangle((neck_x, soil_y + soil_h), neck_w, neck_h + 1.5, 
+                                           facecolor='#D6EAF8', edgecolor='black', lw=2))
             
-            # Right Piezometer (Connected to Bottom of Soil)
-            px_right = soil_x + soil_w + 1.1
-            ax.add_patch(patches.Rectangle((px_right, S_bot), 0.4, TH_bot + 0.5, facecolor='white', edgecolor='black', alpha=0.3))
-            ax.add_patch(patches.Rectangle((px_right, S_bot), 0.4, TH_bot, facecolor='#3498DB', alpha=0.5))
-            ax.plot([px_right, px_right+0.4], [TH_bot, TH_bot], 'b-', lw=2)
-            ax.plot(px_right+0.2, TH_bot, marker='v', color='blue', markersize=8)
-
-            # Connections
-            ax.plot([px_left+0.4, soil_x], [S_top+0.1, S_top+0.1], 'k-', lw=1.5) # Top connection
-            ax.plot([soil_x+soil_w, px_right], [S_bot-0.1, S_bot-0.1], 'k-', lw=1.5) # Bottom connection
-
-            # --- 3. THE "TEACHING" LINE (Hydraulic Gradient) ---
-            ax.plot([px_left+0.2, px_right+0.2], [TH_top, TH_bot], color=grad_color, linestyle='--', lw=2.5)
+            # Draw Top Tank (Wide)
+            tank_w = 2.0
+            tank_x = soil_x + (soil_w - tank_w)/2
+            tank_y = wl_top - 0.5
+            tank_h = 1.0
             
-            # Head Loss Dimension (h)
-            dim_x = px_right + 0.8
-            ax.annotate('', xy=(dim_x, TH_top), xytext=(dim_x, TH_bot), arrowprops=dict(arrowstyle='<->', lw=2, color=grad_color))
-            ax.text(dim_x+0.2, (TH_top+TH_bot)/2, f'h = {h_loss}m', color=grad_color, fontweight='bold', va='center')
+            # Tank Box
+            ax.add_patch(patches.Rectangle((tank_x, tank_y), tank_w, tank_h, 
+                                           facecolor='white', edgecolor='black', lw=2))
+            # Water in Tank
+            ax.add_patch(patches.Rectangle((tank_x, tank_y), tank_w, 0.5, 
+                                           facecolor='#D6EAF8'))
+            # Water Surface Line
+            ax.plot([tank_x, tank_x + tank_w], [wl_top, wl_top], 'b-', lw=2)
+            ax.plot(tank_x + tank_w/2, wl_top, marker='v', color='blue')
 
-            # --- 4. DIMENSIONS & LABELS ---
-            # Soil Height (L)
-            ax.annotate('', xy=(soil_x-0.5, S_bot), xytext=(soil_x-0.5, S_top), arrowprops=dict(arrowstyle='<->', color='black'))
-            ax.text(soil_x-0.6, (S_bot+S_top)/2, f'L = {H2}m', rotation=90, va='center', ha='right')
+            # --- 3. LEFT RESERVOIR (Head 'x') ---
+            # Connected to bottom of soil
+            # Tube coordinates
+            tube_w = 0.6
+            tube_x_start = soil_x + (soil_w - tube_w)/2
+            tube_y_start = soil_y
             
-            # Point A Indicator
-            y_A = S_top - z
-            ax.scatter(soil_x + soil_w/2, y_A, color='red', s=100, edgecolor='black', zorder=5)
-            ax.text(soil_x + soil_w/2 + 0.3, y_A, 'Point A', color='red', fontweight='bold', fontsize=12)
+            left_tank_x = 0.5
+            
+            # Draw "U-Tube" path
+            # Vertical down from soil
+            ax.add_patch(patches.Rectangle((tube_x_start, soil_y - 1.0), tube_w, 1.0, 
+                                           facecolor='#D6EAF8', edgecolor='black', lw=2)) # Down segment
+            
+            # Horizontal to left
+            ax.add_patch(patches.Rectangle((left_tank_x + tank_w/2 - tube_w/2, soil_y - 1.0), 
+                                           tube_x_start - (left_tank_x + tank_w/2 - tube_w/2) + tube_w, tube_w, 
+                                           facecolor='#D6EAF8', edgecolor='black', lw=2))
+            
+            # Vertical up to Left Tank
+            up_tube_x = left_tank_x + tank_w/2 - tube_w/2
+            ax.add_patch(patches.Rectangle((up_tube_x, soil_y - 1.0), tube_w, wl_bot - (soil_y - 1.0), 
+                                           facecolor='#D6EAF8', edgecolor='black', lw=2))
 
-            # Datum Line
-            ax.axhline(S_bot-0.1, ls='-.', color='black', alpha=0.5)
-            ax.text(soil_x-1.4, S_bot-0.4, "DATUM (Elev=0)", style='italic', fontsize=9)
+            # Left Tank (Wide)
+            l_tank_y = wl_bot - 0.5
+            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_y), tank_w, tank_h, 
+                                           facecolor='white', edgecolor='black', lw=2))
+            # Water in Left Tank
+            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_y), tank_w, 0.5, 
+                                           facecolor='#D6EAF8'))
+            # Water Surface Line
+            ax.plot([left_tank_x, left_tank_x + tank_w], [wl_bot, wl_bot], 'b-', lw=2)
+            ax.plot(left_tank_x + tank_w/2, wl_bot, marker='v', color='blue')
 
-            # Flow Arrow
-            ax.text(soil_x + soil_w/2, W_top + 0.5, f"FLOW {flow_sym}", ha='center', fontweight='bold', color='#2980B9', fontsize=14)
+            # --- 4. DIMENSIONS (Matching Sketch) ---
+            # Datum Line at bottom of U-tube
+            datum_y = soil_y - 1.0
+            ax.plot([-0.5, 7], [datum_y, datum_y], 'k-.')
+            ax.text(0, datum_y - 0.3, "Datum")
 
-            # Final Polish
-            ax.set_xlim(px_left - 1, dim_x + 1.5)
-            ax.set_ylim(-1, max(TH_top, TH_bot) + 2)
-            ax.set_aspect('equal')
+            # Dimension 'x' (Left Head)
+            ax.annotate('', xy=(left_tank_x - 0.3, datum_y), xytext=(left_tank_x - 0.3, wl_bot), arrowprops=dict(arrowstyle='<->'))
+            ax.text(left_tank_x - 0.6, (datum_y + wl_bot)/2, "x", fontsize=14, fontweight='bold')
+            
+            # Dimension 'y' (Top Head)
+            dim_x_right = soil_x + soil_w + 1.0
+            ax.annotate('', xy=(dim_x_right, datum_y), xytext=(dim_x_right, wl_top), arrowprops=dict(arrowstyle='<->'))
+            ax.text(dim_x_right + 0.2, (datum_y + wl_top)/2, "y", fontsize=14, fontweight='bold')
+            
+            # Dimension 'z' (Soil Height)
+            ax.annotate('', xy=(soil_x + soil_w + 0.3, soil_y), xytext=(soil_x + soil_w + 0.3, soil_y + soil_h), arrowprops=dict(arrowstyle='<->'))
+            ax.text(soil_x + soil_w + 0.4, soil_y + soil_h/2, "z", fontsize=12)
+
+            # Dimension 'A' (Point Height)
+            pt_A_y = soil_y + (soil_h - z) # z input is depth from top, so height from bottom is H-z
+            # Wait, in sketch 'A' is height from bottom.
+            # Let's verify 'z' input slider. The slider says "Depth of Point C".
+            # If slider value is 'depth', then height A = soil_h - depth.
+            height_A = soil_h - z
+            
+            # Draw Point A
+            ax.scatter(soil_x + soil_w/2, soil_y + height_A, color='red', zorder=5)
+            ax.text(soil_x + soil_w/2 + 0.2, soil_y + height_A, "Point A", color='red', fontweight='bold')
+            
+            # Draw dimension A
+            ax.annotate('', xy=(soil_x + soil_w/2, soil_y), xytext=(soil_x + soil_w/2, soil_y + height_A), 
+                        arrowprops=dict(arrowstyle='<->', color='red'))
+            ax.text(soil_x + soil_w/2 + 0.1, soil_y + height_A/2, "A", color='red')
+
+            ax.set_xlim(-1, 8)
+            ax.set_ylim(datum_y - 1, wl_top + 1)
             ax.axis('off')
             st.pyplot(fig)
 
