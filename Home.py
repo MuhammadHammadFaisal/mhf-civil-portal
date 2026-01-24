@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import base64
 
 # 1. PAGE CONFIG
 st.set_page_config(
@@ -9,18 +8,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- HELPER: CONVERT IMAGE TO BASE64 ---
-# This ensures the image loads even when using custom HTML
-def get_base64_of_bin_file(bin_file):
-    try:
-        with open(bin_file, 'rb') as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
-    except FileNotFoundError:
-        return None
-
-# --- GET ACTIVE MODULES FUNCTION ---
 def get_active_modules():
+    """Scans 'pages/' directory for active modules."""
     active_modules = []
     if os.path.exists("pages"):
         files = os.listdir("pages")
@@ -40,43 +29,25 @@ def get_active_modules():
     return sorted(active_modules)
 
 def main():
-    # 1. LOAD THE LOGO AS BASE64
-    logo_path = "assets/logo.png"
-    logo_base64 = get_base64_of_bin_file(logo_path)
+    # --- LOGO FIX ---
+    # 1. Add the logo using the official method (this puts it at the top)
+    st.logo("assets/logo.png", icon_image="assets/logo.png")
 
-    # 2. INJECT CSS & LOGO HTML
-    # We inject the image directly into the sidebar using HTML, not st.image
-    if logo_base64:
-        st.markdown(
-            f"""
-            <style>
-                /* Push the default navigation down */
-                [data-testid="stSidebarNav"] {{
-                    padding-top: 200px; /* Adjust this if logo is taller/shorter */
-                }}
-                
-                /* Create a container for the logo */
-                .sidebar-logo-container {{
-                    position: absolute;
-                    top: 20px;
-                    left: 20px;
-                    width: 260px; /* Adjust width to fit sidebar */
-                    z-index: 999;
-                }}
-            </style>
-            
-            <div data-testid="stSidebar" class="css-1d391kg">
-                <div class="sidebar-logo-container">
-                    <img src="data:image/png;base64,{logo_base64}" width="100%">
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.error(f"⚠️ Could not find logo at {logo_path}")
+    # 2. Force it to be BIGGER using CSS
+    st.markdown(
+        """
+        <style>
+            [data-testid="stLogo"] {
+                width: 300px !important;  /* Force width */
+                height: auto !important;  /* Auto height */
+                max-width: 100%;          /* Ensure it fits */
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
-    # --- MAIN PAGE CONTENT ---
+    # --- HOME PAGE CONTENT ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
