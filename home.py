@@ -1,84 +1,118 @@
 import streamlit as st
 
-# Import your existing module
-# Note: Ensure your soil mechanics file is named 'soil_mechanics.py' in the same folder 
-# OR inside a folder named 'pages' or 'modules'. 
-# If it is inside pages/01_Soil... you might need to adjust the import or just paste the logic here.
-# For this example, I assume you will paste your Soil Logic where indicated.
+# ==========================================
+# 1. HELPER FUNCTIONS & PAGES
+# ==========================================
 
-def construction_page(course_name):
-    """The professional placeholder for missing modules"""
-    st.title(f"🚧 {course_name}")
-    st.warning("This module is currently under active development.")
+def home_dashboard():
+    """The Main Home Page"""
+    st.title("🏗️ MHF Civil Portal")
+    st.caption("Deterministic Civil Engineering Computation Platform | METU")
+    st.markdown("---")
+    
+    # Professional Dashboard Layout
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("🚀 Active Workspaces")
+        # Active Module Card
+        with st.container(border=True):
+            c1, c2 = st.columns([1, 5])
+            with c1: st.header("🪨")
+            with c2:
+                st.markdown("**Soil Mechanics (CE 363)**")
+                st.caption("Classify soils, calculate flow, and determine effective stress.")
+                st.success("● Status: Online")
+
+    with col2:
+        st.subheader("Updates")
+        st.code("""
+v1.2: Added 1D Seepage
+v1.1: Fixed Permeability
+v1.0: Portal Launch
+        """, language="text")
+        
+        st.info("Developed by Hammad (METU Civil Dept)")
+
+def construction_page(module_name):
+    """Placeholder for missing courses"""
+    st.title(f"🔒 {module_name}")
+    st.markdown("---")
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        st.image("https://img.freepik.com/free-vector/under-construction-warning-sign-vector_53876-166418.jpg?w=740", width=150)
+        # Professional "Blueprint" style placeholder
+        st.warning("Module Under Construction")
+        st.caption("This engineering module is currently in the development queue.")
+    
     with col2:
-        st.write(f"**Status:** Planned for Q4 2026")
-        st.write(f"**Developer:** Hammad (METU)")
-        st.progress(0.1, text="Development Progress: 10%")
-        st.info("Priority is given to CE363 (Soil Mechanics). Check back later for updates.")
+        st.write("### Development Roadmap")
+        st.write(f"**Target Release:** Fall 2026")
+        st.write("**Priority:** Low")
+        st.progress(0.05, text="Coding in progress...")
+
+# ==========================================
+# 2. MAIN APP & SIDEBAR LOGIC
+# ==========================================
 
 def main():
-    st.set_page_config(page_title="MHF Civil Portal", page_icon="🏗️", layout="wide")
+    st.set_page_config(page_title="MHF Civil", page_icon="🏗️", layout="wide")
 
-    # --- SIDEBAR NAVIGATION TREE ---
-    st.sidebar.title("🏗️ MHF Civil Portal")
-    st.sidebar.caption("Deterministic Engineering Calculator")
-    st.sidebar.markdown("---")
+    # --- SIDEBAR SETUP ---
+    st.sidebar.title("🏗️ MHF Civil")
+    st.sidebar.markdown("### Navigation")
 
-    # 1. Select Year Level
-    year_level = st.sidebar.selectbox(
-        "Select Year Level:",
-        ["2nd Year (Sophomore)", "3rd Year (Junior)", "4th Year (Senior)"]
-    )
+    # Define the Menu Structure (The "Blocks")
+    # We use dividers ("---") to visually separate the years
+    menu_options = [
+        "🏠 Home Page",
+        "--- 2ND YEAR MODULES ---",
+        "CE 221: Statics",
+        "CE 224: Strength of Materials",
+        "CE 241: Materials Science",
+        "CE 282: Fluid Mechanics",
+        "--- 3RD YEAR MODULES ---",
+        "CE 305: Hydromechanics",
+        "CE 353: Transportation Eng.",
+        "✅ CE 363: Soil Mechanics",  # Added checkmark to show it's active
+        "CE 366: Foundation Eng.",
+        "CE 383: Structural Analysis"
+    ]
 
-    # 2. Dynamic Course List based on Year (METU Curriculum)
-    if "2nd Year" in year_level:
-        course = st.sidebar.radio(
-            "Select Course:",
-            [
-                "🔒 CE 221: Statics",
-                "🔒 CE 224: Strength of Materials",
-                "🔒 CE 241: Materials Science",
-                "🔒 CE 282: Fluid Mechanics"
-            ]
-        )
+    # The Selection Widget
+    selection = st.sidebar.radio("Go to:", menu_options, label_visibility="collapsed")
+
+    # --- ROUTER LOGIC ---
     
-    elif "3rd Year" in year_level:
-        course = st.sidebar.radio(
-            "Select Course:",
-            [
-                "✅ CE 363: Soil Mechanics",  # <--- The only active one
-                "🔒 CE 305: Hydromechanics",
-                "🔒 CE 353: Transportation Eng.",
-                "🔒 CE 366: Foundation Eng.",
-                "🔒 CE 383: Structural Analysis"
-            ]
-        )
-        
-    else: # 4th Year
-        course = st.sidebar.radio(
-            "Select Course:",
-            [
-                "🔒 CE 4XX: Capstone Design",
-                "🔒 CE 4XX: Electives"
-            ]
-        )
+    # 1. Home Page
+    if "Home" in selection:
+        home_dashboard()
 
-    # --- MAIN PAGE ROUTER ---
-    
-    if "Soil Mechanics" in course:
-        # === LOAD YOUR ACTIVE MODULE HERE ===
-        # You can import your soil_mechanics.app() here
-        # Or paste the Soil Mechanics code block directly here.
-        import pages.Soil_Mechanics as sm  # Example import if using pages folder
-        sm.app() # Assuming your soil file has an app() function
-        
+    # 2. Active Module (Soil Mechanics)
+    elif "Soil Mechanics" in selection:
+        # THIS IS WHERE WE LOAD YOUR SOIL CODE
+        # Ensure your soil mechanics file is named 'topics/flow_water.py' or similar
+        # and has a function called app(). 
+        # For now, I will try to import it, or you can paste the code here.
+        try:
+            # Adjust this import to match your file name!
+            from topics import flow_water 
+            flow_water.app()
+        except ImportError:
+            st.error("⚠️ Error: Could not load Soil Mechanics module. Make sure the file exists.")
+
+    # 3. Separators (If user clicks the dashed lines)
+    elif "---" in selection:
+        st.sidebar.warning("Please select a course below the header.")
+        home_dashboard() # Default to home
+
+    # 4. Under Construction Pages (Everything else)
     else:
-        # === LOAD CONSTRUCTION PAGE ===
-        construction_page(course)
+        construction_page(selection)
+
+    # --- SIDEBAR FOOTER ---
+    st.sidebar.markdown("---")
+    st.sidebar.caption("© 2026 MHF Civil Engineering")
 
 if __name__ == "__main__":
     main()
