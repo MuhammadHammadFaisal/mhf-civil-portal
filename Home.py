@@ -1,4 +1,5 @@
 import streamlit as st
+import os  # <--- [NEW] Needed to scan folders
 
 # 1. PAGE CONFIG
 st.set_page_config(
@@ -7,20 +8,58 @@ st.set_page_config(
     layout="wide"
 )
 
+def get_active_modules():
+    """Scans the 'pages' directory to find active files"""
+    modules = []
+    # Check if pages folder exists
+    if os.path.exists("pages"):
+        files = os.listdir("pages")
+        for f in files:
+            # We only want Python files, but not __init__.py
+            if f.endswith(".py") and f != "__init__.py":
+                # Clean the name: "01_Soil_Mechanics.py" -> "Soil Mechanics"
+                clean_name = f.replace(".py", "").replace("_", " ").replace("-", " ")
+                
+                # Optional: Remove sorting numbers (like "01 " or "1.")
+                parts = clean_name.split(" ", 1)
+                if parts[0].isdigit():
+                    clean_name = parts[1]
+                    
+                modules.append(clean_name.title()) # Make it Capital Case
+    return sorted(modules)
+
 def main():
-    # --- LOGO AT THE TOP ---
-    # We use a container with a special sidebar method to ensure it renders first
+    # --- SIDEBAR LOGO ---
     with st.sidebar:
-        # This empty container pushes the logo to the top
         st.image("assets/logo.png", use_container_width=True)
-        st.markdown("---") # Optional divider
+        st.markdown("---") 
     
-    # --- HOME PAGE CONTENT ---
+    # --- HEADER ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
     
-    # Welcome Message
+    # --- [NEW SECTION] AUTOMATIC MODULE CHECKER ---
+    st.subheader("🚀 Active Workspaces")
+    
+    # Run the scanner
+    available_modules = get_active_modules()
+
+    if available_modules:
+        # Create a grid layout (2 cards per row)
+        cols = st.columns(2)
+        for index, module_name in enumerate(available_modules):
+            # The % 2 logic alternates between column 1 and column 2
+            with cols[index % 2]:
+                with st.container(border=True):
+                    st.markdown(f"**{module_name}**")
+                    st.caption("✅ Module Online")
+    else:
+        st.warning("No modules found in the 'pages/' folder yet.")
+        
+    st.markdown("---")
+
+    # --- MISSION STATEMENT ---
     st.markdown("""
     ### Precision. Logic. Deterministic.
     
@@ -42,7 +81,6 @@ def main():
     **engineering results should be reproducible, transparent, and mathematically defensible.**
     """)
 
-   # Added "https://"
     st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229")
     
     # --- FOOTER ---
@@ -51,7 +89,7 @@ def main():
         """
         <div style='text-align: center; color: #666; font-size: 12px;'>
         © 2026 MHF Civil. All rights reserved.<br>
-        Version 1.1.0 · Ankara, Turkey
+        Version 1.2.0 · Ankara, Turkey
         </div>
         """, 
         unsafe_allow_html=True
@@ -59,7 +97,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
