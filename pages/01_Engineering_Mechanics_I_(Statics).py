@@ -9,8 +9,8 @@ def app():
     col1, col2 = st.columns([1, 2])
     
         
-        st.info("Expected Release: Fall 2026")
-        st.progress(0.1, text="Coding in progress...")
+    st.info("Expected Release: Fall 2026")
+    st.progress(0.1, text="Coding in progress...")
 
 if __name__ == "__main__":
     app()
