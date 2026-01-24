@@ -96,8 +96,8 @@ def main():
     elif "Soil Mechanics" in selection:
         # 4. FIXED: Ensures it loads the 'flow_water' module (the whole file)
         try:
-            from topics import flow_water
-            flow_water.app()
+            from pages import 01_Soil_Mechanics.py
+            01_Soil_Mechanics.app()
         except ImportError:
             st.error("⚠️ Error: Could not find 'topics/flow_water.py'. Please check your file structure.")
 
@@ -107,3 +107,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
