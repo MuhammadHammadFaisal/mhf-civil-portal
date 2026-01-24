@@ -39,141 +39,126 @@ def app():
             # Point of Interest
             z = st.slider("Depth of Point 'A' from top [m]", 0.0, H2, H2/2)
 
-# --- DYNAMIC MATPLOTLIB DIAGRAM (RESERVOIR STYLE) ---
+# --- DYNAMIC MATPLOTLIB DIAGRAM (CORRECTED DATUM & VALUES) ---
         with col_plot:
             fig, ax = plt.subplots(figsize=(7, 8))
             
-            # --- COORDINATES ---
-            # Soil Box (Center)
+            # --- 1. COORDINATE SYSTEM ---
+            # We set the Datum (y=0) at the BOTTOM of the soil
             soil_w = 2.5
-            soil_h = H2
-            soil_x = 3.0
-            soil_y = 2.0  # Elevate soil so we can draw tubes below
+            soil_h = H2  # Total height of soil
+            soil_x = 3.0 # X-position of soil box
+            datum_y = 0.0 # Datum is exactly at bottom of soil
             
-            # Water Heights (Relative to Datum at y=0)
-            # In your sketch: 
-            # 'y' is the total head at the top (measured from datum)
-            # 'x' is the total head at the bottom (measured from datum)
-            # Let's map inputs: H1 = Head Difference, H2 = Soil Height.
-            # We need to assume a Datum. Let's say Datum is at bottom of soil tube.
+            # --- 2. CALCULATE HEAD VALUES (Relative to Datum) ---
+            # y = Total Head at Top (Elevation Head H2 + Pressure Head H1)
+            val_y = H2 + H1
             
-            # For drawing, let's just use the visual proportions from your sketch
-            # Top Water Level (Head y)
-            wl_top = soil_y + soil_h + H1 
-            # Bottom Water Level (Head x) -> If flow is downward, x < y
-            # If flow is upward, x > y.
+            # x = Total Head at Bottom
+            # Downward Flow: Head drops from Top to Bottom (x < y)
+            # Upward Flow: Head drops from Bottom to Top (x > y)
             if "Downward" in flow_dir:
-                wl_bot = wl_top - h_loss
+                val_x = val_y - h_loss
             else:
-                wl_bot = wl_top + h_loss
+                val_x = val_y + h_loss
                 
-            # --- 1. DRAW SOIL CHAMBER ---
-            # Main Box
-            ax.add_patch(patches.Rectangle((soil_x, soil_y), soil_w, soil_h, 
+            # Point A (Height from Bottom)
+            # We need to interpret the slider 'z' as 'Height A' or invert it
+            # Let's use the slider value 'z' as the depth from top for calculation (Method 2), 
+            # BUT for the diagram, let's calculate the Height A from bottom.
+            # Height A = Total Soil Height - Depth z
+            height_A = H2 - z 
+
+            # --- 3. DRAWING SOIL CHAMBER ---
+            # Main Box (Bottom at datum_y)
+            ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, soil_h, 
                                            facecolor='#E3C195', hatch='...', edgecolor='black', lw=2))
-            ax.text(soil_x + soil_w/2, soil_y + soil_h/2, "SOIL", ha='center', fontweight='bold')
+            ax.text(soil_x + soil_w/2, datum_y + soil_h/2, "SOIL", ha='center', fontweight='bold', fontsize=12)
             
-            # --- 2. TOP RESERVOIR (Head 'y') ---
-            # Neck connecting soil to top tank
+            # --- 4. TOP RESERVOIR (Head y) ---
+            # Neck
             neck_w = 0.8
             neck_x = soil_x + (soil_w - neck_w)/2
-            neck_h = wl_top - (soil_y + soil_h) - 0.5 # Stop a bit before water level
-            
-            # Draw Neck
-            ax.add_patch(patches.Rectangle((neck_x, soil_y + soil_h), neck_w, neck_h + 1.5, 
-                                           facecolor='#D6EAF8', edgecolor='black', lw=2))
-            
-            # Draw Top Tank (Wide)
+            # Tank
             tank_w = 2.0
             tank_x = soil_x + (soil_w - tank_w)/2
-            tank_y = wl_top - 0.5
-            tank_h = 1.0
+            tank_y_base = val_y - 0.5 # Start tank slightly below water level
             
-            # Tank Box
-            ax.add_patch(patches.Rectangle((tank_x, tank_y), tank_w, tank_h, 
+            # Draw Neck
+            ax.add_patch(patches.Rectangle((neck_x, datum_y + soil_h), neck_w, (tank_y_base - (datum_y + soil_h)) + 0.1, 
+                                           facecolor='#D6EAF8', edgecolor='black', lw=2))
+            
+            # Draw Top Tank
+            ax.add_patch(patches.Rectangle((tank_x, tank_y_base), tank_w, 1.0, 
                                            facecolor='white', edgecolor='black', lw=2))
             # Water in Tank
-            ax.add_patch(patches.Rectangle((tank_x, tank_y), tank_w, 0.5, 
+            ax.add_patch(patches.Rectangle((tank_x, tank_y_base), tank_w, 0.5, 
                                            facecolor='#D6EAF8'))
-            # Water Surface Line
-            ax.plot([tank_x, tank_x + tank_w], [wl_top, wl_top], 'b-', lw=2)
-            ax.plot(tank_x + tank_w/2, wl_top, marker='v', color='blue')
+            # Water Level Line (y)
+            ax.plot([tank_x, tank_x + tank_w], [val_y, val_y], 'b-', lw=2)
+            ax.plot(tank_x + tank_w/2, val_y, marker='v', color='blue')
 
-            # --- 3. LEFT RESERVOIR (Head 'x') ---
-            # Connected to bottom of soil
-            # Tube coordinates
+            # --- 5. LEFT RESERVOIR (Head x) ---
+            # Connected to bottom (Datum)
             tube_w = 0.6
-            tube_x_start = soil_x + (soil_w - tube_w)/2
-            tube_y_start = soil_y
-            
             left_tank_x = 0.5
             
-            # Draw "U-Tube" path
-            # Vertical down from soil
-            ax.add_patch(patches.Rectangle((tube_x_start, soil_y - 1.0), tube_w, 1.0, 
-                                           facecolor='#D6EAF8', edgecolor='black', lw=2)) # Down segment
-            
-            # Horizontal to left
-            ax.add_patch(patches.Rectangle((left_tank_x + tank_w/2 - tube_w/2, soil_y - 1.0), 
-                                           tube_x_start - (left_tank_x + tank_w/2 - tube_w/2) + tube_w, tube_w, 
+            # U-Tube Path
+            # 1. Down from soil bottom
+            ax.add_patch(patches.Rectangle((soil_x + (soil_w-tube_w)/2, datum_y - 1.0), tube_w, 1.0, 
                                            facecolor='#D6EAF8', edgecolor='black', lw=2))
-            
-            # Vertical up to Left Tank
+            # 2. Horizontal
+            ax.add_patch(patches.Rectangle((left_tank_x + tank_w/2 - tube_w/2, datum_y - 1.0), 
+                                           (soil_x + (soil_w-tube_w)/2) - (left_tank_x + tank_w/2 - tube_w/2) + tube_w, tube_w, 
+                                           facecolor='#D6EAF8', edgecolor='black', lw=2))
+            # 3. Up to Left Tank
             up_tube_x = left_tank_x + tank_w/2 - tube_w/2
-            ax.add_patch(patches.Rectangle((up_tube_x, soil_y - 1.0), tube_w, wl_bot - (soil_y - 1.0), 
+            ax.add_patch(patches.Rectangle((up_tube_x, datum_y - 1.0), tube_w, (val_x - 0.5) - (datum_y - 1.0) + 0.1, 
                                            facecolor='#D6EAF8', edgecolor='black', lw=2))
-
-            # Left Tank (Wide)
-            l_tank_y = wl_bot - 0.5
-            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_y), tank_w, tank_h, 
+            
+            # Left Tank Box
+            l_tank_y_base = val_x - 0.5
+            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_y_base), tank_w, 1.0, 
                                            facecolor='white', edgecolor='black', lw=2))
             # Water in Left Tank
-            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_y), tank_w, 0.5, 
+            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_y_base), tank_w, 0.5, 
                                            facecolor='#D6EAF8'))
-            # Water Surface Line
-            ax.plot([left_tank_x, left_tank_x + tank_w], [wl_bot, wl_bot], 'b-', lw=2)
-            ax.plot(left_tank_x + tank_w/2, wl_bot, marker='v', color='blue')
+            # Water Level Line (x)
+            ax.plot([left_tank_x, left_tank_x + tank_w], [val_x, val_x], 'b-', lw=2)
+            ax.plot(left_tank_x + tank_w/2, val_x, marker='v', color='blue')
 
-            # --- 4. DIMENSIONS (Matching Sketch) ---
-            # Datum Line at bottom of U-tube
-            datum_y = soil_y - 1.0
-            ax.plot([-0.5, 7], [datum_y, datum_y], 'k-.')
-            ax.text(0, datum_y - 0.3, "Datum")
+            # --- 6. DIMENSIONS & VALUES ---
+            
+            # DATUM LINE
+            ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
+            ax.text(soil_x + soil_w + 0.5, datum_y, "Datum (z=0)", va='center', fontsize=10, style='italic')
 
-            # Dimension 'x' (Left Head)
-            ax.annotate('', xy=(left_tank_x - 0.3, datum_y), xytext=(left_tank_x - 0.3, wl_bot), arrowprops=dict(arrowstyle='<->'))
-            ax.text(left_tank_x - 0.6, (datum_y + wl_bot)/2, "x", fontsize=14, fontweight='bold')
-            
-            # Dimension 'y' (Top Head)
-            dim_x_right = soil_x + soil_w + 1.0
-            ax.annotate('', xy=(dim_x_right, datum_y), xytext=(dim_x_right, wl_top), arrowprops=dict(arrowstyle='<->'))
-            ax.text(dim_x_right + 0.2, (datum_y + wl_top)/2, "y", fontsize=14, fontweight='bold')
-            
-            # Dimension 'z' (Soil Height)
-            ax.annotate('', xy=(soil_x + soil_w + 0.3, soil_y), xytext=(soil_x + soil_w + 0.3, soil_y + soil_h), arrowprops=dict(arrowstyle='<->'))
-            ax.text(soil_x + soil_w + 0.4, soil_y + soil_h/2, "z", fontsize=12)
+            # Dimension y (Top Head)
+            dim_x_right = soil_x + soil_w + 1.2
+            ax.annotate('', xy=(dim_x_right, datum_y), xytext=(dim_x_right, val_y), arrowprops=dict(arrowstyle='<->'))
+            ax.text(dim_x_right + 0.1, val_y/2, f"y\n{val_y:.1f}m", fontsize=11, fontweight='bold', ha='left')
 
-            # Dimension 'A' (Point Height)
-            pt_A_y = soil_y + (soil_h - z) # z input is depth from top, so height from bottom is H-z
-            # Wait, in sketch 'A' is height from bottom.
-            # Let's verify 'z' input slider. The slider says "Depth of Point C".
-            # If slider value is 'depth', then height A = soil_h - depth.
-            height_A = soil_h - z
+            # Dimension x (Bottom Head)
+            ax.annotate('', xy=(left_tank_x - 0.3, datum_y), xytext=(left_tank_x - 0.3, val_x), arrowprops=dict(arrowstyle='<->'))
+            ax.text(left_tank_x - 0.8, val_x/2, f"x\n{val_x:.1f}m", fontsize=11, fontweight='bold', ha='right')
+
+            # Dimension z (Soil Height) - Note: In your sketch 'z' labeled the soil height
+            ax.annotate('', xy=(soil_x + soil_w + 0.2, datum_y), xytext=(soil_x + soil_w + 0.2, datum_y + soil_h), arrowprops=dict(arrowstyle='<->'))
+            ax.text(soil_x + soil_w + 0.3, soil_h/2, f"z (Soil)\n{H2:.1f}m", fontsize=10)
+
+            # Point A (Height from Bottom)
+            ax.scatter(soil_x + soil_w/2, datum_y + height_A, color='red', zorder=5, s=80)
+            ax.text(soil_x + soil_w/2 + 0.2, datum_y + height_A, f"Point A", color='red', fontweight='bold')
             
-            # Draw Point A
-            ax.scatter(soil_x + soil_w/2, soil_y + height_A, color='red', zorder=5)
-            ax.text(soil_x + soil_w/2 + 0.2, soil_y + height_A, "Point A", color='red', fontweight='bold')
-            
-            # Draw dimension A
-            ax.annotate('', xy=(soil_x + soil_w/2, soil_y), xytext=(soil_x + soil_w/2, soil_y + height_A), 
+            # Dimension A (From Bottom)
+            ax.annotate('', xy=(soil_x + soil_w/2, datum_y), xytext=(soil_x + soil_w/2, datum_y + height_A), 
                         arrowprops=dict(arrowstyle='<->', color='red'))
-            ax.text(soil_x + soil_w/2 + 0.1, soil_y + height_A/2, "A", color='red')
+            ax.text(soil_x + soil_w/2 + 0.1, height_A/2, f"A = {height_A:.1f}m", color='red', fontweight='bold')
 
-            ax.set_xlim(-1, 8)
-            ax.set_ylim(datum_y - 1, wl_top + 1)
+            ax.set_xlim(-1.5, 9)
+            ax.set_ylim(datum_y - 1.5, max(val_x, val_y) + 1)
             ax.axis('off')
             st.pyplot(fig)
-
         # --- CALCULATION LOGIC ---
         if st.button("🚀 Calculate Effective Stress"):
             i = h_loss / H2 # Hydraulic Gradient
