@@ -5,7 +5,7 @@ def app():
     st.markdown("---")
     
     # 1. SELECT MODE
-    mode = st.radio("Select Solver Mode:", ["🔢 Numeric Calculation", "abc Symbolic / Formula Finder"], horizontal=True)
+    mode = st.radio("Select Solver Mode:", ["Numeric Calculation", "Symbolic / Formula Finder"], horizontal=True)
 
     # ==========================
     # MODE A: NUMERIC
@@ -157,7 +157,7 @@ def app():
             else:
                 st.error("Not enough info to solve.")
 
-            st.markdown("### ✅ Final Results")
+            st.markdown("### Final Results")
             res_col1, res_col2 = st.columns(2)
             def get_val(key): return solver.params.get(key)
 
@@ -180,7 +180,7 @@ def app():
 
         # --- NEW SECTION: RELATIVE DENSITY (Dr) ---
         st.markdown("---")
-        st.subheader("🥪 Relative Density (Dr)")
+        st.subheader("Relative Density (Dr)")
         st.caption("Calculate density state based on e_max and e_min.")
         
         c1, c2, c3 = st.columns(3)
