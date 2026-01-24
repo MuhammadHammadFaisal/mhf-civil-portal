@@ -125,11 +125,7 @@ def app():
             path_outer_y = [datum_y, datum_y - 1.0 + tube_w, datum_y - 1.0 + tube_w, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
             ax.plot(path_outer_x, path_outer_y, color=wall_color, lw=wall_thick, zorder=2)
             
-            # Inner Path (Left side of tube -> Bottom -> Left Tank Left -> Top)
-            path_inner_x = [tube_start_x, tube_start_x, tube_left_end, tube_left_end, left_tank_x, left_tank_x]
-            path_inner_y = [datum_y, datum_y - 1.0, datum_y - 1.0, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
-            ax.plot(path_inner_x, path_inner_y, color=wall_color, lw=wall_thick, zorder=2)
-
+           
             # Water Surfaces (Blue Lines)
             ax.plot([tank_x, tank_x + tank_w], [wl_top, wl_top], color='blue', lw=2, zorder=2)
             ax.plot([left_tank_x, left_tank_x + tank_w], [wl_bot, wl_bot], color='blue', lw=2, zorder=2)
