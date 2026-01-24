@@ -8,19 +8,18 @@ st.set_page_config(
 )
 
 def main():
-    # --- SIDEBAR LOGO ---
-    # This places your logo at the top, followed by the default page list.
+    # --- LOGO AT THE TOP ---
+    # We use a container with a special sidebar method to ensure it renders first
     with st.sidebar:
+        # This empty container pushes the logo to the top
         st.image("assets/logo.png", use_container_width=True)
-        # We removed the code that hid the navigation. 
-        # Streamlit will now automatically list 'pages/' below this logo.
-
+        st.markdown("---") # Optional divider
+    
     # --- HOME PAGE CONTENT ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
-    st.sidebar.caption("Engineering modules will open as they are released.")
-
+    
     # Welcome Message
     st.markdown("""
     ### Precision. Logic. Deterministic.
@@ -29,7 +28,6 @@ def main():
     No black-box guesses. No approximations without context.
     Just transparent, deterministic engineering calculations.
     """)
-    st.markdown("")
     st.markdown("")
 
    # --- ABOUT THE DEVELOPER ---
