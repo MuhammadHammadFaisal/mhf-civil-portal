@@ -1,38 +1,35 @@
 import streamlit as st
 
 # ==========================================
-# 1. HELPER FUNCTIONS & PAGES
+# 1. PAGE CONTENT FUNCTIONS
 # ==========================================
 
-def home_dashboard():
-    """The Main Home Page"""
-    st.title("🏗️ MHF Civil Portal")
-    st.caption("Deterministic Civil Engineering Computation Platform | METU")
+def original_home_content():
+    """Restored Original Home Page Content"""
+    st.title("MHF Civil Portal")
+    st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
     
-    # Professional Dashboard Layout
-    col1, col2 = st.columns([2, 1])
+    st.subheader("Precision. Logic. Deterministic.")
+    st.markdown("""
+    MHF Civil is a focused engineering workspace built for **civil engineers who care about correctness**. 
     
-    with col1:
-        st.subheader("🚀 Active Workspaces")
-        # Active Module Card
-        with st.container(border=True):
-            c1, c2 = st.columns([1, 5])
-            with c1: st.header("🪨")
-            with c2:
-                st.markdown("**Soil Mechanics (CE 363)**")
-                st.caption("Classify soils, calculate flow, and determine effective stress.")
-                st.success("● Status: Online")
-
-    with col2:
-        st.subheader("Updates")
-        st.code("""
-v1.2: Added 1D Seepage
-v1.1: Fixed Permeability
-v1.0: Portal Launch
-        """, language="text")
-        
-        st.info("Developed by Hammad (METU Civil Dept)")
+    No black-box guesses. No approximations without context. Just transparent, deterministic engineering calculations.
+    """)
+    
+    st.markdown("---")
+    
+    st.subheader("About MHF Civil")
+    st.markdown("### Muhammad Hammad Faisal")
+    st.markdown("**Final Year Civil Engineering Student (METU)**")
+    st.caption("Founder — MHF Civil")
+    
+    st.markdown("""
+    MHF Civil is built on a simple principle:
+    **engineering results should be reproducible, transparent, and mathematically defensible.**
+    """)
+    
+    st.link_button("Connect on LinkedIn", "https://www.linkedin.com/") # Add your actual URL here
 
 def construction_page(module_name):
     """Placeholder for missing courses"""
@@ -41,14 +38,12 @@ def construction_page(module_name):
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        # Professional "Blueprint" style placeholder
         st.warning("Module Under Construction")
         st.caption("This engineering module is currently in the development queue.")
     
     with col2:
         st.write("### Development Roadmap")
         st.write(f"**Target Release:** Fall 2026")
-        st.write("**Priority:** Low")
         st.progress(0.05, text="Coding in progress...")
 
 # ==========================================
@@ -63,7 +58,6 @@ def main():
     st.sidebar.markdown("### Navigation")
 
     # Define the Menu Structure (The "Blocks")
-    # We use dividers ("---") to visually separate the years
     menu_options = [
         "🏠 Home Page",
         "--- 2ND YEAR MODULES ---",
@@ -74,7 +68,7 @@ def main():
         "--- 3RD YEAR MODULES ---",
         "CE 305: Hydromechanics",
         "CE 353: Transportation Eng.",
-        "✅ CE 363: Soil Mechanics",  # Added checkmark to show it's active
+        "✅ CE 363: Soil Mechanics",  # Active Module
         "CE 366: Foundation Eng.",
         "CE 383: Structural Analysis"
     ]
@@ -86,25 +80,20 @@ def main():
     
     # 1. Home Page
     if "Home" in selection:
-        home_dashboard()
+        original_home_content()
 
     # 2. Active Module (Soil Mechanics)
     elif "Soil Mechanics" in selection:
-        # THIS IS WHERE WE LOAD YOUR SOIL CODE
-        # Ensure your soil mechanics file is named 'topics/flow_water.py' or similar
-        # and has a function called app(). 
-        # For now, I will try to import it, or you can paste the code here.
         try:
-            # Adjust this import to match your file name!
             from topics import flow_water 
             flow_water.app()
         except ImportError:
-            st.error("⚠️ Error: Could not load Soil Mechanics module. Make sure the file exists.")
+            st.error("⚠️ Error: Could not load Soil Mechanics module. Ensure 'topics/flow_water.py' exists.")
 
     # 3. Separators (If user clicks the dashed lines)
     elif "---" in selection:
         st.sidebar.warning("Please select a course below the header.")
-        home_dashboard() # Default to home
+        original_home_content()
 
     # 4. Under Construction Pages (Everything else)
     else:
