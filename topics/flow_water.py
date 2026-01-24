@@ -166,8 +166,8 @@ def app():
             ax.text(dim_x_loc - 0.1, wl_bot/2, f"x = {val_x:.2f}m", fontsize=11, fontweight='bold', ha='right')
 
             # Point A (Dot)
-            ax.scatter(soil_x + soil_w/2, datum_y + val_A, color='red', zorder=5, s=80, edgecolor='black')
-            ax.text(soil_x + soil_w/2 + 0.2, datum_y + val_A + 0.1, f"Point A", color='red', fontweight='bold', zorder=5)
+            ax.scatter(soil_x + soil_w/2 + 2.0, datum_y + val_A, color='Black', zorder=5, s=80, edgecolor='black')
+            ax.text(soil_x + soil_w/2 + 2.2, datum_y + val_A + 0.1, f"Point A", color='red', fontweight='bold', zorder=5)
             
             # Dimension A (Shifted Right & Black Arrow)
             dim_A_x = soil_x + soil_w/2 + 2.0  # Shifted to the right of the center
