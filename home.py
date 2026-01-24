@@ -8,7 +8,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# 2. CONTENT FUNCTIONS (The "Pages")
+# 2. CONTENT FUNCTIONS
 # ==========================================
 
 def original_home_content():
@@ -37,7 +37,8 @@ def original_home_content():
     **engineering results should be reproducible, transparent, and mathematically defensible.**
     """)
     
-    st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/")
+    # 2. CHANGED: Normal Clickable Link instead of Button
+    st.markdown("[Connect on LinkedIn](https://www.linkedin.com/in/muhammad-hammad-20059a229/)")
     
     # Footer
     st.markdown("---")
@@ -60,26 +61,26 @@ def construction_page(module_name):
 # ==========================================
 
 def main():
-    # --- A. SIDEBAR HEADER ---
+    # --- SIDEBAR HEADER ---
     st.sidebar.markdown("### 🏗️ MHF Civil")
-    st.sidebar.caption("Engineering modules appear here as they are released.")
+    # 1. REMOVED: The caption "Engineering modules appear here..." is gone.
 
-    # --- B. DEFINING THE MENU ---
+    # --- DEFINING THE MENU ---
+    # 3. REMOVED: "--- 2ND YEAR ---" headers are removed so they cannot be clicked.
+    # 5. REMOVED: Green Tick ✅ from Soil Mechanics.
     menu_options = [
         "🏠 Home Page",
-        "--- 2ND YEAR MODULES ---",    # Visual Header
         "CE 221: Statics",
         "CE 224: Strength of Materials",
         "CE 282: Fluid Mechanics",
-        "--- 3RD YEAR MODULES ---",    # Visual Header
         "CE 305: Hydromechanics",
-        "✅ CE 363: Soil Mechanics",   # The Active Page
+        "CE 363: Soil Mechanics",  # 4. FIXED: Clean Name
         "CE 366: Foundation Eng."
     ]
 
-    # --- C. THE NAVIGATION WIDGET ---
+    # --- THE NAVIGATION WIDGET ---
     selection = st.sidebar.radio(
-        "Go to", 
+        "Navigation", 
         menu_options, 
         label_visibility="collapsed"
     )
@@ -87,23 +88,18 @@ def main():
     st.sidebar.markdown("---")
     st.sidebar.caption("© 2026 MHF Civil")
 
-    # --- D. THE ROUTER (Page Switching Logic) ---
+    # --- THE ROUTER ---
     
     if "Home" in selection:
         original_home_content() 
 
     elif "Soil Mechanics" in selection:
-        # Tries to load your actual engineering code
+        # 4. FIXED: Ensures it loads the 'flow_water' module (the whole file)
         try:
             from topics import flow_water
             flow_water.app()
         except ImportError:
-            st.error("⚠️ Error: Could not find 'topics/flow_water.py'.")
-
-    elif "---" in selection:
-        # Handles accidental clicks on headers
-        st.sidebar.warning("That is a category header. Please select a course.")
-        original_home_content()
+            st.error("⚠️ Error: Could not find 'topics/flow_water.py'. Please check your file structure.")
 
     else:
         # Handles all other "Under Construction" pages
