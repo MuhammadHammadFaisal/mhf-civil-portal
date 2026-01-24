@@ -28,7 +28,7 @@ def main():
 
    # --- ABOUT THE DEVELOPER ---
     st.markdown("---")
-    st.subheader("👨‍💻 About MHF Civil")
+    st.subheader("About MHF Civil")
     
     # ERROR WAS HERE: The indentation below was inconsistent in your snippet
     st.markdown("""
@@ -41,7 +41,7 @@ def main():
     """)
 
     
-    st.link_button("🤝 Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/")
+    st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/")
     # --- FOOTER ---
     st.markdown("---")
     st.markdown(
@@ -57,6 +57,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
