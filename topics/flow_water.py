@@ -170,7 +170,7 @@ def app():
             ax.text(soil_x + soil_w/2 + 0.2, datum_y + val_A + 0.1, f"Point A", color='red', fontweight='bold', zorder=5)
             
             # Dimension A (Shifted Right & Black Arrow)
-            dim_A_x = soil_x + soil_w/2 + 0.5  # Shifted to the right of the center
+            dim_A_x = soil_x + soil_w/2 + 2.0  # Shifted to the right of the center
             ax.annotate('', xy=(dim_A_x, datum_y), xytext=(dim_A_x, datum_y + val_A), 
                         arrowprops=dict(arrowstyle='<->', color='black')) # BLACK ARROW
             ax.text(dim_A_x + 0.1, val_A/2, f"A = {val_A:.2f}m", color='black', fontweight='bold', zorder=5)
