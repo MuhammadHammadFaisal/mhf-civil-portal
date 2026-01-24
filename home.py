@@ -96,8 +96,8 @@ def main():
     elif "Soil Mechanics" in selection:
         try:
             # FIXED: Removed '.py' and assumed you renamed the file to 'soil_mechanics.py'
-            from pages import soil_mechanics
-            soil_mechanics.app()
+            from pages import Soil_Mechanics
+            Soil_Mechanics.app()
         except ImportError:
             st.error("⚠️ Error: Could not find 'pages/soil_mechanics.py'. Please rename your file to 'soil_mechanics.py'.")
 
@@ -107,5 +107,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
