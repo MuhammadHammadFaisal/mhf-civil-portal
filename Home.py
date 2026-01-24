@@ -12,7 +12,7 @@ def main():
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
-    st.sidebar.caption("Engineering modules appear here as they are released.")
+    st.sidebar.caption("Engineering modules will open as they are released.")
 
     # Welcome Message
     st.markdown("""
@@ -57,3 +57,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
