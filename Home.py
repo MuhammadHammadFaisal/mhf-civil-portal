@@ -48,7 +48,7 @@ def main():
         cols = st.columns(2)
         for index, module_name in enumerate(available_modules):
             with cols[index % 2]:
-                with st.container(border=True):
+                with st.container(border=True, colour = green):
                     st.markdown(f"**{module_name}**")
                     st.caption("Online & Verified")
     
@@ -91,3 +91,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
