@@ -1,5 +1,5 @@
 import streamlit as st
-import os  # <--- [NEW] Needed to scan folders
+import os
 
 # 1. PAGE CONFIG
 st.set_page_config(
@@ -9,24 +9,35 @@ st.set_page_config(
 )
 
 def get_active_modules():
-    """Scans the 'pages' directory to find active files"""
-    modules = []
-    # Check if pages folder exists
+    """
+    Scans 'pages/' directory.
+    excludes any file containing 'Module Under Construction'.
+    """
+    active_modules = []
+    
     if os.path.exists("pages"):
         files = os.listdir("pages")
         for f in files:
-            # We only want Python files, but not __init__.py
             if f.endswith(".py") and f != "__init__.py":
-                # Clean the name: "01_Soil_Mechanics.py" -> "Soil Mechanics"
-                clean_name = f.replace(".py", "").replace("_", " ").replace("-", " ")
-                
-                # Optional: Remove sorting numbers (like "01 " or "1.")
-                parts = clean_name.split(" ", 1)
-                if parts[0].isdigit():
-                    clean_name = parts[1]
-                    
-                modules.append(clean_name.title()) # Make it Capital Case
-    return sorted(modules)
+                try:
+                    # Open the file and check for the "Under Construction" flag
+                    with open(os.path.join("pages", f), "r", encoding="utf-8") as file_content:
+                        content = file_content.read()
+                        
+                        # IF the file does NOT contain this phrase, add it to the list
+                        if "Module Under Construction" not in content:
+                            # Clean the name: "soil_mechanics.py" -> "Soil Mechanics"
+                            clean_name = f.replace(".py", "").replace("_", " ").replace("-", " ")
+                            # Remove leading numbers if present (e.g., "01 ")
+                            parts = clean_name.split(" ", 1)
+                            if parts[0].isdigit():
+                                clean_name = parts[1]
+                            
+                            active_modules.append(clean_name.title())
+                except Exception:
+                    pass # Skip if file can't be read
+
+    return sorted(active_modules)
 
 def main():
     # --- SIDEBAR LOGO ---
@@ -39,27 +50,23 @@ def main():
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
     
-    # --- [NEW SECTION] AUTOMATIC MODULE CHECKER ---
-    st.subheader("🚀 Active Workspaces")
-    
-    # Run the scanner
+    # --- AUTOMATIC DASHBOARD ---
+    # Only shows completed modules
     available_modules = get_active_modules()
 
     if available_modules:
-        # Create a grid layout (2 cards per row)
+        st.subheader("🚀 Active Workspaces")
         cols = st.columns(2)
         for index, module_name in enumerate(available_modules):
-            # The % 2 logic alternates between column 1 and column 2
             with cols[index % 2]:
                 with st.container(border=True):
                     st.markdown(f"**{module_name}**")
-                    st.caption("✅ Module Online")
-    else:
-        st.warning("No modules found in the 'pages/' folder yet.")
-        
-    st.markdown("---")
+                    st.caption("✅ Online & Verified")
+    
+    # (Note: If no modules are ready, this section effectively hides itself or shows nothing, which is cleaner)
 
     # --- MISSION STATEMENT ---
+    st.markdown("---")
     st.markdown("""
     ### Precision. Logic. Deterministic.
     
