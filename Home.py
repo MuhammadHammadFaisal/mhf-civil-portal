@@ -3,12 +3,17 @@ import streamlit as st
 # 1. PAGE CONFIG (Must be the first command)
 st.set_page_config(
     page_title="MHF Civil Portal", 
-    page_icon="🏗️", 
+    page_icon="assets/logo.png",  # <--- [CHANGE 1] Replaced emoji with your logo path
     layout="wide"
 )
 
 # 2. THE BRANDING & BIO
 def main():
+    # --- [CHANGE 2] ADD SIDEBAR LOGO HERE ---
+    # This puts the logo nicely at the top left of the sidebar
+    st.logo("assets/logo.png", icon_image="assets/logo.png")
+    # ----------------------------------------
+
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
@@ -25,23 +30,20 @@ def main():
     st.markdown("")
     st.markdown("")
 
-
    # --- ABOUT THE DEVELOPER ---
     st.markdown("---")
     st.subheader("About MHF Civil")
     
-    # ERROR WAS HERE: The indentation below was inconsistent in your snippet
     st.markdown("""
     ### Muhammad Hammad Faisal
-    **Final Year Civil Engineering Student (METU)**  
-    Founder — MHF Civil
+    **Final Year Civil Engineering Student (METU)** Founder — MHF Civil
     
     MHF Civil is built on a simple principle:  
     **engineering results should be reproducible, transparent, and mathematically defensible.**
     """)
 
-    
     st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/")
+    
     # --- FOOTER ---
     st.markdown("---")
     st.markdown(
@@ -50,11 +52,9 @@ def main():
         © 2026 MHF Civil. All rights reserved.<br>
         Version 1.1.0 · Ankara, Turkey
         </div>
-
         """, 
         unsafe_allow_html=True
         )
 
 if __name__ == "__main__":
     main()
-
