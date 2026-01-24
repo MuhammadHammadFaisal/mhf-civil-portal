@@ -5,10 +5,10 @@ import numpy as np
 
 def app():
     st.markdown("---")
-    st.subheader("💧 Flow of Water & Seepage Analysis")
+    st.subheader("Flow of Water & Seepage Analysis")
 
     # TABS FOR DIFFERENT PROBLEM TYPES
-    tab1, tab2, tab3 = st.tabs(["1️⃣ 1D Seepage (Effective Stress)", "2️⃣ Permeability Tests", "3️⃣ Flow Nets & Piping"])
+    tab1, tab2, tab3 = st.tabs(["1D Seepage (Effective Stress)", "Permeability Tests", "Flow Nets & Piping"])
 
     # =================================================================
     # TAB 1: 1D SEEPAGE (The "Diagram" Problem)
@@ -190,7 +190,7 @@ def app():
             st.pyplot(fig)
 
         # --- CALCULATION LOGIC ---
-        if st.button("🚀 Calculate Effective Stress"):
+        if st.button("Calculate Effective Stress"):
             # 1. Identify Heads
             H_top = val_z + val_y  # Total Head at Top (Datum + Soil + Water)
             H_bot = val_x          # Total Head at Bottom (Given directly as x)
@@ -241,7 +241,7 @@ def app():
             with c3:
                 st.metric("Effective Stress (σ')", f"{sigma_prime:.2f} kPa")
                 
-            with st.expander("📝 View Step-by-Step Derivation"):
+            with st.expander("View Step-by-Step Derivation"):
                 st.markdown("**1. Heads & Gradient**")
                 st.latex(rf"H_{{top}} = z + y = {val_z} + {val_y} = {H_top:.2f} m")
                 st.latex(rf"H_{{bot}} = x = {H_bot:.2f} m")
@@ -261,7 +261,7 @@ def app():
     # TAB 2: PERMEABILITY (Lab Tests)
     # =================================================================
     with tab2:
-        st.subheader("🧪 Permeability Tests")
+        st.subheader("Permeability Tests")
         test_type = st.radio("Test Type", ["Constant Head", "Falling Head"], horizontal=True)
         
         if "Constant" in test_type:
@@ -291,7 +291,7 @@ def app():
     # TAB 3: FLOW NETS
     # =================================================================
     with tab3:
-        st.subheader("⚠️ Quick Sand & Seepage")
+        st.subheader("Quick Sand & Seepage")
         st.latex(r"i_{cr} = \frac{G_s - 1}{1+e}")
         Gs = st.number_input("Gs", 2.65)
         e = st.number_input("Void Ratio e", 0.6)
