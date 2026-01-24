@@ -7,23 +7,15 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. THE BRANDING & BIO
 def main():
-    # --- [CHANGE 1] HIDE DEFAULT MENU ---
-    # This removes the automatic list of files so your logo is the only thing at the top
-    st.markdown("""
-        <style>
-            [data-testid="stSidebarNav"] {display: none;}
-        </style>
-    """, unsafe_allow_html=True)
-
-    # --- [CHANGE 2] BIG SIDEBAR LOGO ---
-    # We use st.sidebar.image instead of st.logo to make it BIG.
+    # --- SIDEBAR LOGO ---
+    # This places your logo at the top, followed by the default page list.
     with st.sidebar:
         st.image("assets/logo.png", use_container_width=True)
-        st.markdown("---") # Adds a nice divider line below the logo
+        # We removed the code that hid the navigation. 
+        # Streamlit will now automatically list 'pages/' below this logo.
 
-    # --- MAIN PAGE CONTENT ---
+    # --- HOME PAGE CONTENT ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
