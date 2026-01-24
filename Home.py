@@ -38,7 +38,7 @@ def main():
         """
         <style>
             [data-testid="stLogo"] {
-                width: 300px !important;  /* Force width */
+                width: 600px !important;  /* Force width */
                 height: auto !important;  /* Auto height */
                 max-width: 100%;          /* Ensure it fits */
             }
@@ -103,3 +103,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
