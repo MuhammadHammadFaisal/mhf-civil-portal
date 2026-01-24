@@ -38,7 +38,7 @@ def app():
             # 5. Point A
             val_A = st.slider("Height of Point 'A' from Datum [m]", 0.0, val_z, val_z/2)
 
-        # --- DYNAMIC MATPLOTLIB DIAGRAM (CAD STYLE) ---
+        # --- DYNAMIC MATPLOTLIB DIAGRAM (PROFESSIONAL CAD STYLE) ---
         with col_plot:
             fig, ax = plt.subplots(figsize=(7, 8))
             
@@ -89,19 +89,15 @@ def app():
             else: l_tank_base_y = datum_y - 1.0 # Logic to keep tank valid
             
             # U-Tube Fill (One continuous polygon to avoid internal lines)
-            tube_points = [
-                [soil_x + (soil_w-tube_w)/2, datum_y], # Soil connection
-                [soil_x + (soil_w-tube_w)/2, datum_y - 1.0], # Down
-                [left_tank_x + tank_w/2 - tube_w/2, datum_y - 1.0], # Left
-                [left_tank_x + tank_w/2 - tube_w/2, l_tank_base_y] # Up to tank
-            ]
-            # Draw rectangles for fill simply
-            # Vertical Down
-            ax.add_patch(patches.Rectangle((soil_x + (soil_w-tube_w)/2, datum_y - 1.0), tube_w, 1.0, facecolor='#D6EAF8', edgecolor='none', zorder=1))
-            # Horizontal
-            ax.add_patch(patches.Rectangle((left_tank_x + tank_w/2 - tube_w/2, datum_y - 1.0), (soil_x) - (left_tank_x), tube_w, facecolor='#D6EAF8', edgecolor='none', zorder=1))
-            # Vertical Up
-            ax.add_patch(patches.Rectangle((left_tank_x + tank_w/2 - tube_w/2, datum_y - 1.0), tube_w, l_tank_base_y - (datum_y - 1.0) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            # Vertical Down from Soil Center
+            tube_start_x = soil_x + (soil_w - tube_w)/2
+            
+            ax.add_patch(patches.Rectangle((tube_start_x, datum_y - 1.0), tube_w, 1.0, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            # Horizontal Left
+            tube_left_end = left_tank_x + (tank_w - tube_w)/2
+            ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_start_x - tube_left_end + tube_w, tube_w, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            # Vertical Up to Left Tank
+            ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_w, l_tank_base_y - (datum_y - 1.0) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
             # Left Tank Fill
             ax.add_patch(patches.Rectangle((left_tank_x, l_tank_base_y), tank_w, wl_bot - l_tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
 
@@ -110,27 +106,27 @@ def app():
             wall_color = 'black'
             
             # Top Tank Walls
-            # Left side
+            # Left side (Tank + Neck)
             ax.plot([tank_x, tank_x, neck_x, neck_x], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
-            # Right side
+            # Right side (Tank + Neck)
             ax.plot([tank_x + tank_w, tank_x + tank_w, neck_x + neck_w, neck_x + neck_w], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
             
             # Soil Box Walls
             ax.plot([soil_x, soil_x], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) # Left
             ax.plot([soil_x + soil_w, soil_x + soil_w], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) # Right
-            # Bottom (with gap for tube)
-            tube_start = soil_x + (soil_w-tube_w)/2
-            ax.plot([soil_x, tube_start], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
-            ax.plot([tube_start + tube_w, soil_x + soil_w], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
+            
+            # Bottom of Soil (Split for tube)
+            ax.plot([soil_x, tube_start_x], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([tube_start_x + tube_w, soil_x + soil_w], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
             
             # Bottom Tube & Left Tank Walls (Continuous Path)
-            # Outer Path
-            path_outer_x = [tube_start + tube_w, tube_start + tube_w, left_tank_x + tank_w/2 + tube_w/2, left_tank_x + tank_w/2 + tube_w/2, left_tank_x + tank_w, left_tank_x + tank_w]
+            # Outer Path (Right side of tube -> Bottom -> Left Tank Right -> Top)
+            path_outer_x = [tube_start_x + tube_w, tube_start_x + tube_w, tube_left_end + tube_w, tube_left_end + tube_w, left_tank_x + tank_w, left_tank_x + tank_w]
             path_outer_y = [datum_y, datum_y - 1.0 + tube_w, datum_y - 1.0 + tube_w, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
             ax.plot(path_outer_x, path_outer_y, color=wall_color, lw=wall_thick, zorder=2)
             
-            # Inner Path
-            path_inner_x = [tube_start, tube_start, left_tank_x + tank_w/2 - tube_w/2, left_tank_x + tank_w/2 - tube_w/2, left_tank_x, left_tank_x]
+            # Inner Path (Left side of tube -> Bottom -> Left Tank Left -> Top)
+            path_inner_x = [tube_start_x, tube_start_x, tube_left_end, tube_left_end, left_tank_x, left_tank_x]
             path_inner_y = [datum_y, datum_y - 1.0, datum_y - 1.0, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
             ax.plot(path_inner_x, path_inner_y, color=wall_color, lw=wall_thick, zorder=2)
 
@@ -148,7 +144,7 @@ def app():
             ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
             ax.text(soil_x + soil_w + 0.5, datum_y, "Datum (z=0)", va='center', fontsize=10, style='italic')
 
-            # Dimension z (Soil Height) - MOVED TO LEFT SIDE
+            # Dimension z (Soil Height) - LEFT SIDE
             dim_z_x = soil_x - 0.4
             ax.annotate('', xy=(dim_z_x, datum_y), xytext=(dim_z_x, datum_y + val_z), 
                         arrowprops=dict(arrowstyle='<->', color='black'))
@@ -169,14 +165,18 @@ def app():
                         arrowprops=dict(arrowstyle='<->'))
             ax.text(dim_x_loc - 0.1, wl_bot/2, f"x = {val_x:.2f}m", fontsize=11, fontweight='bold', ha='right')
 
-            # Point A
+            # Point A (Dot)
             ax.scatter(soil_x + soil_w/2, datum_y + val_A, color='red', zorder=5, s=80, edgecolor='black')
-            ax.text(soil_x + soil_w/2 + 0.2, datum_y + val_A, f"Point A", color='red', fontweight='bold', zorder=5)
+            ax.text(soil_x + soil_w/2 + 0.2, datum_y + val_A + 0.1, f"Point A", color='red', fontweight='bold', zorder=5)
             
-            # Dimension A (Inside Soil)
-            ax.annotate('', xy=(soil_x + soil_w/2, datum_y), xytext=(soil_x + soil_w/2, datum_y + val_A), 
-                        arrowprops=dict(arrowstyle='<->', color='red'))
-            ax.text(soil_x + soil_w/2 + 0.1, val_A/2, f"A = {val_A:.2f}m", color='red', fontweight='bold', zorder=5)
+            # Dimension A (Shifted Right & Black Arrow)
+            dim_A_x = soil_x + soil_w/2 + 0.5  # Shifted to the right of the center
+            ax.annotate('', xy=(dim_A_x, datum_y), xytext=(dim_A_x, datum_y + val_A), 
+                        arrowprops=dict(arrowstyle='<->', color='black')) # BLACK ARROW
+            ax.text(dim_A_x + 0.1, val_A/2, f"A = {val_A:.2f}m", color='black', fontweight='bold', zorder=5)
+            
+            # Connect Dimension A to Point A with small dotted line for clarity
+            ax.plot([soil_x + soil_w/2, dim_A_x], [datum_y + val_A, datum_y + val_A], 'k:', lw=1)
 
             ax.text(soil_x + soil_w/2, wl_top + 0.5, f"FLOW {flow_arrow}", ha='center', fontsize=12, fontweight='bold')
 
