@@ -1,23 +1,12 @@
 import streamlit as st
 import os
-import base64
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="MHF Civil Portal", 
+    page_title="MHF CIVIL CALC", 
     page_icon="assets/logo.png", 
     layout="wide"
 )
-
-# --- HELPER: CONVERT IMAGE TO CODE ---
-# This allows us to paint the logo into the CSS background
-def get_base64_of_bin_file(bin_file):
-    try:
-        with open(bin_file, 'rb') as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
-    except FileNotFoundError:
-        return None
 
 def get_active_modules():
     """Scans 'pages/' directory for active modules."""
@@ -40,34 +29,13 @@ def get_active_modules():
     return sorted(active_modules)
 
 def main():
-    # --- [FIX] LOGO AT THE TOP ---
-    # We convert the image to text and inject it into the sidebar's CSS
-    logo_file = "assets/logo.png"
-    img_base64 = get_base64_of_bin_file(logo_file)
-
-    if img_base64:
-        st.markdown(
-            f"""
-            <style>
-            /* 1. Target the sidebar navigation block */
-            [data-testid="stSidebarNav"] {{
-                background-image: url("data:image/png;base64,{img_base64}");
-                background-repeat: no-repeat;
-                background-position: 20px 20px; /* 20px from top/left */
-                background-size: 280px auto;    /* Adjust width to fit */
-                padding-top: 160px;             /* Push the links down */
-            }}
-            /* 2. Hide the default Streamlit anchor at top (optional) */
-            [data-testid="stSidebarNav"]::before {{
-                content: "";
-                margin-top: 20px;
-            }}
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    # --- MAIN PAGE CONTENT ---
+    # --- [NEW] MAIN PAGE LOGO ---
+    # This places the logo at the very top of your content
+    col1, col2 = st.columns([1, 4]) # Create columns to control logo size/position
+    with col1:
+        st.image("assets/logo.png", width=250) # <--- Adjust width here if needed
+    
+    # --- HEADER ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
@@ -82,7 +50,7 @@ def main():
             with cols[index % 2]:
                 with st.container(border=True):
                     st.markdown(f"**{module_name}**")
-                    st.caption("✅ Online & Verified")
+                    st.caption("Online & Verified")
     
     # --- MISSION STATEMENT ---
     st.markdown("---")
