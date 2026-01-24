@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import base64
 
 # 1. PAGE CONFIG
 st.set_page_config(
@@ -7,6 +8,16 @@ st.set_page_config(
     page_icon="assets/logo.png", 
     layout="wide"
 )
+
+# --- HELPER: CONVERT IMAGE TO CODE ---
+# This allows us to paint the logo into the CSS background
+def get_base64_of_bin_file(bin_file):
+    try:
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except FileNotFoundError:
+        return None
 
 def get_active_modules():
     """Scans 'pages/' directory for active modules."""
@@ -29,25 +40,34 @@ def get_active_modules():
     return sorted(active_modules)
 
 def main():
-    # --- LOGO FIX ---
-    # 1. Add the logo using the official method (this puts it at the top)
-    st.logo("assets/logo.png", icon_image="assets/logo.png")
+    # --- [FIX] LOGO AT THE TOP ---
+    # We convert the image to text and inject it into the sidebar's CSS
+    logo_file = "assets/logo.png"
+    img_base64 = get_base64_of_bin_file(logo_file)
 
-    # 2. Force it to be BIGGER using CSS
-    st.markdown(
-        """
-        <style>
-            [data-testid="stLogo"] {
-                width: 600px !important;  /* Force width */
-                height: auto !important;  /* Auto height */
-                max-width: 100%;          /* Ensure it fits */
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    if img_base64:
+        st.markdown(
+            f"""
+            <style>
+            /* 1. Target the sidebar navigation block */
+            [data-testid="stSidebarNav"] {{
+                background-image: url("data:image/png;base64,{img_base64}");
+                background-repeat: no-repeat;
+                background-position: 20px 20px; /* 20px from top/left */
+                background-size: 280px auto;    /* Adjust width to fit */
+                padding-top: 160px;             /* Push the links down */
+            }}
+            /* 2. Hide the default Streamlit anchor at top (optional) */
+            [data-testid="stSidebarNav"]::before {{
+                content: "";
+                margin-top: 20px;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    # --- HOME PAGE CONTENT ---
+    # --- MAIN PAGE CONTENT ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
@@ -103,4 +123,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
