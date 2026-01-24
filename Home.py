@@ -9,49 +9,56 @@ st.set_page_config(
 )
 
 def get_active_modules():
-    """
-    Scans 'pages/' directory.
-    excludes any file containing 'Module Under Construction'.
-    """
+    """Scans 'pages/' directory for active modules."""
     active_modules = []
-    
     if os.path.exists("pages"):
         files = os.listdir("pages")
         for f in files:
             if f.endswith(".py") and f != "__init__.py":
                 try:
-                    # Open the file and check for the "Under Construction" flag
                     with open(os.path.join("pages", f), "r", encoding="utf-8") as file_content:
                         content = file_content.read()
-                        
-                        # IF the file does NOT contain this phrase, add it to the list
                         if "Module Under Construction" not in content:
-                            # Clean the name: "soil_mechanics.py" -> "Soil Mechanics"
                             clean_name = f.replace(".py", "").replace("_", " ").replace("-", " ")
-                            # Remove leading numbers if present (e.g., "01 ")
                             parts = clean_name.split(" ", 1)
                             if parts[0].isdigit():
                                 clean_name = parts[1]
-                            
                             active_modules.append(clean_name.title())
                 except Exception:
-                    pass # Skip if file can't be read
-
+                    pass 
     return sorted(active_modules)
 
 def main():
+    # --- [NEW] CSS HACK TO MOVE LOGO TO TOP ---
+    st.markdown("""
+        <style>
+        /* 1. Push the list of pages down to make room for the logo */
+        [data-testid="stSidebarNav"] {
+            padding-top: 180px;  /* Increase this number if your logo is taller */
+        }
+        /* 2. Force the Logo image to float at the top */
+        [data-testid="stSidebar"] [data-testid="stImage"] {
+            position: absolute;
+            top: 20px;
+            left: 10px;
+            width: 90%;
+            z-index: 100;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # --- SIDEBAR LOGO ---
+    # We still use st.sidebar.image, but the CSS above moves it to the top!
     with st.sidebar:
         st.image("assets/logo.png", use_container_width=True)
-        st.markdown("---") 
-    
-    # --- HEADER ---
+        # The "Default Sidebar" list will automatically appear below this thanks to the CSS
+
+    # --- MAIN PAGE CONTENT ---
     st.markdown("# MHF Civil Portal")
     st.caption("Deterministic Civil Engineering Computation Platform")
     st.markdown("---")
     
     # --- AUTOMATIC DASHBOARD ---
-    # Only shows completed modules
     available_modules = get_active_modules()
 
     if available_modules:
@@ -63,8 +70,6 @@ def main():
                     st.markdown(f"**{module_name}**")
                     st.caption("✅ Online & Verified")
     
-    # (Note: If no modules are ready, this section effectively hides itself or shows nothing, which is cleaner)
-
     # --- MISSION STATEMENT ---
     st.markdown("---")
     st.markdown("""
@@ -104,4 +109,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
