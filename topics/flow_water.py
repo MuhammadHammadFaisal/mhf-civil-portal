@@ -121,7 +121,7 @@ def app():
            
             # Top of Soil (Split for tube)
             ax.plot([soil_x, neck_x], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
-            ax.plot([tube_start_x + neck_w, soil_x + soil_w], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2) 
+            ax.plot([tube_start_x + neck_x, soil_x + soil_w], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2) 
             # Bottom Tube & Left Tank Walls (Continuous Path)
             
             # Inner Path (Left side of tube -> Bottom -> Left Tank Left -> Top)
