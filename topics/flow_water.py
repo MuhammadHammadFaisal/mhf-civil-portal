@@ -143,7 +143,7 @@ def app():
             
             # Datum Line
             ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
-            ax.text(soil_x + 0.5 + soil_w, datum_y - 0.5, "Datum (z=0)", va='center', fontsize=10, style='italic')
+            ax.text(soil_x + 0.5 + soil_w, datum_y - 0.25, "Datum (z=0)", va='center', fontsize=10, style='italic')
 
             # Dimension z (Soil Height) - LEFT SIDE
             dim_z_x = soil_x - 0.4
