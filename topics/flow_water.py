@@ -121,7 +121,7 @@ def app():
             
             # Bottom Tube & Left Tank Walls (Continuous Path)
             # Outer Path (Right side of tube -> Bottom -> Left Tank Right -> Top)
-            path_outer_x = [tube_start_x + tube_w, tube_start_x + tube_w, tube_left_end + tube_w, tube_left_end + tube_w, left_tank_x + tank_w, left_tank_x + tank_w]
+            path_outer_x = [tube_start_x , tube_start_x , tube_left_end + tube_w, tube_left_end + tube_w, left_tank_x + tank_w, left_tank_x + tank_w]
             path_outer_y = [datum_y, datum_y - 1.0 + tube_w, datum_y - 1.0 + tube_w, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
             ax.plot(path_outer_x, path_outer_y, color=wall_color, lw=wall_thick, zorder=2)
             
