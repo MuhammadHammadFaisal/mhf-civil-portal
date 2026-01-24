@@ -42,7 +42,7 @@ def main():
     **engineering results should be reproducible, transparent, and mathematically defensible.**
     """)
 
-    st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229/")
+    st.link_button("Connect on LinkedIn", "www.linkedin.com/in/muhammad-hammad-20059a229")
     
     # --- FOOTER ---
     st.markdown("---")
@@ -58,4 +58,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
