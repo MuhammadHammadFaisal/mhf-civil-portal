@@ -29,7 +29,7 @@ def original_home_content():
     **engineering results should be reproducible, transparent, and mathematically defensible.**
     """)
     
-    st.link_button("Connect on LinkedIn", "https://www.linkedin.com/") # Add your actual URL here
+    st.link_button("Connect on LinkedIn", "https://www.linkedin.com/") 
 
 def construction_page(module_name):
     """Placeholder for missing courses"""
@@ -53,11 +53,9 @@ def construction_page(module_name):
 def main():
     st.set_page_config(page_title="MHF Civil", page_icon="🏗️", layout="wide")
 
-    # --- SIDEBAR SETUP ---
-    st.sidebar.title("🏗️ MHF Civil")
-    st.sidebar.markdown("### Navigation")
-
-    # Define the Menu Structure (The "Blocks")
+    # --- SIDEBAR (Minimalist) ---
+    # I have removed the Titles and Headers here as requested.
+    
     menu_options = [
         "🏠 Home Page",
         "--- 2ND YEAR MODULES ---",
@@ -68,40 +66,33 @@ def main():
         "--- 3RD YEAR MODULES ---",
         "CE 305: Hydromechanics",
         "CE 353: Transportation Eng.",
-        "✅ CE 363: Soil Mechanics",  # Active Module
+        "✅ CE 363: Soil Mechanics",
         "CE 366: Foundation Eng.",
         "CE 383: Structural Analysis"
     ]
 
-    # The Selection Widget
-    selection = st.sidebar.radio("Go to:", menu_options, label_visibility="collapsed")
+    # No label, just the options
+    selection = st.sidebar.radio("Nav", menu_options, label_visibility="collapsed")
 
     # --- ROUTER LOGIC ---
     
-    # 1. Home Page
     if "Home" in selection:
         original_home_content()
 
-    # 2. Active Module (Soil Mechanics)
     elif "Soil Mechanics" in selection:
         try:
+            # Loads your diagram code
             from topics import flow_water 
             flow_water.app()
         except ImportError:
             st.error("⚠️ Error: Could not load Soil Mechanics module. Ensure 'topics/flow_water.py' exists.")
 
-    # 3. Separators (If user clicks the dashed lines)
     elif "---" in selection:
-        st.sidebar.warning("Please select a course below the header.")
+        st.sidebar.warning("Select a course.")
         original_home_content()
 
-    # 4. Under Construction Pages (Everything else)
     else:
         construction_page(selection)
-
-    # --- SIDEBAR FOOTER ---
-    st.sidebar.markdown("---")
-    st.sidebar.caption("© 2026 MHF Civil Engineering")
 
 if __name__ == "__main__":
     main()
