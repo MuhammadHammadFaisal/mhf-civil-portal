@@ -153,8 +153,8 @@ def app():
             # Dimension y (Water Depth ABOVE Soil)
             dim_y_x = soil_x + soil_w + 0.8
             ax.annotate('', xy=(dim_y_x, val_z), xytext=(dim_y_x, wl_top), 
-                        arrowprops=dict(arrowstyle='<->', color='blue'))
-            ax.text(dim_y_x + 0.1, (val_z + wl_top)/2, f"y = {val_y:.2f}m", fontsize=11, fontweight='bold', color='blue', ha='left')
+                        arrowprops=dict(arrowstyle='<->', color='black'))
+            ax.text(dim_y_x + 0.1, (val_z + wl_top)/2, f"y = {val_y:.2f}m", fontsize=11, fontweight='bold', color='black', ha='left')
             # Extension lines
             ax.plot([soil_x + soil_w, dim_y_x + 0.2], [val_z, val_z], 'k--', lw=0.5)
             ax.plot([tank_x + tank_w, dim_y_x + 0.2], [wl_top, wl_top], 'k--', lw=0.5)
@@ -167,7 +167,7 @@ def app():
 
             # Point A (Dot)
             ax.scatter(soil_x + soil_w/2 + 2.0, datum_y + val_A, color='Black', zorder=5, s=80, edgecolor='black')
-            ax.text(soil_x + soil_w/2 + 2.2, datum_y + val_A + 0.1, f"Point A", color='red', fontweight='bold', zorder=5)
+            ax.text(soil_x + soil_w/2 + 2.2, datum_y + val_A + 0.1, f"Point A", color='Black', fontweight='bold', zorder=5)
             
             # Dimension A (Shifted Right & Black Arrow)
             dim_A_x = soil_x + soil_w/2 + 2.0  # Shifted to the right of the center
