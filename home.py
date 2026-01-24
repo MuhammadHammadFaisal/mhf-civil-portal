@@ -94,12 +94,12 @@ def main():
         original_home_content() 
 
     elif "Soil Mechanics" in selection:
-        # 4. FIXED: Ensures it loads the 'flow_water' module (the whole file)
         try:
-            from pages import 01_Soil_Mechanics.py
-            01_Soil_Mechanics.app()
+            # FIXED: Removed '.py' and assumed you renamed the file to 'soil_mechanics.py'
+            from pages import soil_mechanics
+            soil_mechanics.app()
         except ImportError:
-            st.error("⚠️ Error: Could not find 'topics/flow_water.py'. Please check your file structure.")
+            st.error("⚠️ Error: Could not find 'pages/soil_mechanics.py'. Please rename your file to 'soil_mechanics.py'.")
 
     else:
         # Handles all other "Under Construction" pages
@@ -107,4 +107,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
