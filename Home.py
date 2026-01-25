@@ -102,7 +102,7 @@ def main():
                 # The CSS 'white-space: pre-wrap' ensures this \n is respected
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n✅ Online & Verified", 
+                    label=f"{module_title}\n Online & Verified", type="primary" 
                     use_container_width=True
                 )
     
@@ -145,3 +145,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
