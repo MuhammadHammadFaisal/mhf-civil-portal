@@ -11,31 +11,34 @@ st.set_page_config(
 # --- CUSTOM CSS FOR GREEN CLICKABLE CARDS ---
 st.markdown("""
 <style>
-/* Target the Page Link buttons inside the main area */
+/* 1. Target the Page Link Card */
 div[data-testid="stPageLink-NavLink"] {
-    background-color: #F0FDF4;  /* Light Green Background */
+    background-color: #F0FDF4;   /* Light Green Background */
     border: 1px solid #22c55e;   /* Green Border */
     border-radius: 12px;         /* Rounded Corners */
-    padding: 20px;               /* Spacious Padding */
+    padding: 15px 20px;          /* Padding */
     transition: all 0.3s ease;   /* Smooth Animation */
-    text-align: left;            /* Align Text Left */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-/* Hover Effect */
+/* 2. Hover Effect (Darker Green + Lift) */
 div[data-testid="stPageLink-NavLink"]:hover {
-    background-color: #DCFCE7;   /* Slightly Darker Green on Hover */
-    transform: translateY(-3px); /* Lift Up Effect */
-    box-shadow: 0 6px 12px rgba(34, 197, 94, 0.2); /* Green Shadow */
-    border-color: #16a34a;
+    background-color: #DCFCE7;   /* Slightly Darker Green */
+    transform: translateY(-2px); /* Lift Up */
+    border-color: #16a34a;       /* Darker Border */
+    box-shadow: 0 6px 12px rgba(34, 197, 94, 0.2);
 }
 
-/* Text Styling inside the link */
-div[data-testid="stPageLink-NavLink"] p {
-    font-size: 18px !important;
-    font-weight: 600 !important;
+/* 3. Force Text Color to Dark Green */
+/* We target all text elements inside the link to ensure they turn green */
+div[data-testid="stPageLink-NavLink"] * {
     color: #14532d !important;   /* Dark Green Text */
-    margin: 0;
+    font-weight: 600 !important;
+    text-decoration: none !important;
 }
+
+/* Optional: Make the second line (Online & Verified) slightly smaller if needed */
+/* Note: Streamlit page_link renders text in a single block, so strict sizing is hard via CSS alone */
 </style>
 """, unsafe_allow_html=True)
 
@@ -99,11 +102,10 @@ def main():
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
                 # We render the entire card as a single clickable Page Link
-                # The CSS above turns this into a big green box
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n Online & Verified", 
-                    icon="",  # Leaf icon for the green theme
+                    label=f"{module_title}\n✅ Online & Verified", 
+                    icon="", 
                     use_container_width=True
                 )
     
@@ -139,11 +141,3 @@ def main():
         <div style='text-align: center; color: #666; font-size: 12px;'>
         © 2026 MHF Civil. All rights reserved.<br>
         Version 1.2.0 · Ankara, Turkey
-        </div>
-        """, 
-        unsafe_allow_html=True
-        )
-
-if __name__ == "__main__":
-    main()
-
