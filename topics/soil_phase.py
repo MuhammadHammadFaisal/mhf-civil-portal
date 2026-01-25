@@ -14,7 +14,7 @@ def app():
     if "Numeric" in mode:
         st.caption("Enter what you know. I will calculate the rest.")
         
-       class SoilState:
+        class SoilState:
             def __init__(self):
                 self.params = {
                     'w': None, 'Gs': None, 'e': None, 'n': None, 'Sr': None,
@@ -40,7 +40,6 @@ def app():
 
             def add_log(self, target_key, formula_latex, sub_latex, result):
                 symbol = self.latex_map.get(target_key, target_key)
-                # Avoid duplicate logs
                 self.log.append({
                     "Variable": symbol, "Formula": formula_latex, "Substitution": sub_latex, "Result": result
                 })
@@ -94,15 +93,14 @@ def app():
                         changed = True
                     # Gamma Bulk
                     if known('Gs') and known('e') and known('w') and not known('gamma_bulk'):
-                        # Using w is often safer than Sr if Sr is derived
                         p['gamma_bulk'] = (p['Gs'] * self.gamma_w * (1 + p['w'])) / (1 + p['e'])
                         self.add_log('gamma_bulk', r'\frac{G_s \gamma_w (1+w)}{1+e}', r'Calc...', p['gamma_bulk'])
                         changed = True
 
-                    # --- 4. [NEW] REVERSE CALCULATIONS (Find e from Gamma) ---
-                    # Find e from Gamma Bulk (This is what fixed your bug!)
+                    # --- 4. REVERSE CALCULATIONS (Find e from Gamma) ---
+                    # Find e from Gamma Bulk
                     if known('gamma_bulk') and known('Gs') and known('w') and not known('e'):
-                        # Derivation: gamma_bulk = Gs(1+w)gamma_w / (1+e)  ->  1+e = Gs(1+w)gamma_w / gamma_bulk
+                        # Derivation: gamma_bulk = Gs(1+w)gamma_w / (1+e) -> 1+e = ...
                         val = (p['Gs'] * (1 + p['w']) * self.gamma_w) / p['gamma_bulk']
                         p['e'] = val - 1
                         self.add_log('e', r'\frac{G_s(1+w)\gamma_w}{\gamma_{bulk}} - 1', r'Calc...', p['e'])
@@ -124,8 +122,14 @@ def app():
                         p['gamma_sub'] = p['gamma_bulk'] - self.gamma_w
                         self.add_log('gamma_sub', r'\gamma_{sat} - \gamma_w', r'Calc...', p['gamma_sub'])
                         changed = True
+                    
+                    if known('n') and known('Sr') and not known('na'):
+                        p['na'] = p['n'] * (1 - p['Sr'])
+                        self.add_log('na', r'n(1 - S_r)', r'Calc...', p['na'])
+                        changed = True
 
                     iterations += 1
+
         # --- DRAWING FUNCTION ---
         def draw_phase_diagram(solver_params):
             """Generates the 3-phase diagram using Matplotlib based on calculated results."""
@@ -188,7 +192,6 @@ def app():
                 ax.text(0, Vs + Vw + Va/2, f'$V_a = {Va:.2f}$ ', ha='right', va='center')
 
             # Curly Brace for 'e' (Void Ratio)
-            # We draw a bracket spanning Air + Water
             if Vv > 0:
                 brace_x = -0.6
                 brace_y_bottom = Vs
