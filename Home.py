@@ -8,40 +8,35 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CUSTOM CSS: TURN LINKS INTO SOLID GREEN BUTTONS ---
+# --- CUSTOM CSS: FORCE GREEN BUTTONS ---
 st.markdown("""
 <style>
-/* 1. The Button Container */
-div[data-testid="stPageLink-NavLink"] {
-    background-color: #198754;   /* SOLID GREEN (Bootstrap Success Color) */
-    border: 2px solid #198754;   /* Matching Border */
-    border-radius: 8px;          /* Slightly rounded like a button */
-    padding: 15px;               /* Comfortable padding */
-    transition: all 0.2s ease;   /* Smooth click animation */
-    text-align: center;          /* Center the text */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+/* 1. Target the Page Link (Generic Selector for robustness) */
+[data-testid="stPageLink-NavLink"] {
+    background-color: #198754 !important;   /* FORCE SOLID GREEN */
+    border: 2px solid #198754 !important;
+    border-radius: 10px !important;
+    padding: 20px !important;
+    text-align: center !important;
+    transition: all 0.2s ease-in-out !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
 }
 
-/* 2. Hover Effect (Brightens up) */
-div[data-testid="stPageLink-NavLink"]:hover {
-    background-color: #157347;   /* Darker Green on Hover */
-    border-color: #146c43;
-    transform: translateY(-2px); /* Button 'lifts' when hovered */
-    box-shadow: 0 6px 12px rgba(25, 135, 84, 0.3); /* Green Glow */
+/* 2. Hover Effect */
+[data-testid="stPageLink-NavLink"]:hover {
+    background-color: #146c43 !important;   /* Darker Green on Hover */
+    border-color: #146c43 !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 15px rgba(25, 135, 84, 0.4) !important;
 }
 
-/* 3. Text Styling (Force White Text) */
-div[data-testid="stPageLink-NavLink"] p {
-    color: white !important;        /* White text */
-    font-size: 18px !important;     /* Larger text */
-    font-weight: 700 !important;    /* Bold */
+/* 3. Text Styling (Force White Text inside the button) */
+[data-testid="stPageLink-NavLink"] * {
+    color: white !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
     line-height: 1.4 !important;
-    white-space: pre-wrap !important; /* Respects the new line */
-    margin: 0;
+    white-space: pre-wrap !important; /* Ensures the new line works */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -104,8 +99,7 @@ def main():
         
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
-                # FIXED: Removed 'type="primary"' (which caused the crash)
-                # The CSS above now handles the Green Color automatically.
+                # --- RENDER BUTTON ---
                 st.page_link(
                     f"pages/{file_name}", 
                     label=f"{module_title}\n✅ Online & Verified", 
