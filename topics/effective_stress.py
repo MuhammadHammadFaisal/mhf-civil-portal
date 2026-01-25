@@ -20,7 +20,7 @@ def app():
         # --- 1. GLOBAL INPUTS ---
         col1, col2, col3 = st.columns(3)
         with col1:
-            water_depth = st.number_input("Water Table Depth (m)", 0.0, step=0.1, value=3.0)
+            water_depth = st.number_input("Water Table Depth (m)", 0.0, step=0.1, value=2.0)
         with col2:
             hc = st.number_input("Capillary Rise (m)", 0.0, step=0.1, value=0.0, help="Height of water rising ABOVE the water table.")
         with col3:
@@ -30,28 +30,32 @@ def app():
         num_layers = st.number_input("Number of Layers", 1, 5, 2)
         layers = []
         
-        # Color palette for schematic
-        colors = ['#E6D690', '#B0A494', '#A69F8B', '#D9CBA3', '#C2B280']
+        # Colors: Sand (Yellowish), Clay (Grayish)
+        colors = {'Sand': '#E6D690', 'Clay': '#B0A494'}
         
         st.markdown("### Soil Stratigraphy")
         for i in range(int(num_layers)):
             with st.expander(f"Layer {i+1}", expanded=True):
                 c1, c2, c3, c4 = st.columns(4)
-                type_soil = c1.selectbox(f"Type", ["Sand", "Clay", "Silt", "Gravel"], key=f"t{i}")
+                
+                # UPDATED: Only Sand and Clay options
+                type_soil = c1.selectbox(f"Type", ["Sand", "Clay"], key=f"t{i}")
+                
                 thick = c2.number_input(f"Thickness (m)", 0.1, step=0.5, value=3.0, key=f"h{i}")
                 gamma_sat = c3.number_input(f"γ_sat (kN/m³)", 0.1, step=0.1, value=20.0, key=f"gs{i}")
                 gamma_dry = c4.number_input(f"γ_dry (kN/m³)", 0.1, step=0.1, value=17.0, key=f"gd{i}")
                 
                 layers.append({
                     "id": i, "type": type_soil, "H": thick, 
-                    "g_sat": gamma_sat, "g_dry": gamma_dry, "color": colors[i % len(colors)]
+                    "g_sat": gamma_sat, "g_dry": gamma_dry, 
+                    "color": colors.get(type_soil, '#E6D690')
                 })
+
+        # Calculate Total Depth dynamically based on inputs
+        total_depth = sum([l['H'] for l in layers])
 
         # --- 3. INPUT DIAGRAM (SCHEMATIC) ---
         st.markdown("### 1. Input Visualization")
-        
-        # Calculate total depth for plotting limits
-        total_depth = sum([l['H'] for l in layers])
         
         fig_sch, ax_sch = plt.subplots(figsize=(8, 5))
         current_depth = 0
@@ -60,18 +64,18 @@ def app():
         if surcharge > 0:
             for x in np.linspace(0, 4, 10):
                 ax_sch.arrow(x, -0.2, 0, 0.2, head_width=0.1, head_length=0.1, fc='red', ec='red')
-            ax_sch.text(2, -0.3, f"q = {surcharge} kPa", ha='center', color='red', fontweight='bold')
+            ax_sch.text(2, -0.4, f"q = {surcharge} kPa", ha='center', color='red', fontweight='bold')
 
         # Draw Layers
         for lay in layers:
-            # Rectangle (x, y, width, height) - y is negative for depth
+            # Rectangle (x, y, width, height) - y is positive down for logic, but we plot inverted
             rect = patches.Rectangle((0, current_depth), 5, lay['H'], facecolor=lay['color'], edgecolor='black', alpha=0.6)
             ax_sch.add_patch(rect)
             
-            # Text Labels
+            # Labels
             mid_y = current_depth + lay['H']/2
             ax_sch.text(2.5, mid_y, f"{lay['type']}\n$\\gamma_{{sat}}={lay['g_sat']}$\n$\\gamma_{{dry}}={lay['g_dry']}$", 
-                        ha='center', va='center', fontsize=9)
+                        ha='center', va='center', fontsize=9, fontweight='bold')
             
             # Dimension Line
             ax_sch.annotate("", xy=(-0.2, current_depth), xytext=(-0.2, current_depth + lay['H']),
@@ -87,11 +91,13 @@ def app():
         # Draw Capillary Rise
         if hc > 0:
             cap_top = water_depth - hc
-            rect_cap = patches.Rectangle((0, cap_top), 5, hc, hatch='///', fill=False, edgecolor='blue', alpha=0.3)
+            if cap_top < 0: cap_top = 0 # Don't go above surface
+            
+            rect_cap = patches.Rectangle((0, cap_top), 5, water_depth - cap_top, hatch='///', fill=False, edgecolor='blue', alpha=0.3)
             ax_sch.add_patch(rect_cap)
             ax_sch.text(5.1, cap_top, f"Capillary\nRise ({hc}m)", color='blue', va='center', fontsize=8)
 
-        ax_sch.set_ylim(total_depth + 1, -1) # Invert Y axis
+        ax_sch.set_ylim(total_depth + 1, -1.5) # Invert Y axis, extra space for surcharge
         ax_sch.set_xlim(-1, 6)
         ax_sch.axis('off')
         st.pyplot(fig_sch)
@@ -100,7 +106,7 @@ def app():
         if st.button("Calculate Stress Profile", type="primary"):
             
             # Collect Critical Depths (Boundaries, WT, Capillary)
-            z_points = {0.0, total_depth} # Set to avoid duplicates
+            z_points = {0.0, total_depth} 
             
             # Add Layer Boundaries
             running_z = 0
@@ -110,6 +116,7 @@ def app():
             
             # Add Water Table & Capillary
             if 0 <= water_depth <= total_depth: z_points.add(water_depth)
+            
             cap_top = water_depth - hc
             if 0 <= cap_top <= total_depth: z_points.add(cap_top)
             
@@ -133,7 +140,7 @@ def app():
                     # Hydrostatic
                     u = (z - water_depth) * gamma_w
                     u_tex = f"({z} - {water_depth}) \\times 9.81"
-                elif z > (water_depth - hc):
+                elif z > (water_depth - hc) and z <= water_depth:
                     # Capillary (Negative)
                     u = -(water_depth - z) * gamma_w
                     u_tex = f"-({water_depth} - {z}) \\times 9.81"
@@ -161,6 +168,9 @@ def app():
                             active_layer = l
                             break
                     
+                    # Safety check
+                    if active_layer is None: active_layer = layers[-1]
+
                     # Determine Gamma to use
                     # Logic: If in Capillary zone or below WT -> use Saturated Unit Weight
                     # Else -> use Dry Unit Weight
@@ -267,4 +277,3 @@ def app():
             
             if fs_calc < 1.0: st.error("UNSAFE: Bottom Heave will occur!")
             else: st.success("SAFE against Heave.")
-                
