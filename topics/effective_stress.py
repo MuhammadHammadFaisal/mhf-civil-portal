@@ -137,7 +137,6 @@ def app():
         if st.button("Calculate Stress Profiles", type="primary"):
             
             # --- CREATE Z-POINTS ---
-            # 1. Critical Points
             z_points_set = {0.0, total_depth}
             cur = 0
             for l in layers:
@@ -149,7 +148,7 @@ def app():
             cap_top = water_depth - hc
             if 0 < cap_top < total_depth: z_points_set.add(cap_top)
                 
-            # 2. Regular Intervals (Every 1m)
+            # Add Regular 1m Intervals
             for d in range(1, int(total_depth) + 1):
                 z_points_set.add(float(d))
 
@@ -200,7 +199,9 @@ def app():
                             g_sym = "\\gamma_{dry}"
                             
                         sigma = sigma_prev + (gam * dz)
-                        math_logs.append(f"**Interval {z_prev}m to {z}m:** {active_l['type']} ({g_sym}={gam})")
+                        
+                        # FIXED: Added $ signs around the math expression in the log
+                        math_logs.append(f"**Interval {z_prev}m to {z}m:** {active_l['type']} (${g_sym}={gam}$)")
                         math_logs.append(f"$\\sigma_{{{z}}} = {sigma_prev:.2f} + ({gam} \\times {dz:.2f}) = {sigma:.2f}$")
                     else:
                         sigma = load_q
