@@ -1,4 +1,16 @@
-# =================================================================
+import streamlit as st
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import numpy as np
+
+def app():
+    st.markdown("---")
+    st.subheader("Flow of Water & Seepage Analysis")
+
+    # TABS FOR DIFFERENT PROBLEM TYPES
+    tab1, tab2, tab3 = st.tabs(["1D Seepage (Effective Stress)", "Permeability Tests", "Flow Nets & Piping"])
+
+    # =================================================================
     # TAB 1: 1D SEEPAGE (The "Diagram" Problem)
     # =================================================================
     with tab1:
@@ -26,57 +38,186 @@
             # 5. Point A
             val_A = st.slider("Height of Point 'A' from Datum [m]", 0.0, val_z, val_z/2)
 
-            # --- MOVE BUTTON HERE ---
-            # Placing the button inside col_setup ensures it stays near the inputs
+            # --- PLACING BUTTON INSIDE COLUMN ---
             calculate_btn = st.button("Calculate Effective Stress", use_container_width=True)
 
         # --- DYNAMIC MATPLOTLIB DIAGRAM ---
         with col_plot:
-            # ... (Keep your existing Matplotlib code here) ...
-            # Ensure the fig and ax logic remains exactly as you wrote it
             fig, ax = plt.subplots(figsize=(7, 8))
-            # [Your drawing code goes here]
+            
+            # COORDINATES
+            datum_y = 0.0
+            soil_w = 2.5
+            soil_x = 3.5 
+            
+            # Water Levels relative to Datum
+            wl_top = val_z + val_y  
+            wl_bot = val_x          
+            
+            # Flow Detection
+            if wl_top > wl_bot:
+                flow_arrow = "⬇️"
+            elif wl_bot > wl_top:
+                flow_arrow = "⬆️"
+            else:
+                flow_arrow = "No Flow"
+
+            # 1. SOIL FILL
+            ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, val_z, 
+                                           facecolor='#E3C195', hatch='...', edgecolor='none', zorder=1))
+            ax.text(soil_x + soil_w/2, datum_y + val_z/2, "SOIL", ha='center', fontweight='bold', fontsize=12, zorder=3)
+            
+            # 2. WATER FILLS
+            tank_w = 2.0
+            tank_x = soil_x + (soil_w - tank_w)/2
+            neck_w = 0.8
+            neck_x = soil_x + (soil_w - neck_w)/2
+            tank_base_y = wl_top - 0.5
+            if tank_base_y < datum_y + val_z: tank_base_y = datum_y + val_z 
+            
+            ax.add_patch(patches.Rectangle((tank_x, tank_base_y), tank_w, wl_top - tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            ax.add_patch(patches.Rectangle((neck_x, datum_y + val_z), neck_w, tank_base_y - (datum_y + val_z) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            
+            tube_w = 0.6
+            left_tank_x = 0.5
+            l_tank_base_y = wl_bot - 0.5
+            if l_tank_base_y < datum_y - 1.0: l_tank_base_y = datum_y - 1.0 
+            
+            tube_start_x = soil_x + (soil_w - tube_w)/2
+            ax.add_patch(patches.Rectangle((tube_start_x, datum_y - 1.0), tube_w, 1.0, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            tube_left_end = left_tank_x + (tank_w - tube_w)/2
+            ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_start_x - tube_left_end + tube_w, tube_w, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_w, l_tank_base_y - (datum_y - 1.0) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_base_y), tank_w, wl_bot - l_tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+
+            # 3. STRUCTURAL WALLS
+            wall_thick = 2.5
+            wall_color = 'black'
+            
+            ax.plot([tank_x, tank_x, neck_x, neck_x], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([tank_x + tank_w, tank_x + tank_w, neck_x + neck_w, neck_x + neck_w], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([soil_x, soil_x], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) 
+            ax.plot([soil_x + soil_w, soil_x + soil_w], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) 
+            ax.plot([soil_x, tube_start_x], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([tube_start_x + tube_w, soil_x + soil_w], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([soil_x, neck_x], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([neck_x + neck_w, soil_x + soil_w], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2) 
+            
+            path_outer_x = [tube_start_x , tube_start_x , tube_left_end + tube_w, tube_left_end + tube_w, left_tank_x + tank_w, left_tank_x + tank_w]
+            path_outer_y = [datum_y, datum_y - 1.0 + tube_w, datum_y - 1.0 + tube_w, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
+            ax.plot(path_outer_x, path_outer_y, color=wall_color, lw=wall_thick, zorder=2)
+            path_inner_x = [tube_start_x + tube_w, tube_start_x + tube_w, tube_left_end, tube_left_end, left_tank_x, left_tank_x]
+            path_inner_y = [datum_y, datum_y - 1.0, datum_y - 1.0, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
+            ax.plot(path_inner_x, path_inner_y, color=wall_color, lw=wall_thick, zorder=2)
+
+            ax.plot([tank_x, tank_x + tank_w], [wl_top, wl_top], color='blue', lw=2, zorder=2)
+            ax.plot([left_tank_x, left_tank_x + tank_w], [wl_bot, wl_bot], color='blue', lw=2, zorder=2)
+            ax.plot(tank_x + tank_w/2, wl_top, marker='v', color='blue', markersize=8, zorder=2)
+            ax.plot(left_tank_x + tank_w/2, wl_bot, marker='v', color='blue', markersize=8, zorder=2)
+
+            # 4. DIMENSIONS
+            ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
+            ax.text(soil_x + 0.5 + soil_w, datum_y - 0.25, "Datum (z=0)", va='center', fontsize=10, style='italic')
+
+            dim_z_x = soil_x - 0.4
+            ax.annotate('', xy=(dim_z_x, datum_y), xytext=(dim_z_x, datum_y + val_z), arrowprops=dict(arrowstyle='<->', color='black'))
+            ax.text(dim_z_x - 0.1, val_z/2, f"z = {val_z:.2f}m", fontsize=10, ha='right')
+
+            dim_y_x = soil_x + soil_w + 0.8
+            ax.annotate('', xy=(dim_y_x, val_z), xytext=(dim_y_x, wl_top), arrowprops=dict(arrowstyle='<->', color='black'))
+            ax.text(dim_y_x + 0.1, (val_z + wl_top)/2, f"y = {val_y:.2f}m", fontsize=11, fontweight='bold', ha='left')
+
+            dim_x_loc = left_tank_x - 0.4
+            ax.annotate('', xy=(dim_x_loc, datum_y), xytext=(dim_x_loc, wl_bot), arrowprops=dict(arrowstyle='<->'))
+            ax.text(dim_x_loc - 0.1, wl_bot/2, f"x = {val_x:.2f}m", fontsize=11, fontweight='bold', ha='right')
+
+            ax.scatter(soil_x + soil_w/2 + 2.0, datum_y + val_A, color='Black', zorder=5, s=80, edgecolor='black')
+            ax.text(soil_x + soil_w/2 + 2.2, datum_y + val_A + 0.1, f"Point A", color='Black', fontweight='bold', zorder=5)
+            
+            dim_A_x = soil_x + soil_w/2 + 2.0  
+            ax.annotate('', xy=(dim_A_x, datum_y), xytext=(dim_A_x, datum_y + val_A), arrowprops=dict(arrowstyle='<->', color='black'))
+            ax.text(dim_A_x + 0.1, val_A/2, f"A = {val_A:.2f}m", color='black', fontweight='bold', zorder=5)
+            ax.plot([soil_x + soil_w/2, dim_A_x], [datum_y + val_A, datum_y + val_A], 'k:', lw=1)
+
+            ax.text(soil_x + soil_w/2, wl_top + 0.5, f"FLOW {flow_arrow}", ha='center', fontsize=12, fontweight='bold')
+
+            ax.set_xlim(-1.5, 9)
+            ax.set_ylim(datum_y - 1.5, max(wl_bot, wl_top) + 1)
+            ax.axis('off')
             st.pyplot(fig)
 
-        # --- CALCULATION LOGIC ---
-        # This can stay outside the columns or inside col_setup, 
-        # but triggered by the button we defined above
+        # --- CALCULATION LOGIC TRIGGERED BY BUTTON ---
         if calculate_btn:
-            # 1. Identify Heads
             H_top = val_z + val_y  
             H_bot = val_x          
-            
-            # 2. Flow Analysis
             h_loss = H_top - H_bot
             
             if h_loss > 0:
-                flow_type = "Downward"
-                effect_msg = "Downward Flow increases Effective Stress (+i·z·γw)"
+                flow_type, effect_msg = "Downward", "Downward Flow increases Effective Stress (+i·z·γw)"
             elif h_loss < 0:
-                flow_type = "Upward"
-                effect_msg = "Upward Flow decreases Effective Stress (-i·z·γw)"
+                flow_type, effect_msg = "Upward", "Upward Flow decreases Effective Stress (-i·z·γw)"
             else:
-                flow_type = "No Flow"
-                effect_msg = "Hydrostatic Condition"
+                flow_type, effect_msg = "No Flow", "Hydrostatic Condition"
 
-            # 3. Calculations
             i = abs(h_loss) / val_z  
             sigma_total = (val_y * gamma_w) + ((val_z - val_A) * gamma_sat)
             H_A = H_bot + (val_A / val_z) * (H_top - H_bot)
-            h_p_A = H_A - val_A
-            u_val = h_p_A * gamma_w
+            u_val = (H_A - val_A) * gamma_w
             sigma_prime = sigma_total - u_val
             
-            # --- DISPLAY RESULTS BELOW BOTH COLUMNS ---
             st.markdown("---")
             st.success(f"**Flow Condition:** {flow_type} ({effect_msg})")
             
             c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("Total Stress (σ)", f"{sigma_total:.2f} kPa")
-            with c2:
-                st.metric("Pore Pressure (u)", f"{u_val:.2f} kPa")
-            with c3:
-                st.metric("Effective Stress (σ')", f"{sigma_prime:.2f} kPa")
+            with c1: st.metric("Total Stress (σ)", f"{sigma_total:.2f} kPa")
+            with c2: st.metric("Pore Pressure (u)", f"{u_val:.2f} kPa")
+            with c3: st.metric("Effective Stress (σ')", f"{sigma_prime:.2f} kPa")
             
-            # ... [Rest of your expander logic] ...
+            with st.expander("View Step-by-Step Derivation"):
+                st.latex(rf"H_{{top}} = {H_top:.2f} m, \quad H_{{bot}} = {H_bot:.2f} m, \quad i = {i:.3f}")
+                st.latex(rf"\sigma = ({val_y} \cdot 9.81) + (({val_z} - {val_A}) \cdot {gamma_sat}) = {sigma_total:.2f} kPa")
+                st.latex(rf"u = ({H_A:.2f} - {val_A}) \cdot 9.81 = {u_val:.2f} kPa")
+
+    # =================================================================
+    # TAB 2: PERMEABILITY (Lab Tests)
+    # =================================================================
+    with tab2:
+        st.subheader("Permeability Tests")
+        test_type = st.radio("Test Type", ["Constant Head", "Falling Head"], horizontal=True)
+        
+        if "Constant" in test_type:
+            st.latex(r"k = \frac{Q \cdot L}{A \cdot h \cdot t}")
+            c1, c2, c3 = st.columns(3)
+            Q = c1.number_input("Volume (Q) [cm³]", 0.0)
+            L = c2.number_input("Length (L) [cm]", 0.0)
+            h = c3.number_input("Head (h) [cm]", 0.0)
+            c4, c5 = st.columns(2)
+            A = c4.number_input("Area (A) [cm²]", 0.0)
+            t = c5.number_input("Time (t) [sec]", 0.0)
+            if st.button("Calculate k (Constant)"):
+                if A*h*t > 0: st.success(f"k = {(Q*L)/(A*h*t):.4e} cm/sec")
+        else:
+            st.latex(r"k = 2.303 \frac{a \cdot L}{A \cdot t} \log_{10}\left(\frac{h_1}{h_2}\right)")
+            c1, c2 = st.columns(2)
+            a = c1.number_input("Standpipe Area (a)", 0.0, format="%.4f")
+            A_soil = c2.number_input("Soil Area (A)", 0.0)
+            L = c1.number_input("Length (L)", 0.0)
+            t = c2.number_input("Time (t)", 0.0)
+            h1 = c1.number_input("Start Head (h1)", 0.0)
+            h2 = c2.number_input("End Head (h2)", 0.0)
+            if st.button("Calculate k (Falling)"):
+                if A_soil*t > 0: st.success(f"k = {(2.303*a*L/(A_soil*t))*np.log10(h1/h2):.4e} cm/sec")
+
+    # =================================================================
+    # TAB 3: FLOW NETS
+    # =================================================================
+    with tab3:
+        st.subheader("Quick Sand & Seepage")
+        st.latex(r"i_{cr} = \frac{G_s - 1}{1+e}")
+        Gs = st.number_input("Gs", 2.65)
+        e = st.number_input("Void Ratio e", 0.6)
+        if st.button("Calculate Critical Gradient"):
+            st.metric("i_critical", f"{(Gs-1)/(1+e):.3f}")
+
+if __name__ == "__main__":
+    app()
