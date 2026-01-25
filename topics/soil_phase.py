@@ -284,6 +284,7 @@ def app():
                         st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.4f}}}")
 
         # --- RELATIVE DENSITY ---
+        st.markdown("---")
         st.markdown("")
         st.markdown("")
         with st.container(border=True):
