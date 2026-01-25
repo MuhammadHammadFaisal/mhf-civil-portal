@@ -28,13 +28,7 @@ def app():
         st.caption("Define soil layers, water table, and surcharge to calculate the stress profile.")
 
         # -------------------------------------------------
-        # 1. ANALYSIS SETTINGS & GLOBAL INPUTS
-        # -------------------------------------------------
-        st.info("💡 **Comparison Mode:** Calculates Long Term (Drained) and Short Term (Undrained) conditions side-by-side.")
-        st.divider()
-
-        # -------------------------------------------------
-        # 2. INPUTS (Side-by-Side with Visualizer)
+        # 1. INPUTS (Side-by-Side with Visualizer)
         # -------------------------------------------------
         col_input, col_viz = st.columns([1.1, 1])
 
@@ -93,7 +87,7 @@ def app():
             total_depth = depth_tracker
 
         # -------------------------------------------------
-        # 3. SOIL PROFILE VISUALIZER (Clean Geometry Only)
+        # 2. SOIL PROFILE VISUALIZER
         # -------------------------------------------------
         with col_viz:
             st.markdown("### Soil Profile Preview")
@@ -137,12 +131,12 @@ def app():
             st.pyplot(fig)
 
         # -------------------------------------------------
-        # 4. CALCULATION & RESULTS
+        # 3. CALCULATION & RESULTS
         # -------------------------------------------------
         st.markdown("---")
         if st.button("Calculate Stress Profiles", type="primary"):
             
-            # --- 1. CREATE Z-POINTS ---
+            # --- CREATE Z-POINTS ---
             z_points_set = {0.0, total_depth}
             cur = 0
             for l in layers:
@@ -160,10 +154,10 @@ def app():
 
             sorted_z = sorted(list(z_points_set))
             
-            # --- 2. CALCULATION ENGINE ---
-            def calculate_profile(mode_name):
+            # --- CALCULATION ENGINE ---
+            def calculate_profile(mode_name, load_q):
                 results = []
-                sigma_prev = surcharge
+                sigma_prev = load_q
                 z_prev = 0.0
                 
                 for i, z in enumerate(sorted_z):
@@ -197,7 +191,7 @@ def app():
                             
                         sigma = sigma_prev + (gam * dz)
                     else:
-                        sigma = surcharge
+                        sigma = load_q
 
                     # C. Excess Pore Pressure
                     u_excess = 0.0
@@ -212,8 +206,9 @@ def app():
                             if l['type'] == 'Clay': is_clay = True
                             break
                     
-                    if mode_name == "Short Term" and is_clay and z > water_depth:
-                        u_excess = surcharge
+                    # Only apply excess pore pressure if loading exists
+                    if mode_name == "Short Term" and load_q > 0 and is_clay and z > water_depth:
+                        u_excess = load_q
 
                     u_tot = u_h + u_excess
                     sig_eff = sigma - u_tot
@@ -230,21 +225,17 @@ def app():
                 
                 return pd.DataFrame(results)
 
-            df_long = calculate_profile("Long Term")
-            df_short = calculate_profile("Short Term")
+            # --- RUN 3 SCENARIOS ---
+            df_init = calculate_profile("Initial", 0.0)        # No Load
+            df_long = calculate_profile("Long Term", surcharge) # Loaded, Drained
+            df_short = calculate_profile("Short Term", surcharge) # Loaded, Undrained
 
-            # --- 3. RESULTS DISPLAY ---
-            st.markdown("### Results Comparison")
-            
-            col_L, col_R = st.columns(2)
-
+            # --- PLOTTING HELPER ---
             def plot_results(df, title, ax):
-                # Plot Lines
                 ax.plot(df["Total Stress (σ)"], df["Depth (z)"], 'b-o', label=r"Total $\sigma$")
                 ax.plot(df["Pore Pressure (u)"], df["Depth (z)"], 'r--x', label=r"Pore $u$")
                 ax.plot(df["Eff. Stress (σ')"], df["Depth (z)"], 'k-s', linewidth=2, label=r"Effective $\sigma'$")
                 
-                # Plot Background Layers
                 cur_h = 0
                 for l in layers:
                     cur_h += l['H']
@@ -259,25 +250,37 @@ def app():
                 ax.grid(True, linestyle="--", alpha=0.6)
                 ax.legend()
 
-            # LEFT: LONG TERM
-            with col_L:
-                st.subheader("Long Term (Drained)")
-                st.caption("Excess Pore Pressure Dissipated (Δu = 0)")
-                st.dataframe(df_long.style.format("{:.2f}"))
-                
-                fig_L, ax_L = plt.subplots(figsize=(6, 6))
-                plot_results(df_long, "Long Term Profile", ax_L)
-                st.pyplot(fig_L)
+            # --- DISPLAY 3 COLUMNS ---
+            st.markdown("### Results Comparison")
+            
+            c_init, c_long, c_short = st.columns(3)
 
-            # RIGHT: SHORT TERM
-            with col_R:
+            # 1. INITIAL (NO LOAD)
+            with c_init:
+                st.subheader("Initial (Before Loading)")
+                st.caption(f"Surcharge q = 0 kPa")
+                st.dataframe(df_init.style.format("{:.2f}"))
+                fig1, ax1 = plt.subplots(figsize=(5, 6))
+                plot_results(df_init, "Initial Profile", ax1)
+                st.pyplot(fig1)
+
+            # 2. LONG TERM (LOADED)
+            with c_long:
+                st.subheader("Long Term (Drained)")
+                st.caption(f"q = {surcharge} kPa | Excess u = 0")
+                st.dataframe(df_long.style.format("{:.2f}"))
+                fig2, ax2 = plt.subplots(figsize=(5, 6))
+                plot_results(df_long, "Long Term Profile", ax2)
+                st.pyplot(fig2)
+
+            # 3. SHORT TERM (LOADED)
+            with c_short:
                 st.subheader("Short Term (Undrained)")
-                st.caption(f"Excess Pore Pressure in Clay (Δu = q = {surcharge})")
+                st.caption(f"q = {surcharge} kPa | Excess u in Clay")
                 st.dataframe(df_short.style.format("{:.2f}"))
-                
-                fig_S, ax_S = plt.subplots(figsize=(6, 6))
-                plot_results(df_short, "Short Term Profile", ax_S)
-                st.pyplot(fig_S)
+                fig3, ax3 = plt.subplots(figsize=(5, 6))
+                plot_results(df_short, "Short Term Profile", ax3)
+                st.pyplot(fig3)
 
     # =====================================================
     # TAB 2 — HEAVE CHECK
