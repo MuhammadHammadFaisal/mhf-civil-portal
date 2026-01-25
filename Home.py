@@ -33,7 +33,7 @@ def main():
     # This places the logo at the very top of your content
     col1, col2 = st.columns([1, 1]) # Create columns to control logo size/position
     with col1:
-        st.image("assets/logo.png", width=250) # <--- Adjust width here if needed
+        st.image("assets/logo.png", width=300) # <--- Adjust width here if needed
     
     # --- HEADER ---
     st.markdown("# MHF Civil Portal")
@@ -91,6 +91,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
