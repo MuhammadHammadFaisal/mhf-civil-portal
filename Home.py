@@ -11,29 +11,31 @@ st.set_page_config(
 # --- CUSTOM CSS FOR GREEN CLICKABLE CARDS ---
 st.markdown("""
 <style>
-/* 1. Target the Page Link Card */
+/* 1. Target the Page Link Card Container */
 div[data-testid="stPageLink-NavLink"] {
-    background-color: #F0FDF4;   /* Light Green Background */
-    border: 1px solid #22c55e;   /* Green Border */
-    border-radius: 12px;         /* Rounded Corners */
-    padding: 15px 20px;          /* Padding */
-    transition: all 0.3s ease;   /* Smooth Animation */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background-color: #dcfce7;   /* Light Green Background */
+    border: 2px solid #22c55e;   /* Strong Green Border */
+    border-radius: 10px;
+    padding: 15px;
+    transition: all 0.2s ease-in-out;
+    text-align: center;          /* Center text */
 }
 
-/* 2. Hover Effect (Darker Green + Lift) */
+/* 2. Hover Effect */
 div[data-testid="stPageLink-NavLink"]:hover {
-    background-color: #DCFCE7;   /* Slightly Darker Green */
-    transform: translateY(-2px); /* Lift Up */
-    border-color: #16a34a;       /* Darker Border */
-    box-shadow: 0 6px 12px rgba(34, 197, 94, 0.2);
+    background-color: #bbf7d0;   /* Slightly Darker Green */
+    transform: scale(1.02);      /* Slight Zoom Pop */
+    box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3);
+    border-color: #15803d;
 }
 
-/* 3. Force Text Color to Dark Green */
-div[data-testid="stPageLink-NavLink"] * {
-    color: #14532d !important;   /* Dark Green Text */
-    font-weight: 600 !important;
-    text-decoration: none !important;
+/* 3. Text Styling & New Line Enforcement */
+div[data-testid="stPageLink-NavLink"] p {
+    color: #14532d !important;      /* Dark Green Text */
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    line-height: 1.5 !important;    /* Space between lines */
+    white-space: pre-wrap !important; /* CRITICAL: Forces \n to create a new line */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -96,7 +98,8 @@ def main():
         
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
-                # FIXED: Removed 'icon=""' to prevent the crash
+                # We use \n to break the line
+                # The CSS 'white-space: pre-wrap' ensures this \n is respected
                 st.page_link(
                     f"pages/{file_name}", 
                     label=f"{module_title}\n✅ Online & Verified", 
