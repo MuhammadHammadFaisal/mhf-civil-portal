@@ -1,55 +1,66 @@
-def main():
-    # --- HERO SECTION ---
-    # We use a tighter ratio [1, 2] to keep text close to the logo.
-    # We try to use the 'vertical_alignment' parameter (Streamlit 1.38+ feature).
+import streamlit as st
+# IMPORT MODULES (Ensure these files exist in your 'topics' folder)
+from topics import soil_phase
+from topics import effective_stress
+from topics import flow_water
+
+# 1. PAGE CONFIG (Must be the first Streamlit command)
+st.set_page_config(
+    page_title="Soil Mechanics", 
+    page_icon="assets/logo.png", 
+    layout="wide"
+)
+
+def app():
+    # --- SIDEBAR LOGO ---
+    # Ensures consistency with your other pages
+    st.logo(image="assets/logo.png", icon_image="assets/logo.png")
+
+    # --- HERO SECTION (The Professional Header) ---
+    # We use the [1, 2] ratio and vertical centering to align text with the logo
     try:
         col_logo, col_text = st.columns([1, 2], vertical_alignment="center")
     except TypeError:
-        # Fallback for older Streamlit versions
         col_logo, col_text = st.columns([1, 2])
 
     with col_logo:
-        # The logo will resize naturally to the column width
         st.image("assets/logo.png", use_container_width=True) 
 
     with col_text:
-        # CSS Styling for Professional Alignment
-        # padding-top adjusts the vertical position manually if needed
         st.markdown(
             """
             <div style="padding-top: 10px; padding-left: 10px;">
-                <h1 style='font-size: 55px; margin-bottom: 0px; line-height: 1.1;'>MHF Civil Calc</h1>
-                <p style='color: #666; font-size: 20px; font-weight: 300; margin-top: 8px;'>
-                    Deterministic Civil Engineering Computation Platform
+                <h1 style='font-size: 45px; margin-bottom: 0px; line-height: 1.1;'>Soil Mechanics</h1>
+                <p style='color: #666; font-size: 18px; font-weight: 300; margin-top: 8px;'>
+                    Phase Relationships, Effective Stress & Flow Analysis
                 </p>
             </div>
             """, 
             unsafe_allow_html=True
         )
 
-    st.markdown("---")import streamlit as st
-# IMPORT MODULES
-from topics import soil_phase
-from topics import effective_stress
-from topics import flow_water
+    st.markdown("---")
 
-st.set_page_config(page_title="Soil Mechanics", page_icon="assets/logo.png", layout="wide")
+    # --- TOPIC SELECTION MENU ---
+    # Using a selectbox to switch between sub-modules
+    topic = st.selectbox(
+        "Select Calculation Module:", 
+        [
+            "Phase Relationships",
+            "Effective Stress",
+            "Flow of Water in Soils"
+        ]
+    )
 
-st.header("Soil Mechanics")
+    # --- ROUTER LOGIC ---
+    if topic == "Phase Relationships":
+        soil_phase.app()
 
-# THE MENU
-topic = st.selectbox("Select Topic:", [
-    "Phase Relationships",
-    "Effective Stress",  # <-- Renamed for clarity
-    "Flow of Water in Soils" # Moved down as we are skipping it
-])
+    elif topic == "Effective Stress":
+        effective_stress.app()
 
-# THE ROUTER
-if topic == "Phase Relationships":
-    soil_phase.app()
+    elif topic == "Flow of Water in Soils":
+        flow_water.app()
 
-elif topic == "Effective Stress":
-    effective_stress.app()  # <-- Activates the new file
-
-elif topic == "Flow of Water in Soils":
-    flow_water.app()
+if __name__ == "__main__":
+    app()
