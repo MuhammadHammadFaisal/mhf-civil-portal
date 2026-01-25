@@ -40,7 +40,7 @@ def app():
 
             st.markdown("---")
             
-            # --- MOVED BUTTON & CALCULATION LOGIC HERE ---
+            # --- BUTTON & CALCULATION LOGIC ---
             if st.button("Calculate Effective Stress", type="primary"):
                 # 1. Identify Heads
                 H_top = val_z + val_y  # Total Head at Top (Datum + Soil + Water)
@@ -65,12 +65,9 @@ def app():
                 # --- Method 1: Total Stress - Pore Pressure ---
                 
                 # Total Stress at A (Sigma)
-                # Weight of water above soil + Weight of saturated soil above A
-                # Depth of soil above A = z - A
                 sigma_total = (val_y * gamma_w) + ((val_z - val_A) * gamma_sat)
                 
                 # Pore Pressure at A (u)
-                # We calculate Total Head at A using linear interpolation
                 # H(h) = H_bottom + (h/z) * (H_top - H_bottom) where h is height from datum
                 H_A = H_bot + (val_A / val_z) * (H_top - H_bot)
                 
@@ -81,7 +78,7 @@ def app():
                 
                 sigma_prime = sigma_total - u_val
                 
-                # --- DISPLAY ---
+                # --- DISPLAY RESULTS ---
                 st.success(f"**Flow Condition:** {flow_type}\n\n*{effect_msg}*")
                 
                 st.metric("Total Stress (σ)", f"{sigma_total:.2f} kPa")
@@ -104,20 +101,20 @@ def app():
                     st.latex(rf"H_A = {H_bot} + \frac{{{val_A}}}{{{val_z}}}({H_top} - {H_bot}) = {H_A:.2f} m")
                     st.latex(rf"u = (H_A - Z_A) \cdot \gamma_w = ({H_A:.2f} - {val_A}) \cdot 9.81 = {u_val:.2f} kPa")
 
-        # --- DYNAMIC MATPLOTLIB DIAGRAM (PROFESSIONAL CAD STYLE) ---
+        # --- DYNAMIC MATPLOTLIB DIAGRAM ---
         with col_plot:
             fig, ax = plt.subplots(figsize=(7, 8))
             
             # COORDINATES
             datum_y = 0.0
             soil_w = 2.5
-            soil_x = 3.5  # Moved right to make space for left arrows
+            soil_x = 3.5  
             
             # Water Levels relative to Datum
             wl_top = val_z + val_y  
             wl_bot = val_x          
             
-            # Flow Detection (For visual arrow)
+            # Flow Detection
             if wl_top > wl_bot:
                 flow_arrow = "⬇️"
             elif wl_bot > wl_top:
@@ -126,81 +123,69 @@ def app():
                 flow_arrow = "No Flow"
 
             # --- DRAWING LAYERS ---
-            # Strategy: Draw Fills first (Zorder 1), then Thick Walls (Zorder 2)
             
             # 1. SOIL FILL
             ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, val_z, 
                                            facecolor='#E3C195', hatch='...', edgecolor='none', zorder=1))
             ax.text(soil_x + soil_w/2, datum_y + val_z/2, "SOIL", ha='center', fontweight='bold', fontsize=12, zorder=3)
             
-            # 2. WATER FILLS (Blue areas without borders)
-            # Top Tank Water
+            # 2. WATER FILLS
             tank_w = 2.0
             tank_x = soil_x + (soil_w - tank_w)/2
             neck_w = 0.8
             neck_x = soil_x + (soil_w - neck_w)/2
             tank_base_y = wl_top - 0.5
-            if tank_base_y < datum_y + val_z: tank_base_y = datum_y + val_z # Prevent tank from sinking into soil
+            if tank_base_y < datum_y + val_z: tank_base_y = datum_y + val_z 
             
             # Top Tank Fill
             ax.add_patch(patches.Rectangle((tank_x, tank_base_y), tank_w, wl_top - tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
-            # Neck Fill
             ax.add_patch(patches.Rectangle((neck_x, datum_y + val_z), neck_w, tank_base_y - (datum_y + val_z) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
             
             # Left Tank & Tube Fill
             tube_w = 0.6
             left_tank_x = 0.5
             l_tank_base_y = wl_bot - 0.5
-            if l_tank_base_y > datum_y - 1.0: pass 
-            else: l_tank_base_y = datum_y - 1.0 # Logic to keep tank valid
+            if l_tank_base_y < datum_y - 1.0: l_tank_base_y = datum_y - 1.0 
             
-            # U-Tube Fill (One continuous polygon to avoid internal lines)
-            # Vertical Down from Soil Center
             tube_start_x = soil_x + (soil_w - tube_w)/2
             
+            # U-Tube Fill 
             ax.add_patch(patches.Rectangle((tube_start_x, datum_y - 1.0), tube_w, 1.0, facecolor='#D6EAF8', edgecolor='none', zorder=1))
-            # Horizontal Left
             tube_left_end = left_tank_x + (tank_w - tube_w)/2
             ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_start_x - tube_left_end + tube_w, tube_w, facecolor='#D6EAF8', edgecolor='none', zorder=1))
-            # Vertical Up to Left Tank
             ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_w, l_tank_base_y - (datum_y - 1.0) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
-            # Left Tank Fill
             ax.add_patch(patches.Rectangle((left_tank_x, l_tank_base_y), tank_w, wl_bot - l_tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
 
-            # --- 3. STRUCTURAL WALLS (Thick Continuous Lines) ---
+            # --- 3. STRUCTURAL WALLS ---
             wall_thick = 2.5
             wall_color = 'black'
             
             # Top Tank Walls
-            # Left side (Tank + Neck)
             ax.plot([tank_x, tank_x, neck_x, neck_x], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
-            # Right side (Tank + Neck)
             ax.plot([tank_x + tank_w, tank_x + tank_w, neck_x + neck_w, neck_x + neck_w], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
             
             # Soil Box Walls
-            ax.plot([soil_x, soil_x], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) # Left
-            ax.plot([soil_x + soil_w, soil_x + soil_w], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) # Right
+            ax.plot([soil_x, soil_x], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) 
+            ax.plot([soil_x + soil_w, soil_x + soil_w], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) 
             
-            # Bottom of Soil (Split for tube)
+            # Bottom of Soil
             ax.plot([soil_x, tube_start_x], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
             ax.plot([tube_start_x + tube_w, soil_x + soil_w], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
            
-            # Top of Soil (Split for tube)
+            # Top of Soil
             ax.plot([soil_x, neck_x], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
             ax.plot([neck_x + neck_w, soil_x + soil_w], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2) 
-            # Bottom Tube & Left Tank Walls (Continuous Path)
             
-            # Inner Path (Left side of tube -> Bottom -> Left Tank Left -> Top)
+            # Bottom Tube & Left Tank Walls
             path_outer_x = [tube_start_x , tube_start_x , tube_left_end + tube_w, tube_left_end + tube_w, left_tank_x + tank_w, left_tank_x + tank_w]
             path_outer_y = [datum_y, datum_y - 1.0 + tube_w, datum_y - 1.0 + tube_w, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
             ax.plot(path_outer_x, path_outer_y, color=wall_color, lw=wall_thick, zorder=2)
-            # Outer Path (Right side of tube -> Bottom -> Left Tank Right -> Top)
+            
             path_inner_x = [tube_start_x + tube_w, tube_start_x + tube_w, tube_left_end, tube_left_end, left_tank_x, left_tank_x]
             path_inner_y = [datum_y, datum_y - 1.0, datum_y - 1.0, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
             ax.plot(path_inner_x, path_inner_y, color=wall_color, lw=wall_thick, zorder=2)
 
-            
-            # Water Surfaces (Blue Lines)
+            # Water Surfaces
             ax.plot([tank_x, tank_x + tank_w], [wl_top, wl_top], color='blue', lw=2, zorder=2)
             ax.plot([left_tank_x, left_tank_x + tank_w], [wl_bot, wl_bot], color='blue', lw=2, zorder=2)
             
@@ -214,38 +199,35 @@ def app():
             ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
             ax.text(soil_x + 0.5 + soil_w, datum_y - 0.25, "Datum (z=0)", va='center', fontsize=10, style='italic')
 
-            # Dimension z (Soil Height) - LEFT SIDE
+            # Dimension z
             dim_z_x = soil_x - 0.4
             ax.annotate('', xy=(dim_z_x, datum_y), xytext=(dim_z_x, datum_y + val_z), 
                         arrowprops=dict(arrowstyle='<->', color='black'))
             ax.text(dim_z_x - 0.1, val_z/2, f"z = {val_z:.2f}m", fontsize=10, ha='right')
 
-            # Dimension y (Water Depth ABOVE Soil)
+            # Dimension y
             dim_y_x = soil_x + soil_w + 0.8
             ax.annotate('', xy=(dim_y_x, val_z), xytext=(dim_y_x, wl_top), 
                         arrowprops=dict(arrowstyle='<->', color='black'))
             ax.text(dim_y_x + 0.1, (val_z + wl_top)/2, f"y = {val_y:.2f}m", fontsize=11, fontweight='bold', color='black', ha='left')
-            # Extension lines
             ax.plot([soil_x + soil_w, dim_y_x + 0.2], [val_z, val_z], 'k--', lw=0.5)
             ax.plot([tank_x + tank_w, dim_y_x + 0.2], [wl_top, wl_top], 'k--', lw=0.5)
 
-            # Dimension x (Total Head Bottom)
+            # Dimension x
             dim_x_loc = left_tank_x - 0.4
             ax.annotate('', xy=(dim_x_loc, datum_y), xytext=(dim_x_loc, wl_bot), 
                         arrowprops=dict(arrowstyle='<->'))
             ax.text(dim_x_loc - 0.1, wl_bot/2, f"x = {val_x:.2f}m", fontsize=11, fontweight='bold', ha='right')
 
-            # Point A (Dot)
+            # Point A
             ax.scatter(soil_x + soil_w/2 + 2.0, datum_y + val_A, color='Black', zorder=5, s=80, edgecolor='black')
             ax.text(soil_x + soil_w/2 + 2.2, datum_y + val_A + 0.1, f"Point A", color='Black', fontweight='bold', zorder=5)
             
-            # Dimension A (Shifted Right & Black Arrow)
-            dim_A_x = soil_x + soil_w/2 + 2.0  # Shifted to the right of the center
+            # Dimension A
+            dim_A_x = soil_x + soil_w/2 + 2.0
             ax.annotate('', xy=(dim_A_x, datum_y), xytext=(dim_A_x, datum_y + val_A), 
-                        arrowprops=dict(arrowstyle='<->', color='black')) # BLACK ARROW
+                        arrowprops=dict(arrowstyle='<->', color='black'))
             ax.text(dim_A_x + 0.1, val_A/2, f"A = {val_A:.2f}m", color='black', fontweight='bold', zorder=5)
-            
-            # Connect Dimension A to Point A with small dotted line for clarity
             ax.plot([soil_x + soil_w/2, dim_A_x], [datum_y + val_A, datum_y + val_A], 'k:', lw=1)
 
             ax.text(soil_x + soil_w/2, wl_top + 0.5, f"FLOW {flow_arrow}", ha='center', fontsize=12, fontweight='bold')
@@ -255,9 +237,8 @@ def app():
             ax.axis('off')
             st.pyplot(fig)
 
-
     # =================================================================
-    # TAB 2: PERMEABILITY (Lab Tests)
+    # TAB 2: PERMEABILITY
     # =================================================================
     with tab2:
         st.subheader("Permeability Tests")
@@ -297,6 +278,5 @@ def app():
         if st.button("Calculate Critical Gradient"):
             st.metric("i_critical", f"{(Gs-1)/(1+e):.3f}")
 
-# For testing
 if __name__ == "__main__":
     app()
