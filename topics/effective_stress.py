@@ -47,7 +47,6 @@ def app():
         
         st.markdown("### Soil Stratigraphy")
         
-        # We need to track depth AS we create inputs to show the right boxes
         current_depth_tracker = 0.0
         
         for i in range(int(num_layers)):
@@ -57,39 +56,31 @@ def app():
                 type_soil = c1.selectbox(f"Type", ["Sand", "Clay"], key=f"t{i}")
                 thick = c2.number_input(f"Thickness (m)", 0.1, step=0.5, value=5.0, key=f"h{i}")
                 
-                # Logic to determine which Unit Weight is needed
                 layer_top = current_depth_tracker
                 layer_bot = current_depth_tracker + thick
                 
-                # Check position relative to Water Table
                 is_above_wt = layer_bot <= water_depth
                 is_below_wt = layer_top >= water_depth
                 is_crossing_wt = (layer_top < water_depth) and (layer_bot > water_depth)
-                
-                # Capillary Zone Check
-                cap_top = water_depth - hc
-                is_in_capillary = (layer_bot > cap_top) and (layer_bot <= water_depth)
+                is_in_capillary = (layer_bot > (water_depth - hc)) and (layer_bot <= water_depth)
                 
                 gamma_sat = 0.0
                 gamma_dry = 0.0
                 
-                # DYNAMIC INPUTS
-                # If ANY part is wet (below WT or in Capillary), we need Gamma Sat
                 need_sat = is_below_wt or is_crossing_wt or is_in_capillary
-                # If ANY part is dry (above WT and above Capillary), we need Gamma Dry
                 need_dry = is_above_wt or is_crossing_wt
                 
                 if need_sat:
                     gamma_sat = c3.number_input(f"γ_sat (kN/m³)", 0.1, step=0.1, value=20.0, key=f"gs{i}")
                 else:
                     c3.markdown(f"*(Layer is Dry)*")
-                    gamma_sat = 20.0 # Default needed for safety
+                    gamma_sat = 20.0
                 
                 if need_dry:
                     gamma_dry = c4.number_input(f"γ_dry (kN/m³)", 0.1, step=0.1, value=17.0, key=f"gd{i}")
                 else:
                     c4.markdown(f"*(Layer Submerged)*")
-                    gamma_dry = 17.0 # Default needed
+                    gamma_dry = 17.0
 
                 layers.append({
                     "id": i, "type": type_soil, "H": thick, 
@@ -101,38 +92,41 @@ def app():
 
         total_depth = current_depth_tracker
 
-        # --- 4. INPUT VISUALIZATION ---
+        # --- 4. INPUT VISUALIZATION (COMPACT SIZE) ---
         st.markdown("### 1. Input Visualization")
         
         if total_depth > 0:
-            # Changed figsize from (8, 5) to (6, 3.5) for a smaller diagram
-            fig_sch, ax_sch = plt.subplots(figsize=(6, 3.5))
+            # COMPACT SIZE: Reduced to (6, 3) to match your preference
+            fig_sch, ax_sch = plt.subplots(figsize=(6, 3))
             cur_d = 0
             
             if surcharge > 0:
                 for x in np.linspace(0, 4, 10):
                     ax_sch.arrow(x, -0.2, 0, 0.2, head_width=0.1, head_length=0.1, fc='red', ec='red')
-                ax_sch.text(2, -0.4, f"q = {surcharge} kPa", ha='center', color='red', fontweight='bold', fontsize=9)
+                # Smaller font for compactness
+                ax_sch.text(2, -0.5, f"q = {surcharge} kPa", ha='center', color='red', fontweight='bold', fontsize=8)
 
             for lay in layers:
                 rect = patches.Rectangle((0, cur_d), 5, lay['H'], facecolor=lay['color'], edgecolor='black', alpha=0.6)
                 ax_sch.add_patch(rect)
                 mid_y = cur_d + lay['H']/2
+                
+                # Compact labels
                 ax_sch.text(2.5, mid_y, lay['type'], ha='center', va='center', fontweight='bold', fontsize=9)
                 ax_sch.annotate("", xy=(-0.2, cur_d), xytext=(-0.2, cur_d + lay['H']), arrowprops=dict(arrowstyle='<->'))
-                ax_sch.text(-0.3, mid_y, f"{lay['H']}m", va='center', ha='right', fontsize=9)
+                ax_sch.text(-0.3, mid_y, f"{lay['H']}m", va='center', ha='right', fontsize=8)
                 cur_d += lay['H']
 
             ax_sch.axhline(y=water_depth, color='blue', linestyle='--', linewidth=2)
-            ax_sch.text(5.1, water_depth, "WT ▽", color='blue', va='center', fontsize=9)
+            ax_sch.text(5.1, water_depth, "WT ▽", color='blue', va='center', fontsize=8)
 
             if hc > 0:
                 c_top = max(0, water_depth - hc)
                 rect_cap = patches.Rectangle((0, c_top), 5, water_depth - c_top, hatch='///', fill=False, edgecolor='blue', alpha=0.3)
                 ax_sch.add_patch(rect_cap)
-                ax_sch.text(5.1, c_top, f"Capillary\n({hc}m)", color='blue', va='center', fontsize=8)
+                ax_sch.text(5.1, c_top, f"Capillary\n({hc}m)", color='blue', va='center', fontsize=7)
 
-            ax_sch.set_ylim(total_depth * 1.1, -1)
+            ax_sch.set_ylim(total_depth * 1.1, -1.5)
             ax_sch.set_xlim(-1, 6)
             ax_sch.axis('off')
             st.pyplot(fig_sch)
@@ -140,7 +134,6 @@ def app():
         # --- 5. CALCULATION LOGIC ---
         if st.button("Calculate Stress Profile", type="primary"):
             
-            # --- CRITICAL DEPTHS GENERATION ---
             z_points = {0.0, total_depth} 
             
             run_z = 0
@@ -174,14 +167,13 @@ def app():
                 else:
                     u_hydro = 0.0
                 
-                # B. TOTAL STRESS (Accumulation)
+                # B. TOTAL STRESS
                 if i == 0:
                     sigma = surcharge
                 else:
                     dz = z - z_prev
                     z_mid = (z + z_prev) / 2
                     
-                    # Find active layer
                     active_layer = None
                     cur_l_bot = 0
                     for l in layers:
@@ -191,7 +183,6 @@ def app():
                             break
                     if active_layer is None: active_layer = layers[-1]
 
-                    # Decide Unit Weight
                     if z_mid > (water_depth - hc):
                         gamma_used = active_layer['g_sat']
                     else:
@@ -203,15 +194,14 @@ def app():
                     calc_steps.append(f"**Interval {z_prev}m to {z}m:** {active_layer['type']} ($\gamma={gamma_used}$)")
                     calc_steps.append(f"$\\sigma_{{{z}}} = {sigma_prev:.2f} + ({gamma_used} \\times {dz:.2f}) = {sigma:.2f}$")
 
-                # C. EXCESS PORE PRESSURE (Short Term Clay)
+                # C. EXCESS PORE PRESSURE
                 u_excess = 0.0
                 
-                # Check layer at this specific depth
                 active_layer_at_point = None
                 r_z = 0
                 for l in layers:
                     r_z += l['H']
-                    if z <= r_z and z > (r_z - l['H']): # Strictly inside or at bottom boundary
+                    if z <= r_z and z > (r_z - l['H']): 
                         active_layer_at_point = l
                         break
                 
@@ -275,26 +265,27 @@ def app():
                 st.pyplot(fig)
 
     # ==================================================
-    # TAB 2: HEAVE CHECK (Preserved)
+    # TAB 2: HEAVE CHECK
     # ==================================================
     with tab2:
         st.subheader("Heave & Piping Analysis")
         st.info("Calculates safety against bottom heave for excavations in Clay over Artesian Sand.")
         
         c1, c2 = st.columns(2)
-        H_clay = c1.number_input("Clay Thickness (m)", 5.0)
-        gamma_c = c2.number_input("Clay Unit Wt (kN/m³)", 20.0)
-        
-        artesian_head = c1.number_input("Artesian Head above Surface (m)", 2.0)
-        exc_depth = c2.number_input("Excavation Depth (m)", 3.0)
+        with col1:
+            h_clay_total = st.number_input("Total Thickness of Clay Layer (m)", 5.0, step=0.1)
+            gamma_clay = st.number_input("Clay Unit Wt (kN/m³)", 20.0)
+        with col2:
+            artesian_head = st.number_input("Artesian Head above Surface (m)", 2.0)
+            exc_depth = st.number_input("Excavation Depth (m)", 3.0)
         
         if st.button("Check Heave Safety"):
-            remaining_clay = H_clay - exc_depth
+            remaining_clay = h_clay_total - exc_depth
             if remaining_clay <= 0:
                 st.error("Excavation is deeper than clay layer!")
             else:
-                sigma_down = remaining_clay * gamma_c
-                u_up = (H_clay + artesian_head) * 9.81
+                sigma_down = remaining_clay * gamma_clay
+                u_up = (h_clay_total + artesian_head) * 9.81
                 fs = sigma_down / u_up
                 
                 st.latex(rf"FS = \frac{{\sigma_{{down}}}}{{u_{{up}}}} = \frac{{{remaining_clay:.2f} \times {gamma_c}}}{{{u_up:.2f}}} = \mathbf{{{fs:.3f}}}")
