@@ -31,7 +31,7 @@ def get_active_modules():
 def main():
     # --- [NEW] MAIN PAGE LOGO ---
     # This places the logo at the very top of your content
-    col1, col2 = st.columns([1, 4]) # Create columns to control logo size/position
+    col1, col2 = st.columns([1, 1]) # Create columns to control logo size/position
     with col1:
         st.image("assets/logo.png", width=250) # <--- Adjust width here if needed
     
@@ -91,5 +91,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
