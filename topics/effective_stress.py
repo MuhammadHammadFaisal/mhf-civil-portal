@@ -137,6 +137,7 @@ def app():
         if st.button("Calculate Stress Profiles", type="primary"):
             
             # --- CREATE Z-POINTS ---
+            # 1. Critical Points
             z_points_set = {0.0, total_depth}
             cur = 0
             for l in layers:
@@ -148,7 +149,7 @@ def app():
             cap_top = water_depth - hc
             if 0 < cap_top < total_depth: z_points_set.add(cap_top)
                 
-            # Add Regular 1m Intervals
+            # 2. Regular Intervals (Every 1m)
             for d in range(1, int(total_depth) + 1):
                 z_points_set.add(float(d))
 
@@ -157,14 +158,14 @@ def app():
             # --- CALCULATION ENGINE ---
             def calculate_profile(mode_name, load_q):
                 results = []
-                math_logs = []  # Store calculation steps
+                math_logs = []
                 
                 sigma_prev = load_q
                 z_prev = 0.0
                 
                 for i, z in enumerate(sorted_z):
                     
-                    # A. Pore Pressure Logic
+                    # A. Pore Pressure
                     u_calc_text = "0"
                     if z > water_depth:
                         u_h = (z - water_depth) * gamma_w
@@ -175,12 +176,12 @@ def app():
                     else:
                         u_h = 0.0
                     
-                    # B. Total Stress Logic
+                    # B. Total Stress
                     if i > 0:
                         dz = z - z_prev
                         z_mid = (z + z_prev)/2
                         
-                        # Identify Layer
+                        # Find Layer
                         d_search = 0
                         active_l = layers[-1]
                         for l in layers:
@@ -189,7 +190,7 @@ def app():
                                 active_l = l
                                 break
                         
-                        # Identify Gamma
+                        # Find Gamma
                         eff_wt_boundary = water_depth - hc
                         if z_mid > eff_wt_boundary:
                             gam = active_l['g_sat']
@@ -199,16 +200,13 @@ def app():
                             g_sym = "\\gamma_{dry}"
                             
                         sigma = sigma_prev + (gam * dz)
-                        
-                        # Add Calc Log for Stress Accumulation
                         math_logs.append(f"**Interval {z_prev}m to {z}m:** {active_l['type']} ({g_sym}={gam})")
                         math_logs.append(f"$\\sigma_{{{z}}} = {sigma_prev:.2f} + ({gam} \\times {dz:.2f}) = {sigma:.2f}$")
-                        
                     else:
                         sigma = load_q
                         math_logs.append(f"**Surface (z=0):** Load = {load_q} kPa")
 
-                    # C. Excess Pore Pressure (Short Term Clay)
+                    # C. Excess Pore Pressure
                     u_excess = 0.0
                     check_z = z
                     if i > 0 and z == total_depth: check_z = z - 0.01 
@@ -228,7 +226,6 @@ def app():
                     u_tot = u_h + u_excess
                     sig_eff = sigma - u_tot
                     
-                    # Add Point Calc Log
                     math_logs.append(f"**@ z={z}m:**")
                     math_logs.append(f"$u = {u_calc_text} = {u_tot:.2f}$")
                     math_logs.append(f"$\\sigma' = {sigma:.2f} - {u_tot:.2f} = \\mathbf{{{sig_eff:.2f}}}$")
@@ -273,7 +270,6 @@ def app():
 
             # --- DISPLAY 3 COLUMNS ---
             st.markdown("### Results Comparison")
-            
             c_init, c_long, c_short = st.columns(3)
 
             # 1. INITIAL
@@ -285,21 +281,21 @@ def app():
                 plot_results(df_init, "Initial Profile", ax1)
                 st.pyplot(fig1)
                 
-                with st.expander("📝 Show Math (Initial)"):
+                with st.expander("Show Math (Initial)"):
                     for line in log_init:
                         if line.startswith("**") or line == "---": st.markdown(line)
                         else: st.latex(line.replace("$", ""))
 
             # 2. LONG TERM
             with c_long:
-                st.subheader("Long Term")
-                st.caption(f"q = {surcharge}, Δu = 0")
+                st.subheader("Long Term (Drained)")
+                st.caption(f"q = {surcharge} kPa | Excess u = 0")
                 st.dataframe(df_long.style.format("{:.2f}"))
                 fig2, ax2 = plt.subplots(figsize=(5, 6))
                 plot_results(df_long, "Long Term Profile", ax2)
                 st.pyplot(fig2)
 
-                with st.expander("📝 Show Math (Long Term)"):
+                with st.expander("Show Math (Long Term)"):
                     for line in log_long:
                         if line.startswith("**") or line == "---": st.markdown(line)
                         else: st.latex(line.replace("$", ""))
@@ -307,13 +303,13 @@ def app():
             # 3. SHORT TERM
             with c_short:
                 st.subheader("Short Term")
-                st.caption(f"q = {surcharge}, Δu in Clay")
+                st.caption(f"q = {surcharge} kPa | Excess u in Clay")
                 st.dataframe(df_short.style.format("{:.2f}"))
                 fig3, ax3 = plt.subplots(figsize=(5, 6))
                 plot_results(df_short, "Short Term Profile", ax3)
                 st.pyplot(fig3)
 
-                with st.expander("📝 Show Math (Short Term)"):
+                with st.expander("Show Math (Short Term)"):
                     for line in log_short:
                         if line.startswith("**") or line == "---": st.markdown(line)
                         else: st.latex(line.replace("$", ""))
