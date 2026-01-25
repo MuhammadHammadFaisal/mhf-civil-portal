@@ -30,17 +30,18 @@ def get_active_modules():
 
 def main():
     # --- MAIN PAGE HERO SECTION ---
-    # We use 3 columns to center the content professionally
+    # We use 3 columns to center the content.
+    # [1, 2, 1] creates a center column that isn't too wide or too narrow.
     col_left, col_center, col_right = st.columns([1, 2, 1])
 
     with col_center:
-        # Display logo centered
-        st.image("assets/logo.png", use_container_width=True) 
+        # [FIX] Set a fixed width (350px) so it doesn't blow up to full screen size
+        st.image("assets/logo.png", width=350) 
         
         # Display Title and Caption Centered
         st.markdown(
             """
-            <div style='text-align: center;'>
+            <div style='text-align: left; padding-left: 20px;'>
                 <h1>MHF Civil Portal</h1>
                 <p style='color: gray; font-size: 18px;'>Deterministic Civil Engineering Computation Platform</p>
             </div>
