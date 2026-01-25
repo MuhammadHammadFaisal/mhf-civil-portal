@@ -253,7 +253,7 @@ def app():
             fig_preview = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=False)
             st.pyplot(fig_preview)
 
-        st.markdown("---")
+      
         solve_btn = st.button("Solve Numeric Problem", type="primary", use_container_width=True)
 
         # --- BOTTOM SECTION: RESULTS ---
