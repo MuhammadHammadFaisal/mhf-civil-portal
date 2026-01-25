@@ -156,7 +156,7 @@ def app():
             Ma = 0
 
             # Plot Setup
-            fig, ax = plt.subplots(figsize=(6, 5))
+            fig, ax = plt.subplots(figsize=(3, 2.5))
             ax.set_xlim(-1, 2)
             ax.set_ylim(0, 1 + e + 0.2)
             ax.axis('off')
@@ -259,7 +259,7 @@ def app():
             
             # 1. Standard Results
             if solver.log:
-                with st.expander("📝 View Step-by-Step Solution", expanded=False):
+                with st.expander("View Step-by-Step Solution", expanded=False):
                     for step in solver.log:
                         st.markdown(f"**Found ${step['Variable']}$:**")
                         st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.4f}}}")
