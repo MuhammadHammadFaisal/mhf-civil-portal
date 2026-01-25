@@ -107,7 +107,7 @@ def main():
     if modules_list:
         st.subheader("Active Course Calculators")
         
-        cols = st.columns(2)
+        cols = st.columns(4)
         
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
@@ -115,7 +115,7 @@ def main():
                 # CSS ::first-line handles the bolding of the top part.
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n✅ Online & Verified", 
+                    label=f"{module_title}\n Online & Verified", 
                     use_container_width=True
                 )
     
@@ -158,3 +158,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
