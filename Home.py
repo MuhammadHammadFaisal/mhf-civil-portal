@@ -102,8 +102,8 @@ def main():
                 # The CSS above turns this into a big green box
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n✅ Online & Verified", 
-                    icon="🌿",  # Leaf icon for the green theme
+                    label=f"{module_title}\n Online & Verified", 
+                    icon="",  # Leaf icon for the green theme
                     use_container_width=True
                 )
     
@@ -146,3 +146,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
