@@ -99,7 +99,7 @@ def app():
             # COMPACT SIZE: Reduced to (6, 3) to match your preference
             fig, ax = plt.subplots(figsize=(5, 3.5))
             ax.set_xlim(-1.5, 2.5) 
-            ax.set_ylim(0, max(1.5, 1 + e + 0.3)) 
+            ax.set_ylim(0, max(20)) 
             ax.axis('off')
             if surcharge > 0:
                 for x in np.linspace(0, 4, 10):
