@@ -9,7 +9,10 @@ st.set_page_config(
 )
 
 def get_active_modules():
-    """Scans 'pages/' directory for active modules."""
+    """
+    Scans 'pages/' directory for active modules.
+    Returns a list of tuples: (filename, display_name)
+    """
     active_modules = []
     if os.path.exists("pages"):
         files = os.listdir("pages")
@@ -23,28 +26,25 @@ def get_active_modules():
                             parts = clean_name.split(" ", 1)
                             if parts[0].isdigit():
                                 clean_name = parts[1]
-                            active_modules.append(clean_name.title())
+                            # Append tuple: (filename, Title Case Name)
+                            active_modules.append((f, clean_name.title()))
                 except Exception:
                     pass 
-    return sorted(active_modules)
+    return sorted(active_modules, key=lambda x: x[1])
 
 def main():
     # --- HERO SECTION ---
-    # We use a tighter ratio [1, 2] to keep text close to the logo.
-    # We try to use the 'vertical_alignment' parameter (Streamlit 1.38+ feature).
+    # Tight layout [1, 2] ratio with vertical centering
     try:
         col_logo, col_text = st.columns([1, 2], vertical_alignment="center")
     except TypeError:
-        # Fallback for older Streamlit versions
         col_logo, col_text = st.columns([1, 2])
 
     with col_logo:
-        # The logo will resize naturally to the column width
         st.image("assets/logo.png", use_container_width=True) 
 
     with col_text:
-        # CSS Styling for Professional Alignment
-        # padding-top adjusts the vertical position manually if needed
+        # Pushes text slightly down to align with logo center
         st.markdown(
             """
             <div style="padding-top: 10px; padding-left: 10px;">
@@ -59,17 +59,42 @@ def main():
 
     st.markdown("---")
     
-    # --- AUTOMATIC DASHBOARD ---
-    available_modules = get_active_modules()
+    # --- AUTOMATIC DASHBOARD (UPDATED) ---
+    modules_list = get_active_modules()
 
-    if available_modules:
+    if modules_list:
         st.subheader("Active Course Calculators")
         cols = st.columns(2)
-        for index, module_name in enumerate(available_modules):
+        
+        # We iterate through (filename, title) tuples
+        for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
                 with st.container(border=True):
-                    st.markdown(f"**{module_name}**")
-                    st.caption("Online & Verified")
+                    
+                    # 1. Module Title
+                    st.markdown(f"### {module_title}")
+                    
+                    # 2. Professional "Online" Badge (Green Pill Style)
+                    # This HTML creates a subtle green background with dark green text
+                    st.markdown(
+                        """
+                        <div style="margin-bottom: 15px;">
+                            <span style='background-color: #d1e7dd; color: #0f5132; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;'>
+                                ✅ ONLINE & VERIFIED
+                            </span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                    
+                    # 3. Clickable Redirect Button
+                    # This creates a full-width button that links to the page
+                    st.page_link(
+                        f"pages/{file_name}", 
+                        label="Launch Calculator", 
+                        icon="🚀", 
+                        use_container_width=True
+                    )
     
     # --- MISSION STATEMENT ---
     st.markdown("---")
