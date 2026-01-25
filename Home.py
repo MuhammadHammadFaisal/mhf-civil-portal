@@ -29,11 +29,14 @@ def get_active_modules():
     return sorted(active_modules)
 
 def main():
-    # --- [NEW] MAIN PAGE LOGO ---
-    # This places the logo at the very top of your content
-    col1, col2 = st.columns([1, 1]) # Create columns to control logo size/position
+    # --- [NEW] SIDEBAR LOGO (Nav Bar) ---
+    # This ensures the logo appears in the top-left sidebar like your other pages
+    st.logo(image="assets/logo.png", icon_image="assets/logo.png")
+
+    # --- MAIN PAGE BODY LOGO ---
+    col1, col2 = st.columns([1, 1]) 
     with col1:
-        st.image("assets/logo.png", width=300) # <--- Adjust width here if needed
+        st.image("assets/logo.png", width=300) 
     
     # --- HEADER ---
     st.markdown("# MHF Civil Portal")
@@ -91,7 +94,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
