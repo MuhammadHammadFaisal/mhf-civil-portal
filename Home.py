@@ -141,3 +141,10 @@ def main():
         <div style='text-align: center; color: #666; font-size: 12px;'>
         © 2026 MHF Civil. All rights reserved.<br>
         Version 1.2.0 · Ankara, Turkey
+        </div>
+        """, 
+        unsafe_allow_html=True
+        )
+
+if __name__ == "__main__":
+    main()
