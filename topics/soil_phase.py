@@ -26,7 +26,7 @@ def app():
                 self.rho_w = 1.0
                 self.gamma_w = 9.81
                 self.log = [] 
-                self.inputs = [] 
+                self.inputs = [] # Track what user typed
 
                 self.latex_map = {
                     'w': 'w', 'Gs': 'G_s', 'e': 'e', 'n': 'n', 'Sr': 'S_r',
@@ -36,7 +36,7 @@ def app():
                 }
 
             def set_param(self, key, value):
-                # CHANGE: Changed "> 0" to ">= 0" so 0.0 is accepted (needed for Dry state)
+                # FIX: Check for >= 0 so that "0.0" (Dry) is accepted
                 if value is not None and value >= 0: 
                     self.params[key] = float(value)
                     self.inputs.append(key)
@@ -59,6 +59,7 @@ def app():
                     # 1. Basic n <-> e
                     if known('n') and not known('e'):
                         p['e'] = p['n'] / (1 - p['n'])
+                        # Create substitution string like: 0.3 / (1 - 0.3)
                         sub = r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}'
                         self.add_log('e', r'\frac{n}{1 - n}', sub, p['e'])
                         changed = True
@@ -141,15 +142,8 @@ def app():
         def draw_phase_diagram(params, inputs_list, is_result_mode=False):
             """
             is_result_mode=False: Draws INPUT diagram (Preview). 
-                                  Uses fixed geometry but labels knowns Green/Unknowns Red.
             is_result_mode=True:  Draws RESULT diagram.
-                                  Uses actual calculated geometry.
             """
-            
-            # 1. Setup Geometry Variables
-            # If Result Mode: Use actual calculated values.
-            # If Input Mode: Use placeholders (e=0.7, Sr=0.5) just to make the box look nice,
-            # unless the user actually typed a value, then use that to be responsive.
             
             raw_e = params.get('e')
             raw_Sr = params.get('Sr')
@@ -163,7 +157,7 @@ def app():
                 Gs = raw_Gs if raw_Gs is not None else 2.7
                 w = raw_w if raw_w is not None else 0.1
             else:
-                # Use Placeholders for geometry unless specified, so diagram doesn't look broken
+                # Use Placeholders for geometry unless specified
                 e = raw_e if raw_e is not None else 0.7 
                 Sr = raw_Sr if raw_Sr is not None else 0.5
                 Gs = raw_Gs if raw_Gs is not None else 2.7
@@ -258,7 +252,6 @@ def app():
         # LAYOUT: SPLIT SCREEN (INPUTS | PREVIEW DIAGRAM)
         # ==================================================
         
-        # We define the variables first so we can draw the preview immediately
         solver = SoilState()
         
         # --- TOP SECTION: INPUTS & PREVIEW ---
@@ -269,6 +262,7 @@ def app():
             
             # Condition Radio
             condition = st.radio("Soil State:", ["Partially Saturated", "Fully Saturated (Sr=1)", "Dry (Sr=0)"])
+            # Set condition BEFORE inputs logic
             if "Fully" in condition: solver.set_param('Sr', 1.0)
             elif "Dry" in condition: solver.set_param('Sr', 0.0)
 
@@ -284,18 +278,20 @@ def app():
                 gamma_b_in = st.number_input("Bulk Unit Wt", 0.0, step=0.1)
                 gamma_d_in = st.number_input("Dry Unit Wt", 0.0, step=0.1)
 
-            # Register Inputs into Solver Object IMMEDIATELY
+            # Register Inputs
             if w_in > 0: solver.set_param('w', w_in)
             if Gs_in > 0: solver.set_param('Gs', Gs_in)
             if e_in > 0: solver.set_param('e', e_in)
             if n_in > 0: solver.set_param('n', n_in)
+            
+            # Only set Sr from box if user selected Partial mode
             if "Partially" in condition and Sr_in > 0: solver.set_param('Sr', Sr_in)
+            
             if gamma_b_in > 0: solver.set_param('gamma_bulk', gamma_b_in)
             if gamma_d_in > 0: solver.set_param('gamma_dry', gamma_d_in)
 
         with top_col2:
             st.markdown("### Input Monitor")
-            # Draw Preview Diagram (is_result_mode=False)
             fig_preview = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=False)
             st.pyplot(fig_preview)
 
@@ -326,26 +322,34 @@ def app():
                     if p['gamma_dry']: st.latex(r"\gamma_{dry} = " + f"{p['gamma_dry']:.2f}")
 
                 with bot_col2:
-                    # Draw Final Diagram (is_result_mode=True)
                     fig_final = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=True)
                     st.pyplot(fig_final)
 
-                # Step by Step Expander
-                with st.expander("Show Calculation Steps"):
+                with st.expander("Show Calculation Steps", expanded=True):
                     for step in solver.log:
                         st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.4f}}}")
 
-        # --- RELATIVE DENSITY ---
-        st.markdown("---")
-        st.subheader("Relative Density (Dr)")
-        c1, c2, c3 = st.columns(3)
-        with c1: e_curr = st.number_input("Current e", 0.0, step=0.01, key="dr_e")
-        with c2: e_max = st.number_input("Max e (Loose)", 0.0, step=0.01, key="dr_emax")
-        with c3: e_min = st.number_input("Min e (Dense)", 0.0, step=0.01, key="dr_emin")
-        
-        if st.button("Calc Dr"):
-            if e_max > e_min:
-                Dr = (e_max - e_curr) / (e_max - e_min)
-                st.info(f"Relative Density Dr = {Dr*100:.1f}%")
-            else:
-                st.error("e_max must be > e_min")
+        # --- SEPARATE SECTION: RELATIVE DENSITY ---
+        st.markdown("")
+        st.markdown("")
+        with st.container(border=True):
+            st.subheader("Relative Density ($D_r$) Calculator")
+            st.caption("Separate utility to determine soil state (Loose/Dense) based on void ratios.")
+            
+            rc1, rc2, rc3 = st.columns(3)
+            with rc1: e_curr = st.number_input("Current e", 0.0, step=0.01, key="dr_e")
+            with rc2: e_max = st.number_input("Max e (Loose state)", 0.0, step=0.01, key="dr_emax")
+            with rc3: e_min = st.number_input("Min e (Dense state)", 0.0, step=0.01, key="dr_emin")
+            
+            if st.button("Calculate Dr"):
+                if e_max > e_min and e_max > 0:
+                    Dr = (e_max - e_curr) / (e_max - e_min)
+                    st.latex(r"D_r = \frac{e_{max} - e}{e_{max} - e_{min}} = " + f"{Dr*100:.1f}\\%")
+                    
+                    if Dr < 0.15: st.info("State: Very Loose")
+                    elif Dr < 0.35: st.info("State: Loose")
+                    elif Dr < 0.65: st.info("State: Medium Dense")
+                    elif Dr < 0.85: st.info("State: Dense")
+                    else: st.info("State: Very Dense")
+                else:
+                    st.error("Invalid inputs: e_max must be greater than e_min.")
