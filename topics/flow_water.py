@@ -38,7 +38,7 @@ def app():
             # 5. Point A
             val_A = st.slider("Height of Point 'A' from Datum [m]", 0.0, val_z, val_z/2)
 
-            st.markdown("---")
+            
             
             # --- BUTTON & CALCULATION LOGIC ---
             if st.button("Calculate Effective Stress", type="primary"):
@@ -236,7 +236,7 @@ def app():
             ax.set_ylim(datum_y - 1.5, max(wl_bot, wl_top) + 1)
             ax.axis('off')
             st.pyplot(fig)
-
+            st.markdown("---")
     # =================================================================
     # TAB 2: PERMEABILITY
     # =================================================================
