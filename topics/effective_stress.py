@@ -30,17 +30,7 @@ def app():
         # -------------------------------------------------
         # 1. ANALYSIS SETTINGS & GLOBAL INPUTS
         # -------------------------------------------------
-        col_glob1, col_glob2 = st.columns(2)
-        with col_glob1:
-            analysis_mode = st.radio(
-                "Analysis Condition:", 
-                ["Long Term (Drained)", "Short Term (Undrained)"],
-                help="Short Term: Surcharge creates excess pore pressure in CLAY layers."
-            )
-        
-        with col_glob2:
-            st.info("💡 **Interactive Diagram:** The graph below now overlays the **Initial Total Stress ($\sigma_v$)** profile on top of the soil layers.")
-
+        st.info("💡 **Comparison Mode:** Calculates Long Term (Drained) and Short Term (Undrained) conditions side-by-side.")
         st.divider()
 
         # -------------------------------------------------
@@ -77,18 +67,12 @@ def app():
                     
                     # --- LOGIC TO DETERMINE REQUIRED INPUTS ---
                     eff_wt = water_depth - hc
-                    
-                    # 1. Is any part of layer DRY? (Above eff_wt)
                     needs_dry = layer_top < eff_wt
-                    
-                    # 2. Is any part of layer WET? (Below eff_wt)
                     needs_sat = layer_bot > eff_wt
                     
-                    # 3. Default Values
                     g_dry_input = 17.0
                     g_sat_input = 20.0
                     
-                    # --- RENDER INPUTS ---
                     if needs_sat:
                         g_sat_input = cols[2].number_input(f"γ_sat", value=20.0, key=f"gs{i}")
                     else:
@@ -109,65 +93,26 @@ def app():
             total_depth = depth_tracker
 
         # -------------------------------------------------
-        # 3. SOIL PROFILE VISUALIZER + INITIAL STRESS
+        # 3. SOIL PROFILE VISUALIZER (Clean Geometry Only)
         # -------------------------------------------------
         with col_viz:
-            st.markdown("### Soil Profile & Initial Stress")
+            st.markdown("### Soil Profile Preview")
             
             fig, ax = plt.subplots(figsize=(6, 5))
             
-            # --- PRE-CALCULATE INITIAL STRESS POINTS FOR PLOTTING ---
-            stress_z = [0.0]
-            stress_val = [surcharge]
-            current_sigma = surcharge
-            current_d = 0.0
-            
-            # 1. Draw Layers & Accumulate Stress
+            # 1. Draw Layers
+            current_depth = 0
             for lay in layers:
-                # Background Layer
-                rect = patches.Rectangle((0, current_d), 1, lay['H'], facecolor=lay['color'], edgecolor='black', alpha=0.7, transform=ax.get_yaxis_transform())
-                # Note: We use transformation to mix axes types later, but simple rect is easiest on primary axis
-                # Let's stick to standard plotting
-                ax.add_patch(patches.Rectangle((0, current_d), 5, lay['H'], facecolor=lay['color'], edgecolor='gray', alpha=0.5))
+                rect = patches.Rectangle((0, current_depth), 5, lay['H'], facecolor=lay['color'], edgecolor='black')
+                ax.add_patch(rect)
                 
-                # Label
-                mid_y = current_d + lay['H']/2
-                l_top = current_d
-                l_bot = current_d + lay['H']
-                eff_wt = water_depth - hc
-                
+                mid_y = current_depth + lay['H']/2
                 label = f"{lay['type']}"
-                ax.text(0.5, mid_y, label, ha='left', va='center', fontsize=9, fontweight='bold', color='#333')
-                
-                # Height Marker
-                ax.text(-0.1, mid_y, f"{lay['H']}m", ha='right', va='center', fontsize=8)
-                
-                # --- STRESS CALCULATION FOR PREVIEW ---
-                # We need to split if it crosses WT to draw the stress line correctly (slope change)
-                if l_top < eff_wt and l_bot > eff_wt:
-                    # Split Layer
-                    h_dry = eff_wt - l_top
-                    h_sat = l_bot - eff_wt
-                    
-                    # Part 1 (Dry)
-                    current_sigma += lay['g_dry'] * h_dry
-                    stress_z.append(eff_wt)
-                    stress_val.append(current_sigma)
-                    
-                    # Part 2 (Sat)
-                    current_sigma += lay['g_sat'] * h_sat
-                    stress_z.append(l_bot)
-                    stress_val.append(current_sigma)
-                else:
-                    # Single Phase
-                    gamma = lay['g_sat'] if l_top >= eff_wt else lay['g_dry']
-                    current_sigma += gamma * lay['H']
-                    stress_z.append(l_bot)
-                    stress_val.append(current_sigma)
+                ax.text(2.5, mid_y, label, ha='center', va='center', fontweight='bold', fontsize=10)
+                ax.text(-0.2, mid_y, f"{lay['H']}m", ha='right', va='center', fontsize=9)
+                current_depth += lay['H']
 
-                current_d += lay['H']
-
-            # 2. Draw Surcharge Visuals
+            # 2. Draw Surcharge
             if surcharge > 0:
                 for x in np.linspace(0.5, 4.5, 8):
                     ax.arrow(x, -0.5, 0, 0.4, head_width=0.15, head_length=0.1, fc='red', ec='red')
@@ -184,26 +129,9 @@ def app():
                 ax.add_patch(rect_cap)
                 ax.text(5.1, cap_top, f"Capillary\n({hc}m)", color='blue', va='center', fontsize=8)
 
-            # --- 5. OVERLAY STRESS GRAPH (TWIN AXIS) ---
-            ax_stress = ax.twiny() # Create top X-axis for Stress
-            ax_stress.plot(stress_val, stress_z, color='red', linewidth=2, marker='o', markersize=4, label="Total Stress (σ)")
-            
-            # Formatting Twin Axis
-            ax_stress.set_xlabel(r"Initial Total Stress $\sigma_v$ (kPa)", color='red', fontsize=9)
-            ax_stress.tick_params(axis='x', labelcolor='red', labelsize=8)
-            ax_stress.spines['top'].set_color('red')
-            
-            # Ensure 0 is visible
-            xmax = max(stress_val) * 1.2
-            ax_stress.set_xlim(0, xmax)
-
-            # Primary Axis Formatting
+            ax.set_xlim(-1, 6)
             ax.set_ylim(total_depth * 1.1, -1.5)
-            ax.set_xlim(0, 6)
-            ax.set_xticks([]) # Hide bottom X axis
-            ax.set_ylabel("Depth (m)")
-            
-            # Ground Line
+            ax.axis('off')
             ax.plot([0, 5], [0, 0], 'k-', linewidth=2) 
             
             st.pyplot(fig)
@@ -212,9 +140,9 @@ def app():
         # 4. CALCULATION & RESULTS
         # -------------------------------------------------
         st.markdown("---")
-        if st.button("Calculate Stress Profile", type="primary"):
+        if st.button("Calculate Stress Profiles", type="primary"):
             
-            # --- 1. CREATE Z-POINTS (Discretization) ---
+            # --- 1. CREATE Z-POINTS ---
             z_points_set = {0.0, total_depth}
             cur = 0
             for l in layers:
@@ -232,7 +160,7 @@ def app():
 
             sorted_z = sorted(list(z_points_set))
             
-            # --- 2. CALCULATION FUNCTION ---
+            # --- 2. CALCULATION ENGINE ---
             def calculate_profile(mode_name):
                 results = []
                 sigma_prev = surcharge
@@ -240,7 +168,7 @@ def app():
                 
                 for i, z in enumerate(sorted_z):
                     
-                    # --- A. Pore Pressure (u) ---
+                    # A. Pore Pressure
                     if z > water_depth:
                         u_h = (z - water_depth) * gamma_w
                     elif z > (water_depth - hc):
@@ -248,7 +176,7 @@ def app():
                     else:
                         u_h = 0.0
                     
-                    # --- B. Total Stress (Sigma) ---
+                    # B. Total Stress
                     if i > 0:
                         dz = z - z_prev
                         z_mid = (z + z_prev)/2
@@ -271,7 +199,7 @@ def app():
                     else:
                         sigma = surcharge
 
-                    # --- C. Excess Pore Pressure (Undrained Clay) ---
+                    # C. Excess Pore Pressure
                     u_excess = 0.0
                     check_z = z
                     if i > 0 and z == total_depth: check_z = z - 0.01 
@@ -302,61 +230,53 @@ def app():
                 
                 return pd.DataFrame(results)
 
-            # --- 3. RUN CALCULATIONS ---
             df_long = calculate_profile("Long Term")
             df_short = calculate_profile("Short Term")
 
-            # --- 4. DISPLAY SIDE-BY-SIDE ---
+            # --- 3. RESULTS DISPLAY ---
             st.markdown("### Results Comparison")
             
-            col_res_L, col_res_R = st.columns(2)
+            col_L, col_R = st.columns(2)
 
-            # === LEFT: LONG TERM ===
-            with col_res_L:
+            def plot_results(df, title, ax):
+                # Plot Lines
+                ax.plot(df["Total Stress (σ)"], df["Depth (z)"], 'b-o', label=r"Total $\sigma$")
+                ax.plot(df["Pore Pressure (u)"], df["Depth (z)"], 'r--x', label=r"Pore $u$")
+                ax.plot(df["Eff. Stress (σ')"], df["Depth (z)"], 'k-s', linewidth=2, label=r"Effective $\sigma'$")
+                
+                # Plot Background Layers
+                cur_h = 0
+                for l in layers:
+                    cur_h += l['H']
+                    ax.axhspan(cur_h - l['H'], cur_h, facecolor=l['color'], alpha=0.3)
+                
+                ax.axhline(water_depth, color='blue', linestyle='-.', alpha=0.5, label="WT")
+                
+                ax.invert_yaxis()
+                ax.set_xlabel("Stress (kPa)")
+                ax.set_ylabel("Depth (m)")
+                ax.set_title(title)
+                ax.grid(True, linestyle="--", alpha=0.6)
+                ax.legend()
+
+            # LEFT: LONG TERM
+            with col_L:
                 st.subheader("Long Term (Drained)")
-                st.caption("Excess Pore Pressure = 0")
+                st.caption("Excess Pore Pressure Dissipated (Δu = 0)")
                 st.dataframe(df_long.style.format("{:.2f}"))
                 
-                fig_L, ax_L = plt.subplots(figsize=(6, 5))
-                ax_L.plot(df_long["Total Stress (σ)"], df_long["Depth (z)"], 'b-o', label=r"Total $\sigma$")
-                ax_L.plot(df_long["Pore Pressure (u)"], df_long["Depth (z)"], 'r--x', label=r"Pore $u$")
-                ax_L.plot(df_long["Eff. Stress (σ')"], df_long["Depth (z)"], 'k-s', linewidth=2, label=r"Effective $\sigma'$")
-                ax_L.axhline(water_depth, color='blue', linestyle='-.', alpha=0.5, label="WT")
-                
-                cur_h = 0
-                for l in layers:
-                    cur_h += l['H']
-                    ax_L.axhspan(cur_h - l['H'], cur_h, facecolor=l['color'], alpha=0.3)
-
-                ax_L.invert_yaxis()
-                ax_L.set_xlabel("Stress (kPa)")
-                ax_L.set_ylabel("Depth (m)")
-                ax_L.grid(True, linestyle="--", alpha=0.6)
-                ax_L.legend()
+                fig_L, ax_L = plt.subplots(figsize=(6, 6))
+                plot_results(df_long, "Long Term Profile", ax_L)
                 st.pyplot(fig_L)
 
-            # === RIGHT: SHORT TERM ===
-            with col_res_R:
+            # RIGHT: SHORT TERM
+            with col_R:
                 st.subheader("Short Term (Undrained)")
-                st.caption(f"Excess Pore Pressure in Clay = q ({surcharge} kPa)")
+                st.caption(f"Excess Pore Pressure in Clay (Δu = q = {surcharge})")
                 st.dataframe(df_short.style.format("{:.2f}"))
                 
-                fig_S, ax_S = plt.subplots(figsize=(6, 5))
-                ax_S.plot(df_short["Total Stress (σ)"], df_short["Depth (z)"], 'b-o', label=r"Total $\sigma$")
-                ax_S.plot(df_short["Pore Pressure (u)"], df_short["Depth (z)"], 'r--x', label=r"Pore $u$")
-                ax_S.plot(df_short["Eff. Stress (σ')"], df_short["Depth (z)"], 'k-s', linewidth=2, label=r"Effective $\sigma'$")
-                ax_S.axhline(water_depth, color='blue', linestyle='-.', alpha=0.5, label="WT")
-                
-                cur_h = 0
-                for l in layers:
-                    cur_h += l['H']
-                    ax_S.axhspan(cur_h - l['H'], cur_h, facecolor=l['color'], alpha=0.3)
-
-                ax_S.invert_yaxis()
-                ax_S.set_xlabel("Stress (kPa)")
-                ax_S.set_ylabel("Depth (m)")
-                ax_S.grid(True, linestyle="--", alpha=0.6)
-                ax_S.legend()
+                fig_S, ax_S = plt.subplots(figsize=(6, 6))
+                plot_results(df_short, "Short Term Profile", ax_S)
                 st.pyplot(fig_S)
 
     # =====================================================
