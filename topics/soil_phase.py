@@ -58,39 +58,82 @@ def app():
                     
                     # 1. Basic n <-> e
                     if known('n') and not known('e'):
-                        p['e'] = p['n'] / (1 - p['n']); self.add_log('e', r'\frac{n}{1 - n}', r'Calc', p['e']); changed = True
+                        p['e'] = p['n'] / (1 - p['n'])
+                        sub = r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}'
+                        self.add_log('e', r'\frac{n}{1 - n}', sub, p['e'])
+                        changed = True
+                        
                     if known('e') and not known('n'):
-                        p['n'] = p['e'] / (1 + p['e']); self.add_log('n', r'\frac{e}{1 + e}', r'Calc', p['n']); changed = True
+                        p['n'] = p['e'] / (1 + p['e'])
+                        sub = r'\frac{' + f"{p['e']:.3f}" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
+                        self.add_log('n', r'\frac{e}{1 + e}', sub, p['n'])
+                        changed = True
 
                     # 2. Se = wGs
                     if known('w') and known('Gs') and known('e') and not known('Sr'):
-                        p['Sr'] = (p['w'] * p['Gs']) / p['e']; self.add_log('Sr', r'\frac{w G_s}{e}', r'Calc', p['Sr']); changed = True
+                        p['Sr'] = (p['w'] * p['Gs']) / p['e']
+                        sub = r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}'
+                        self.add_log('Sr', r'\frac{w G_s}{e}', sub, p['Sr'])
+                        changed = True
+                        
                     if known('w') and known('Gs') and known('Sr') and not known('e') and p['Sr'] != 0:
-                        p['e'] = (p['w'] * p['Gs']) / p['Sr']; self.add_log('e', r'\frac{w G_s}{S_r}', r'Calc', p['e']); changed = True
+                        p['e'] = (p['w'] * p['Gs']) / p['Sr']
+                        sub = r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['Sr']:.3f}" + r'}'
+                        self.add_log('e', r'\frac{w G_s}{S_r}', sub, p['e'])
+                        changed = True
+                        
                     if known('Sr') and known('e') and known('Gs') and not known('w'):
-                        p['w'] = (p['Sr'] * p['e']) / p['Gs']; self.add_log('w', r'\frac{S_r e}{G_s}', r'Calc', p['w']); changed = True
+                        p['w'] = (p['Sr'] * p['e']) / p['Gs']
+                        sub = r'\frac{' + f"{p['Sr']:.3f} \cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}'
+                        self.add_log('w', r'\frac{S_r e}{G_s}', sub, p['w'])
+                        changed = True
+                        
                     if known('Sr') and known('e') and known('w') and not known('Gs') and p['w'] != 0:
-                        p['Gs'] = (p['Sr'] * p['e']) / p['w']; self.add_log('Gs', r'\frac{S_r e}{w}', r'Calc', p['Gs']); changed = True
+                        p['Gs'] = (p['Sr'] * p['e']) / p['w']
+                        sub = r'\frac{' + f"{p['Sr']:.3f} \cdot {p['e']:.3f}" + r'}{' + f"{p['w']:.3f}" + r'}'
+                        self.add_log('Gs', r'\frac{S_r e}{w}', sub, p['Gs'])
+                        changed = True
 
                     # 3. Unit Weights
                     if known('Gs') and known('e') and not known('gamma_dry'):
-                        p['gamma_dry'] = (p['Gs'] * self.gamma_w) / (1 + p['e']); self.add_log('gamma_dry', r'\frac{G_s \gamma_w}{1 + e}', r'Calc', p['gamma_dry']); changed = True
+                        p['gamma_dry'] = (p['Gs'] * self.gamma_w) / (1 + p['e'])
+                        sub = r'\frac{' + f"{p['Gs']:.2f} \cdot 9.81" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
+                        self.add_log('gamma_dry', r'\frac{G_s \gamma_w}{1 + e}', sub, p['gamma_dry'])
+                        changed = True
+                        
                     if known('Gs') and known('e') and known('w') and not known('gamma_bulk'):
-                        p['gamma_bulk'] = (p['Gs'] * self.gamma_w * (1 + p['w'])) / (1 + p['e']); self.add_log('gamma_bulk', r'\frac{G_s \gamma_w (1+w)}{1+e}', r'Calc', p['gamma_bulk']); changed = True
+                        p['gamma_bulk'] = (p['Gs'] * self.gamma_w * (1 + p['w'])) / (1 + p['e'])
+                        sub = r'\frac{' + f"{p['Gs']:.2f} \cdot 9.81 (1 + {p['w']:.3f})" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
+                        self.add_log('gamma_bulk', r'\frac{G_s \gamma_w (1+w)}{1+e}', sub, p['gamma_bulk'])
+                        changed = True
 
                     # 4. Reverse Calcs
                     if known('gamma_bulk') and known('Gs') and known('w') and not known('e'):
                         val = (p['Gs'] * (1 + p['w']) * self.gamma_w) / p['gamma_bulk']
-                        p['e'] = val - 1; self.add_log('e', r'Rev Calc', r'Calc', p['e']); changed = True
+                        p['e'] = val - 1
+                        sub = r'\frac{' + f"{p['Gs']:.2f}(1+{p['w']:.3f})9.81" + r'}{' + f"{p['gamma_bulk']:.2f}" + r'} - 1'
+                        self.add_log('e', r'\frac{G_s(1+w)\gamma_w}{\gamma_{bulk}} - 1', sub, p['e'])
+                        changed = True
+                        
                     if known('gamma_dry') and known('Gs') and not known('e'):
                         val = (p['Gs'] * self.gamma_w) / p['gamma_dry']
-                        p['e'] = val - 1; self.add_log('e', r'Rev Calc', r'Calc', p['e']); changed = True
+                        p['e'] = val - 1
+                        sub = r'\frac{' + f"{p['Gs']:.2f} \cdot 9.81" + r'}{' + f"{p['gamma_dry']:.2f}" + r'} - 1'
+                        self.add_log('e', r'\frac{G_s \gamma_w}{\gamma_{dry}} - 1', sub, p['e'])
+                        changed = True
 
-                    # 5. Saturation
+                    # 5. Saturation & Submerged
                     if known('gamma_bulk') and p['Sr'] == 1.0 and not known('gamma_sub'):
-                        p['gamma_sub'] = p['gamma_bulk'] - self.gamma_w; self.add_log('gamma_sub', r'\gamma_{sat} - \gamma_w', r'Calc', p['gamma_sub']); changed = True
+                        p['gamma_sub'] = p['gamma_bulk'] - self.gamma_w
+                        sub = f"{p['gamma_bulk']:.2f} - 9.81"
+                        self.add_log('gamma_sub', r'\gamma_{sat} - \gamma_w', sub, p['gamma_sub'])
+                        changed = True
+                        
                     if known('n') and known('Sr') and not known('na'):
-                        p['na'] = p['n'] * (1 - p['Sr']); self.add_log('na', r'n(1-S_r)', r'Calc', p['na']); changed = True
+                        p['na'] = p['n'] * (1 - p['Sr'])
+                        sub = f"{p['n']:.3f}(1 - {p['Sr']:.3f})"
+                        self.add_log('na', r'n(1-S_r)', sub, p['na'])
+                        changed = True
 
                     iterations += 1
 
