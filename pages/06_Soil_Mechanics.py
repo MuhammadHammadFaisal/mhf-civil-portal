@@ -17,7 +17,8 @@ def app():
     # --- HERO SECTION (The Professional Header) ---
     # We use the [1, 2] ratio and vertical centering to align text with the logo
     try:
-        col_logo, col_text = st.columns([1, 2], vertical_alignment="center")
+        # [0.6, 2.5] makes the logo column much narrower
+        col_logo, col_text = st.columns([0.6, 2.5], vertical_alignment="center")
     except TypeError:
         col_logo, col_text = st.columns([1, 2])
 
