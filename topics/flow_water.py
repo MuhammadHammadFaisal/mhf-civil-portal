@@ -58,7 +58,7 @@ def app():
                 else:
                     flow_type = "No Flow"
                     effect_msg = "Hydrostatic Condition"
-
+            st.markdown("---")
                 # 3. Calculations
                 i = abs(h_loss) / val_z  # Hydraulic Gradient
                 
@@ -236,7 +236,7 @@ def app():
             ax.set_ylim(datum_y - 1.5, max(wl_bot, wl_top) + 1)
             ax.axis('off')
             st.pyplot(fig)
-            st.markdown("---")
+            
     # =================================================================
     # TAB 2: PERMEABILITY
     # =================================================================
