@@ -5,7 +5,7 @@ import matplotlib.patches as patches
 import numpy as np
 
 # =========================================================
-# APP CONFIG (Must be the first Streamlit command)
+# APP CONFIG
 # =========================================================
 st.set_page_config(
     page_title="Advanced Soil Stress Analysis",
@@ -25,297 +25,265 @@ def app():
     # TAB 1 — STRESS PROFILE
     # =====================================================
     with tab1:
+        st.caption("Define soil layers, water table, and surcharge to calculate the stress profile.")
 
         # -------------------------------------------------
-        # 1. INPUTS + INPUT MONITOR
+        # 1. ANALYSIS SETTINGS & GLOBAL INPUTS
         # -------------------------------------------------
-        st.markdown("## 1. Inputs")
-
-        col_inputs, col_monitor = st.columns([2.0, 1.5])
-
-        # ================= LEFT: INPUTS =================
-        with col_inputs:
-            
-            # Analysis Settings
+        col_glob1, col_glob2 = st.columns(2)
+        with col_glob1:
             analysis_mode = st.radio(
-                "Analysis State:", 
+                "Analysis Condition:", 
                 ["Long Term (Drained)", "Short Term (Undrained)"],
-                help="Short Term: Surcharge creates excess pore pressure in CLAY layers only."
+                help="Short Term: Surcharge creates excess pore pressure in CLAY layers."
             )
+        
+        with col_glob2:
+            st.info("💡 **Diagram Logic:** The schematic below updates automatically as you add layers or change the water table.")
 
-            st.caption("Define global parameters below. Soil layers are defined in the next section.")
+        st.divider()
 
-            c1, c2 = st.columns(2)
+        # -------------------------------------------------
+        # 2. INPUTS (Side-by-Side with Visualizer)
+        # -------------------------------------------------
+        col_input, col_viz = st.columns([1, 1])
+
+        with col_input:
+            st.markdown("### A. Global Parameters")
+            c1, c2, c3 = st.columns(3)
             with c1:
-                water_depth = st.number_input("Water Table Depth (m)", value=2.0, step=0.1)
-                hc = st.number_input("Capillary Rise (m)", value=0.0, step=0.1)
+                water_depth = st.number_input("Water Table Depth (m)", value=2.0, step=0.5)
             with c2:
-                surcharge = st.number_input("Surcharge q (kPa)", value=80.0, step=5.0)
-                gamma_w = 9.81 # Constant
+                hc = st.number_input("Capillary Rise (m)", value=0.0, step=0.1)
+            with c3:
+                surcharge = st.number_input("Surcharge q (kPa)", value=50.0, step=5.0)
+                gamma_w = 9.81
 
-        # ================= RIGHT: INPUT MONITOR =================
-        with col_monitor:
-            st.markdown("### Input Monitor")
-            # Drawing a generic Phase Diagram representation
-            fig, ax = plt.subplots(figsize=(4, 3))
-            ax.axis("off")
+            st.markdown("### B. Stratigraphy")
+            num_layers = st.number_input("Number of Layers", 1, 5, 2)
+            layers = []
+            colors = {"Sand": "#E6D690", "Clay": "#B0A494"}
             
-            # Draw containers
-            # Solids (Bottom)
-            ax.add_patch(patches.Rectangle((0.3, 0), 0.4, 0.5, facecolor="#D2B48C", edgecolor="black"))
-            ax.text(0.5, 0.25, "Solids (S)", ha="center", va="center", fontsize=10, weight="bold")
-            
-            # Water (Middle)
-            ax.add_patch(patches.Rectangle((0.3, 0.5), 0.4, 0.3, facecolor="#8fd3f4", edgecolor="black"))
-            ax.text(0.5, 0.65, "Water (W)", ha="center", va="center", fontsize=10, weight="bold")
-            
-            # Air (Top)
-            ax.add_patch(patches.Rectangle((0.3, 0.8), 0.4, 0.2, facecolor="white", edgecolor="black"))
-            ax.text(0.5, 0.9, "Air (A)", ha="center", va="center", fontsize=10, weight="bold")
+            depth_tracker = 0.0
 
-            # Annotations based on inputs
-            ax.text(0.8, 0.9, r"$V_a$", fontsize=9)
-            ax.text(0.8, 0.65, r"$V_w$", fontsize=9)
-            ax.text(0.8, 0.25, r"$V_s=1$", fontsize=9)
+            for i in range(int(num_layers)):
+                with st.expander(f"Layer {i+1} (Top at {depth_tracker:.1f}m)", expanded=True):
+                    cols = st.columns(4)
+                    soil_type = cols[0].selectbox(f"Type", ["Sand", "Clay"], key=f"t{i}")
+                    thickness = cols[1].number_input(f"Height (m)", 0.1, 20.0, 4.0, step=0.5, key=f"h{i}")
+                    
+                    # Logic: Only ask for relevant Unit Weight
+                    layer_bot = depth_tracker + thickness
+                    is_sat = layer_bot > (water_depth - hc)
+                    
+                    if is_sat:
+                        g_sat = cols[2].number_input(f"γ_sat", value=20.0, key=f"gs{i}")
+                        g_dry = 18.0 # Default
+                    else:
+                        g_sat = 20.0 # Default
+                        cols[2].markdown("*(Dry)*")
+                    
+                    if not is_sat:
+                        g_dry = cols[3].number_input(f"γ_dry", value=18.0, key=f"gd{i}")
+                    else:
+                        cols[3].markdown("*(Sat)*")
+
+                    layers.append({
+                        "type": soil_type, "H": thickness, 
+                        "g_sat": g_sat, "g_dry": g_dry, 
+                        "color": colors[soil_type]
+                    })
+                    depth_tracker += thickness
             
-            ax.text(0.5, 1.1, "Phase Diagram Concept", ha="center", color="gray")
-            st.pyplot(fig, use_container_width=True)
+            total_depth = depth_tracker
 
         # -------------------------------------------------
-        # 2. SOIL STRATIGRAPHY
+        # 3. SOIL PROFILE VISUALIZER (The "Correct" Diagram)
         # -------------------------------------------------
-        st.markdown("## 2. Soil Stratigraphy")
+        with col_viz:
+            st.markdown("### Soil Profile Preview")
+            
+            # Create Plot
+            fig, ax = plt.subplots(figsize=(6, 5))
+            
+            # 1. Draw Surcharge (q) Arrows
+            if surcharge > 0:
+                arrow_y_start = -0.5  # Slightly above ground
+                arrow_y_end = 0       # Ground surface
+                for x in np.linspace(0.5, 4.5, 8):
+                    ax.arrow(x, arrow_y_start, 0, 0.4, head_width=0.15, head_length=0.1, fc='red', ec='red')
+                ax.text(2.5, -0.6, f"q = {surcharge} kPa", ha='center', color='red', fontweight='bold')
 
-        num_layers = st.number_input("Number of Layers", 1, 5, 2)
-        layers = []
-        colors = {"Sand": "#E6D690", "Clay": "#B0A494"}
+            # 2. Draw Layers
+            current_depth = 0
+            for lay in layers:
+                # Rectangle (x, y, width, height)
+                # Note: y increases downwards in our logic, but matplotlib y increases upwards.
+                # We will invert y-axis at the end.
+                rect = patches.Rectangle((0, current_depth), 5, lay['H'], facecolor=lay['color'], edgecolor='black')
+                ax.add_patch(rect)
+                
+                # Center Text (Layer Info)
+                mid_y = current_depth + lay['H']/2
+                label_text = f"{lay['type']}\n"
+                
+                # Check which gamma is active for display
+                if mid_y > (water_depth - hc):
+                    label_text += f"$\\gamma_{{sat}}={lay['g_sat']}$"
+                else:
+                    label_text += f"$\\gamma_{{dry}}={lay['g_dry']}$"
+                
+                ax.text(2.5, mid_y, label_text, ha='center', va='center', fontsize=9)
+                
+                # Height Dimension
+                ax.text(-0.2, mid_y, f"{lay['H']}m", ha='right', va='center', fontsize=9)
+                
+                current_depth += lay['H']
 
-        depth_tracker = 0.0
+            # 3. Draw Water Table
+            ax.axhline(water_depth, color='blue', linestyle='--', linewidth=2)
+            ax.text(5.1, water_depth, "WT ▽", color='blue', va='center')
 
-        for i in range(int(num_layers)):
-            with st.expander(f"Layer {i+1} (Top at {depth_tracker:.2f} m)", expanded=True):
-                a, b, c, d = st.columns(4)
+            # 4. Capillary Rise
+            if hc > 0:
+                cap_top = water_depth - hc
+                if cap_top < 0: cap_top = 0
+                rect_cap = patches.Rectangle((0, cap_top), 5, water_depth - cap_top, hatch='///', fill=False, edgecolor='blue', alpha=0.3)
+                ax.add_patch(rect_cap)
+                ax.text(5.1, cap_top, f"Capillary\n({hc}m)", color='blue', va='center', fontsize=8)
 
-                soil_type = a.selectbox("Type", ["Sand", "Clay"], key=f"t{i}")
-                thickness = b.number_input("Thickness (m)", 0.1, step=0.5, value=4.0, key=f"h{i}")
-                gamma_sat = c.number_input("γ_sat (kN/m³)", value=20.0, step=0.1, key=f"gs{i}")
-                gamma_dry = d.number_input("γ_dry (kN/m³)", value=17.0, step=0.1, key=f"gd{i}")
-
-                layers.append({
-                    "type": soil_type,
-                    "H": thickness,
-                    "g_sat": gamma_sat,
-                    "g_dry": gamma_dry,
-                    "color": colors[soil_type]
-                })
-
-                depth_tracker += thickness
-
-        total_depth = depth_tracker
+            # Styling
+            ax.set_xlim(-1, 6)
+            ax.set_ylim(total_depth * 1.1, -1.5) # Invert Y-axis to show depth downwards
+            ax.axis('off') # Turn off standard axis
+            
+            # Ground Line
+            ax.plot([0, 5], [0, 0], 'k-', linewidth=2) 
+            
+            st.pyplot(fig)
 
         # -------------------------------------------------
-        # 3. CALCULATE STRESSES
+        # 4. CALCULATION & RESULTS
         # -------------------------------------------------
         st.markdown("---")
         if st.button("Calculate Stress Profile", type="primary"):
-
-            # 1. Discretize Depth (Create calculation points)
-            z_points = {0.0, total_depth} # Start with top and bottom
-            current_depth = 0.0
-
-            # Add Layer Boundaries
-            for layer in layers:
-                current_depth += layer["H"]
-                z_points.add(round(current_depth, 3))
-
-            # Add Water Table
-            if 0 < water_depth < total_depth:
-                z_points.add(water_depth)
-
-            # Add Capillary Rise Top
+            
+            # Discretize Depths
+            z_points = {0.0, total_depth}
+            cur = 0
+            for l in layers:
+                cur += l['H']
+                z_points.add(round(cur, 3))
+            
+            if 0 < water_depth < total_depth: z_points.add(water_depth)
             if hc > 0:
-                cap_top = water_depth - hc
-                if 0 < cap_top < total_depth:
-                    z_points.add(cap_top)
-
-            # Sort points
-            z_points = sorted(list(z_points))
-
-            # 2. Calculation Loop
+                ct = water_depth - hc
+                if 0 < ct < total_depth: z_points.add(ct)
+                
+            sorted_z = sorted(list(z_points))
+            
             results = []
             sigma_prev = surcharge
             z_prev = 0.0
-
-            for i, z in enumerate(z_points):
-                
-                # --- A. Pore Pressure (u) ---
+            
+            for i, z in enumerate(sorted_z):
+                # Pore Pressure
                 if z > water_depth:
-                    # Hydrostatic
-                    u_h = (z - water_depth) * gamma_w
-                elif z > (water_depth - hc) and z <= water_depth:
-                    # Capillary Suction (Negative)
-                    u_h = -(water_depth - z) * gamma_w
+                    u = (z - water_depth) * gamma_w
+                elif z > (water_depth - hc):
+                    u = -(water_depth - z) * gamma_w
                 else:
-                    # Dry
-                    u_h = 0.0
-
-                # --- B. Total Stress (sigma) ---
-                if i == 0:
-                    sigma = surcharge
-                    # Determine soil type at surface for completeness
-                    soil_here = layers[0]["type"]
-                else:
+                    u = 0.0
+                
+                # Total Stress
+                if i > 0:
                     dz = z - z_prev
-                    z_mid = (z + z_prev) / 2 # Midpoint for checking layer props
-
-                    # Find which layer we are in
-                    depth_sum = 0
-                    active_layer = None
+                    z_mid = (z + z_prev)/2
+                    
+                    # Find Layer
+                    d_search = 0
+                    active_l = layers[-1]
                     for l in layers:
-                        depth_sum += l["H"]
-                        if z_mid <= depth_sum:
-                            active_layer = l
+                        d_search += l['H']
+                        if z_mid <= d_search:
+                            active_l = l
                             break
                     
-                    if active_layer is None: active_layer = layers[-1] # Fallback
-                    
-                    soil_here = active_layer["type"]
-                    
-                    # Decide Unit Weight (Sat vs Dry)
-                    # If below Water Table OR in Capillary Zone -> Use Saturated
-                    if z_mid > (water_depth - hc):
-                        gamma_used = active_layer["g_sat"]
-                    else:
-                        gamma_used = active_layer["g_dry"]
+                    # Gamma
+                    gam = active_l['g_sat'] if z_mid > (water_depth - hc) else active_l['g_dry']
+                    sigma = sigma_prev + (gam * dz)
+                else:
+                    sigma = surcharge
 
-                    # Accumulate Stress
-                    sigma = sigma_prev + (gamma_used * dz)
-
-                # --- C. Excess Pore Pressure (Undrained Condition) ---
+                # Excess Pore Pressure (Short Term Clay)
                 u_excess = 0.0
-                
-                # Check layer at this specific point z
-                active_layer_at_point = None
-                depth_check = 0
+                # Check if Clay
+                check_d = 0
+                is_clay = False
                 for l in layers:
-                    depth_check += l["H"]
-                    if z <= depth_check and z > (depth_check - l["H"]):
-                        active_layer_at_point = l
+                    check_d += l['H']
+                    if z <= check_d and z > (check_d - l['H']):
+                        if l['type'] == 'Clay': is_clay = True
                         break
                 
-                # Fallback for boundaries
-                if active_layer_at_point is None and z > 0:
-                     # If at exact boundary, usually look at layer above or below depending on context.
-                     # Here simplified: check layer we just calculated for.
-                     active_layer_at_point = active_layer
-
-                is_clay = (active_layer_at_point["type"] == "Clay") if active_layer_at_point else False
-                
-                # If Short Term AND Clay AND Saturated -> Excess u = Surcharge
                 if "Short Term" in analysis_mode and is_clay and z > water_depth:
                     u_excess = surcharge
 
-                # --- D. Final Calculations ---
-                u_total = u_h + u_excess
-                sigma_eff = sigma - u_total
-
-                results.append({
-                    "Depth (m)": z,
-                    "Total Stress σ": sigma,
-                    "Pore Pressure u": u_total,
-                    "Eff. Stress σ'": sigma_eff
-                })
-
+                u_tot = u + u_excess
+                sig_eff = sigma - u_tot
+                
+                results.append({"Depth (z)": z, "Total Stress (σ)": sigma, "Pore Pressure (u)": u_tot, "Eff. Stress (σ')": sig_eff})
+                
                 sigma_prev = sigma
                 z_prev = z
-
+            
             df = pd.DataFrame(results)
-
-            # -------------------------------------------------
-            # 4. RESULTS VISUALIZATION
-            # -------------------------------------------------
-            st.markdown("## 2. Results")
-
-            col_res1, col_res2 = st.columns([1, 2])
-
-            with col_res1:
+            
+            # Display Results
+            st.markdown("### Results")
+            c_res1, c_res2 = st.columns([1, 2])
+            
+            with c_res1:
                 st.dataframe(df.style.format("{:.2f}"))
-
-            with col_res2:
-                fig, ax = plt.subplots(figsize=(8, 6))
-
-                # Background Layers
-                cur = 0
-                for l in layers:
-                    ax.axhspan(cur, cur + l["H"], color=l["color"], alpha=0.3)
-                    # Label the layer on the plot
-                    ax.text(df["Total Stress σ"].max()*0.8, cur + l["H"]/2, l["type"], 
-                            ha="center", va="center", alpha=0.5, fontsize=9)
-                    cur += l["H"]
-
-                # Plot Lines
-                ax.plot(df["Total Stress σ"], df["Depth (m)"], label=r"Total $\sigma$", marker="o", color="blue")
-                ax.plot(df["Pore Pressure u"], df["Depth (m)"], label=r"Pore $u$", linestyle="--", color="red")
-                ax.plot(df["Eff. Stress σ'"], df["Depth (m)"], label=r"Effective $\sigma'$", linewidth=3, color="black")
-
-                # Water Table Line
-                ax.axhline(water_depth, color="blue", linestyle="-.", label="Water Table")
-
-                ax.set_ylim(max(z_points) * 1.05, 0) # Invert Y Axis
-                ax.set_xlabel("Stress (kPa)")
-                ax.set_ylabel("Depth (m)")
-                ax.set_title("Stress Distribution with Depth")
-                ax.grid(True, linestyle=":", alpha=0.6)
-                ax.legend()
-
-                st.pyplot(fig)
+            
+            with c_res2:
+                fig_res, ax_res = plt.subplots(figsize=(8, 6))
+                ax_res.plot(df["Total Stress (σ)"], df["Depth (z)"], 'b-o', label=r"Total $\sigma$")
+                ax_res.plot(df["Pore Pressure (u)"], df["Depth (z)"], 'r--x', label=r"Pore $u$")
+                ax_res.plot(df["Eff. Stress (σ')"], df["Depth (z)"], 'k-s', linewidth=2, label=r"Effective $\sigma'$")
+                
+                ax_res.invert_yaxis()
+                ax_res.set_xlabel("Stress (kPa)")
+                ax_res.set_ylabel("Depth (m)")
+                ax_res.grid(True, linestyle="--")
+                ax_res.legend()
+                ax_res.set_title("Stress Distribution")
+                st.pyplot(fig_res)
 
     # =====================================================
     # TAB 2 — HEAVE CHECK
     # =====================================================
     with tab2:
-        st.subheader("Bottom Heave & Piping Check")
-        st.info("Checks safety against heave for an excavation in Clay overlying an Artesian Sand layer.")
-
+        st.subheader("Bottom Heave Check")
         c1, c2 = st.columns(2)
         with c1:
-            h_clay = st.number_input("Total Clay Thickness (m)", value=5.0)
-            gamma_clay = st.number_input("Clay Unit Weight (kN/m³)", value=20.0)
+            h_clay = st.number_input("Clay Thickness (m)", value=5.0)
+            g_clay = st.number_input("Clay Unit Weight", value=20.0)
         with c2:
-            artesian_head = st.number_input("Artesian Head above Surface (m)", value=2.0)
-            excavation_depth = st.number_input("Excavation Depth (m)", value=3.0)
-
-        if st.button("Check Heave Safety"):
-            remaining = h_clay - excavation_depth
-
-            if remaining <= 0:
-                st.error("Excavation exceeds clay thickness! (No clay left to resist uplift)")
+            h_art = st.number_input("Artesian Head (m)", value=2.0)
+            d_exc = st.number_input("Excavation Depth (m)", value=3.0)
+            
+        if st.button("Calculate FS"):
+            rem = h_clay - d_exc
+            if rem <= 0:
+                st.error("Invalid Geometry")
             else:
-                # Downward Force (Weight of remaining clay)
-                sigma_down = remaining * gamma_clay
-                
-                # Upward Force (Artesian Pressure at bottom of clay)
-                # Pressure head at bottom = (H_clay + Head_above_surface)
-                # Note: Pressure acts at the interface.
-                total_head_at_bottom = h_clay + artesian_head
-                u_up = total_head_at_bottom * 9.81
-                
-                FS = sigma_down / u_up
+                s_down = rem * g_clay
+                u_up = (h_clay + h_art) * 9.81
+                fs = s_down / u_up
+                st.latex(rf"FS = \frac{{{s_down:.2f}}}{{{u_up:.2f}}} = \mathbf{{{fs:.2f}}}")
+                if fs < 1.0: st.error("Unsafe")
+                else: st.success("Safe")
 
-                st.markdown(f"**Remaining Clay Thickness:** {remaining:.2f} m")
-                st.latex(
-                    rf"FS = \frac{{\sigma_{{down}}}}{{u_{{up}}}} = \frac{{{remaining:.2f} \times {gamma_clay}}}{{{total_head_at_bottom:.2f} \times 9.81}} = \mathbf{{{FS:.3f}}}"
-                )
-
-                if FS < 1.0:
-                    st.error("❌ UNSAFE — Bottom Heave Expected")
-                elif FS < 1.2:
-                    st.warning("⚠️ Marginal Safety (FS < 1.2)")
-                else:
-                    st.success("✅ Safe Against Heave")
-
-# =========================================================
-# RUN APP
-# =========================================================
 if __name__ == "__main__":
     app()
