@@ -22,13 +22,13 @@ def app():
     tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
 
     # =====================================================
-    # TAB 1 — STRESS PROFILE
+    # TAB 1 — STRESS PROFILE (Existing Logic)
     # =====================================================
     with tab1:
         st.caption("Define soil layers, water table, and surcharge to calculate the stress profile.")
 
         # -------------------------------------------------
-        # 1. INPUTS (Side-by-Side with Visualizer)
+        # 1. INPUTS
         # -------------------------------------------------
         col_input, col_viz = st.columns([1.1, 1])
 
@@ -59,7 +59,7 @@ def app():
                     layer_top = depth_tracker
                     layer_bot = depth_tracker + thickness
                     
-                    # --- LOGIC TO DETERMINE REQUIRED INPUTS ---
+                    # Logic for Inputs
                     eff_wt = water_depth - hc
                     needs_dry = layer_top < eff_wt
                     needs_sat = layer_bot > eff_wt
@@ -94,29 +94,28 @@ def app():
             
             fig, ax = plt.subplots(figsize=(6, 5))
             
-            # 1. Draw Layers
+            # Draw Layers
             current_depth = 0
             for lay in layers:
                 rect = patches.Rectangle((0, current_depth), 5, lay['H'], facecolor=lay['color'], edgecolor='black')
                 ax.add_patch(rect)
-                
                 mid_y = current_depth + lay['H']/2
                 label = f"{lay['type']}"
                 ax.text(2.5, mid_y, label, ha='center', va='center', fontweight='bold', fontsize=10)
                 ax.text(-0.2, mid_y, f"{lay['H']}m", ha='right', va='center', fontsize=9)
                 current_depth += lay['H']
 
-            # 2. Draw Surcharge
+            # Draw Surcharge
             if surcharge > 0:
                 for x in np.linspace(0.5, 4.5, 8):
                     ax.arrow(x, -0.5, 0, 0.4, head_width=0.15, head_length=0.1, fc='red', ec='red')
                 ax.text(2.5, -0.6, f"q = {surcharge} kPa", ha='center', color='red', fontweight='bold', fontsize=9)
 
-            # 3. Draw Water Table
+            # Draw Water Table
             ax.axhline(water_depth, color='blue', linestyle='--', linewidth=2)
             ax.text(5.1, water_depth, "WT ▽", color='blue', va='center', fontsize=9)
 
-            # 4. Capillary Rise
+            # Draw Capillary Rise
             if hc > 0:
                 cap_top = max(0, water_depth - hc)
                 rect_cap = patches.Rectangle((0, cap_top), 5, water_depth - cap_top, hatch='///', fill=False, edgecolor='blue', alpha=0.3)
@@ -136,7 +135,7 @@ def app():
         st.markdown("---")
         if st.button("Calculate Stress Profiles", type="primary"):
             
-            # --- CREATE Z-POINTS ---
+            # --- Z-POINTS ---
             z_points_set = {0.0, total_depth}
             cur = 0
             for l in layers:
@@ -147,8 +146,7 @@ def app():
             
             cap_top = water_depth - hc
             if 0 < cap_top < total_depth: z_points_set.add(cap_top)
-                
-            # Add Regular 1m Intervals
+            
             for d in range(1, int(total_depth) + 1):
                 z_points_set.add(float(d))
 
@@ -158,7 +156,6 @@ def app():
             def calculate_profile(mode_name, load_q):
                 results = []
                 math_logs = []
-                
                 sigma_prev = load_q
                 z_prev = 0.0
                 
@@ -180,7 +177,6 @@ def app():
                         dz = z - z_prev
                         z_mid = (z + z_prev)/2
                         
-                        # Find Layer
                         d_search = 0
                         active_l = layers[-1]
                         for l in layers:
@@ -189,7 +185,6 @@ def app():
                                 active_l = l
                                 break
                         
-                        # Find Gamma
                         eff_wt_boundary = water_depth - hc
                         if z_mid > eff_wt_boundary:
                             gam = active_l['g_sat']
@@ -199,8 +194,6 @@ def app():
                             g_sym = "\\gamma_{dry}"
                             
                         sigma = sigma_prev + (gam * dz)
-                        
-                        # FIXED: Added $ signs around the math expression in the log
                         math_logs.append(f"**Interval {z_prev}m to {z}m:** {active_l['type']} (${g_sym}={gam}$)")
                         math_logs.append(f"$\\sigma_{{{z}}} = {sigma_prev:.2f} + ({gam} \\times {dz:.2f}) = {sigma:.2f}$")
                     else:
@@ -244,7 +237,7 @@ def app():
                 
                 return pd.DataFrame(results), math_logs
 
-            # --- RUN 3 SCENARIOS ---
+            # --- RUN SCENARIOS ---
             df_init, log_init = calculate_profile("Initial", 0.0)        
             df_long, log_long = calculate_profile("Long Term", surcharge) 
             df_short, log_short = calculate_profile("Short Term", surcharge)
@@ -261,7 +254,6 @@ def app():
                     ax.axhspan(cur_h - l['H'], cur_h, facecolor=l['color'], alpha=0.3)
                 
                 ax.axhline(water_depth, color='blue', linestyle='-.', alpha=0.5, label="WT")
-                
                 ax.invert_yaxis()
                 ax.set_xlabel("Stress (kPa)")
                 ax.set_ylabel("Depth (m)")
@@ -269,39 +261,34 @@ def app():
                 ax.grid(True, linestyle="--", alpha=0.6)
                 ax.legend()
 
-            # --- DISPLAY 3 COLUMNS ---
+            # --- DISPLAY ---
             st.markdown("### Results Comparison")
             c_init, c_long, c_short = st.columns(3)
 
-            # 1. INITIAL
             with c_init:
                 st.subheader("Initial (No Load)")
-                st.caption(f"q = 0 kPa")
+                st.caption("q = 0 kPa")
                 st.dataframe(df_init.style.format("{:.2f}"))
                 fig1, ax1 = plt.subplots(figsize=(5, 6))
                 plot_results(df_init, "Initial Profile", ax1)
                 st.pyplot(fig1)
-                
                 with st.expander("Show Math (Initial)"):
                     for line in log_init:
                         if line.startswith("**") or line == "---": st.markdown(line)
                         else: st.latex(line.replace("$", ""))
 
-            # 2. LONG TERM
             with c_long:
                 st.subheader("Long Term (Drained)")
-                st.caption(f"q = {surcharge} kPa | Excess u = 0")
+                st.caption(f"q = {surcharge} kPa | Δu = 0")
                 st.dataframe(df_long.style.format("{:.2f}"))
                 fig2, ax2 = plt.subplots(figsize=(5, 6))
                 plot_results(df_long, "Long Term Profile", ax2)
                 st.pyplot(fig2)
-
                 with st.expander("Show Math (Long Term)"):
                     for line in log_long:
                         if line.startswith("**") or line == "---": st.markdown(line)
                         else: st.latex(line.replace("$", ""))
 
-            # 3. SHORT TERM
             with c_short:
                 st.subheader("Short Term")
                 st.caption(f"q = {surcharge} kPa | Excess u in Clay")
@@ -309,36 +296,131 @@ def app():
                 fig3, ax3 = plt.subplots(figsize=(5, 6))
                 plot_results(df_short, "Short Term Profile", ax3)
                 st.pyplot(fig3)
-
                 with st.expander("Show Math (Short Term)"):
                     for line in log_short:
                         if line.startswith("**") or line == "---": st.markdown(line)
                         else: st.latex(line.replace("$", ""))
 
     # =====================================================
-    # TAB 2 — HEAVE CHECK
+    # TAB 2 — HEAVE CHECK (UPGRADED)
     # =====================================================
     with tab2:
-        st.subheader("Bottom Heave Check")
-        c1, c2 = st.columns(2)
-        with c1:
-            h_clay = st.number_input("Clay Thickness (m)", value=5.0)
-            g_clay = st.number_input("Clay Unit Weight", value=20.0)
-        with c2:
-            h_art = st.number_input("Artesian Head (m)", value=2.0)
-            d_exc = st.number_input("Excavation Depth (m)", value=3.0)
+        st.caption("Check safety against bottom heave for an excavation in Clay overlying an Artesian Sand layer.")
+        
+        # -------------------------------------------------
+        # 1. INPUTS & DIAGRAM
+        # -------------------------------------------------
+        col_h_input, col_h_viz = st.columns([1, 1])
+
+        with col_h_input:
+            st.markdown("### Parameters")
+            h_clay = st.number_input("Total Clay Thickness (m)", value=8.0, step=0.5)
+            d_exc = st.number_input("Excavation Depth (m)", value=5.0, step=0.5)
+            g_clay = st.number_input("Clay Saturated Unit Weight (kN/m³)", value=19.0, step=0.1)
+            h_art = st.number_input("Artesian Head above Surface (m)", value=2.0, step=0.5)
             
-        if st.button("Calculate FS"):
-            rem = h_clay - d_exc
-            if rem <= 0:
-                st.error("Invalid Geometry")
+            gamma_w = 9.81
+            
+            # Real-time Checks
+            rem_clay = h_clay - d_exc
+            st.info(f"Remaining Clay Thickness: **{rem_clay:.2f} m**")
+
+        with col_h_viz:
+            st.markdown("### Geometry Preview")
+            
+            fig_h, ax_h = plt.subplots(figsize=(6, 4))
+            
+            # Draw Clay Layer (Full)
+            # We treat Surface as y=0, going down
+            # Clay goes from 0 to h_clay
+            ax_h.add_patch(patches.Rectangle((0, 0), 6, h_clay, facecolor='#B0A494', edgecolor='black', alpha=0.3, label="Removed Soil"))
+            
+            # Draw Excavation (White box "removing" the clay)
+            if d_exc > 0:
+                ax_h.add_patch(patches.Rectangle((0, 0), 6, d_exc, facecolor='white', edgecolor='black', hatch='//', alpha=0.5))
+                ax_h.text(3, d_exc/2, "Excavation", ha='center', va='center', fontsize=9, color='gray')
+
+            # Draw Remaining Clay (The Plug)
+            # From d_exc to h_clay
+            if rem_clay > 0:
+                ax_h.add_patch(patches.Rectangle((0, d_exc), 6, rem_clay, facecolor='#8D6E63', edgecolor='black'))
+                ax_h.text(3, d_exc + rem_clay/2, "Remaining Clay Plug", ha='center', va='center', fontweight='bold', color='white')
+                
+                # Force Vectors
+                # Downward Weight
+                ax_h.arrow(3, d_exc + rem_clay*0.3, 0, rem_clay*0.4, head_width=0.2, fc='blue', ec='blue')
+                ax_h.text(3.2, d_exc + rem_clay*0.5, "W (Weight)", color='blue', fontweight='bold')
+                
+                # Upward Pressure
+                ax_h.arrow(2, h_clay + 1.5, 0, -1.0, head_width=0.2, fc='red', ec='red')
+                ax_h.text(2.2, h_clay + 1.0, "U (Uplift)", color='red', fontweight='bold')
+
+            # Draw Sand Layer (Bottom)
+            ax_h.add_patch(patches.Rectangle((0, h_clay), 6, 2, facecolor='#E6D690', edgecolor='gray'))
+            ax_h.text(3, h_clay + 1, "Sand (Artesian Source)", ha='center', va='center', fontsize=9)
+
+            # Draw Artesian Head Line
+            piezo_y = -h_art # Negative because Y goes positive down
+            ax_h.axhline(piezo_y, color='red', linestyle='-.', linewidth=2)
+            ax_h.text(5.5, piezo_y, f"Piezometric Level\n(+{h_art}m)", color='red', va='center', ha='right', fontsize=9)
+
+            ax_h.set_ylim(h_clay + 2.5, -h_art - 1.5) # Invert Y axis
+            ax_h.set_xlim(0, 6)
+            ax_h.axis('off')
+            
+            # Ground Line
+            ax_h.plot([0, 6], [0, 0], 'k-', linewidth=2)
+            
+            st.pyplot(fig_h)
+
+        # -------------------------------------------------
+        # 2. CALCULATION
+        # -------------------------------------------------
+        st.markdown("---")
+        if st.button("Calculate Factor of Safety", type="primary"):
+            
+            if rem_clay <= 0:
+                st.error(" Excavation is deeper than the clay layer! Immediate flooding/failure.")
             else:
-                s_down = rem * g_clay
-                u_up = (h_clay + h_art) * 9.81
-                fs = s_down / u_up
-                st.latex(rf"FS = \frac{{{s_down:.2f}}}{{{u_up:.2f}}} = \mathbf{{{fs:.2f}}}")
-                if fs < 1.0: st.error("Unsafe")
-                else: st.success("Safe")
+                # 1. Downward Stress (Resistance)
+                sigma_down = rem_clay * g_clay
+                
+                # 2. Upward Pore Pressure (Driving Force)
+                # Pressure Head at bottom interface = h_clay + h_art
+                # Note: h_art is above surface, so total distance from piezometric line to bottom is (h_art + h_clay)
+                head_total = h_clay + h_art
+                u_up = head_total * gamma_w
+                
+                # 3. Factor of Safety
+                fs = sigma_down / u_up
+                
+                # 4. Results Display
+                c_res_l, c_res_r = st.columns([1, 1.5])
+                
+                with c_res_l:
+                    st.markdown("### Results")
+                    if fs < 1.0:
+                        st.error(f"**FS = {fs:.3f}** (UNSAFE)")
+                        st.warning(" Bottom Heave / Piping Failure is expected.")
+                    elif fs < 1.2:
+                        st.warning(f"**FS = {fs:.3f}** (Marginal)")
+                        st.info(" Safety is low. Consider dewatering.")
+                    else:
+                        st.success(f"**FS = {fs:.3f}** (SAFE)")
+                        st.balloons()
+
+                with c_res_r:
+                    with st.expander(" Show Calculation Steps", expanded=True):
+                        st.markdown("**1. Resisting Stress (Weight of Clay Plug)**")
+                        st.latex(rf"\sigma_{{down}} = T_{{clay}} \times \gamma_{{clay}}")
+                        st.latex(rf"\sigma_{{down}} = {rem_clay:.2f} \, m \times {g_clay:.1f} \, kN/m^3 = \mathbf{{{sigma_down:.2f} \, kPa}}")
+                        
+                        st.markdown("**2. Uplift Pressure (Artesian Head)**")
+                        st.latex(rf"u_{{up}} = (H_{{clay}} + h_{{artesian}}) \times \gamma_w")
+                        st.latex(rf"u_{{up}} = ({h_clay} + {h_art}) \times 9.81 = \mathbf{{{u_up:.2f} \, kPa}}")
+                        
+                        st.markdown("**3. Factor of Safety**")
+                        st.latex(rf"FS = \frac{{\sigma_{{down}}}}{{u_{{up}}}} = \frac{{{sigma_down:.2f}}}{{{u_up:.2f}}} = \mathbf{{{fs:.3f}}}")
 
 if __name__ == "__main__":
     app()
