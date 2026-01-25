@@ -188,4 +188,199 @@ def app():
             
             if Vv > 0:
                 brace_x = -0.6
-                ax.plot([brace_x, brace_x], [Vs, Vs+Vv], color='black
+                ax.plot([brace_x, brace_x], [Vs, Vs+Vv], color='black', lw=1)
+                ax.plot([brace_x, brace_x+0.1], [Vs, Vs], color='black', lw=1)
+                ax.plot([brace_x, brace_x+0.1], [Vs+Vv, Vs+Vv], color='black', lw=1)
+                txt = get_label('e', raw_e)
+                col = get_color('e')
+                ax.text(brace_x-0.1, Vs+Vv/2, f'$e={txt}$', ha='right', va='center', fontsize=10, color=col, fontweight='bold')
+
+            ax.text(1.8, 1+e+0.1, r'$Mass$', ha='center', fontsize=10, fontweight='bold')
+            txt_gs = get_label('Gs', raw_Gs, "{:.2f}")
+            col_gs = get_color('Gs')
+            ax.text(1.1, Vs/2, f'$M_s$ ($G_s={txt_gs}$)', ha='left', va='center', fontsize=9, color=col_gs)
+
+            if Vw > 0.001:
+                txt_w = get_label('w', raw_w, "{:.3f}")
+                col_w = get_color('w')
+                ax.text(1.1, Vs + Vw/2, f'$M_w$ ($w={txt_w}$)', ha='left', va='center', fontsize=9, color=col_w)
+
+            txt_sr = get_label('Sr', raw_Sr, "{:.2f}")
+            col_sr = get_color('Sr')
+            ax.text(0.5, 1+e+0.15, f'$S_r={txt_sr}$', ha='center', fontsize=10, color=col_sr, fontweight='bold')
+
+            title = "Input Preview" if not is_result_mode else "Final State"
+            ax.set_title(title, fontsize=10)
+            return fig
+
+        # ==================================================
+        # LAYOUT: NUMERIC DASHBOARD
+        # ==================================================
+        
+        solver = SoilState()
+        
+        # --- TOP SECTION: INPUTS & PREVIEW ---
+        top_col1, top_col2 = st.columns([1, 1])
+        
+        with top_col1:
+            st.markdown("### 1. Inputs")
+            
+            condition = st.radio("Soil State:", ["Partially Saturated", "Fully Saturated (Sr=1)", "Dry (Sr=0)"])
+            if "Fully" in condition: solver.set_param('Sr', 1.0)
+            elif "Dry" in condition: solver.set_param('Sr', 0.0)
+
+            c1, c2 = st.columns(2)
+            with c1:
+                w_in = st.number_input("Water Content (w)", 0.0, step=0.01, format="%.3f")
+                Gs_in = st.number_input("Specific Gravity (Gs)", 0.0, step=0.01, format="%.2f")
+                e_in = st.number_input("Void Ratio (e)", 0.0, step=0.01)
+            with c2:
+                n_in = st.number_input("Porosity (n)", 0.0, step=0.01)
+                Sr_in = st.number_input("Saturation (Sr)", 0.0, 1.0, step=0.01)
+                gamma_b_in = st.number_input("Bulk Unit Wt", 0.0, step=0.1)
+                gamma_d_in = st.number_input("Dry Unit Wt", 0.0, step=0.1)
+
+            if w_in > 0: solver.set_param('w', w_in)
+            if Gs_in > 0: solver.set_param('Gs', Gs_in)
+            if e_in > 0: solver.set_param('e', e_in)
+            if n_in > 0: solver.set_param('n', n_in)
+            if "Partially" in condition and Sr_in > 0: solver.set_param('Sr', Sr_in)
+            if gamma_b_in > 0: solver.set_param('gamma_bulk', gamma_b_in)
+            if gamma_d_in > 0: solver.set_param('gamma_dry', gamma_d_in)
+
+        with top_col2:
+            st.markdown("### Input Monitor")
+            fig_preview = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=False)
+            st.pyplot(fig_preview)
+
+        st.markdown("---")
+        solve_btn = st.button("Solve Numeric Problem", type="primary", use_container_width=True)
+
+        # --- BOTTOM SECTION: RESULTS ---
+        if solve_btn:
+            solver.solve()
+            st.markdown("### 2. Solution")
+            
+            if not solver.log:
+                st.error("Not enough information provided to solve.")
+            else:
+                bot_col1, bot_col2 = st.columns([1, 1])
+                with bot_col1:
+                    st.success("Calculation Complete!")
+                    p = solver.params
+                    st.latex(f"w = {p['w']:.4f}")
+                    st.latex(f"G_s = {p['Gs']:.3f}")
+                    st.latex(f"e = {p['e']:.4f}")
+                    st.latex(f"S_r = {p['Sr']:.4f}")
+                    if p['gamma_bulk']: st.latex(r"\gamma_{bulk} = " + f"{p['gamma_bulk']:.2f}")
+                    if p['gamma_dry']: st.latex(r"\gamma_{dry} = " + f"{p['gamma_dry']:.2f}")
+
+                with bot_col2:
+                    fig_final = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=True)
+                    st.pyplot(fig_final)
+
+                with st.expander("Show Calculation Steps", expanded=True):
+                    for step in solver.log:
+                        st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.4f}}}")
+
+        # --- RELATIVE DENSITY ---
+        st.markdown("")
+        st.markdown("")
+        with st.container(border=True):
+            st.subheader("Relative Density ($D_r$) Calculator")
+            rc1, rc2, rc3 = st.columns(3)
+            with rc1: e_curr = st.number_input("Current e", 0.0, step=0.01, key="dr_e")
+            with rc2: e_max = st.number_input("Max e", 0.0, step=0.01, key="dr_emax")
+            with rc3: e_min = st.number_input("Min e", 0.0, step=0.01, key="dr_emin")
+            
+            if st.button("Calculate Dr"):
+                if e_max > e_min:
+                    Dr = (e_max - e_curr) / (e_max - e_min)
+                    st.latex(r"D_r = \frac{e_{max} - e}{e_{max} - e_{min}} = " + f"{Dr*100:.1f}\\%")
+                else:
+                    st.error("e_max must be > e_min")
+
+    # ==========================================
+    # MODE B: SYMBOLIC / FORMULA FINDER
+    # ==========================================
+    elif "Symbolic" in mode:
+        st.subheader("Formula Finder 🔍")
+        st.caption("Select the variables you **KNOW** to find the formula for the variable you **WANT**.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            known_vars = st.multiselect(
+                "I have these variables (Inputs):",
+                options=[
+                    "w (Water Content)", "Gs (Specific Gravity)", "e (Void Ratio)", 
+                    "n (Porosity)", "Sr (Saturation)", "gamma_bulk (Bulk Unit Wt)", 
+                    "gamma_dry (Dry Unit Wt)", "gamma_sat (Saturated Unit Wt)"
+                ],
+                default=["Gs (Specific Gravity)", "e (Void Ratio)"]
+            )
+            cleaned_knowns = set([k.split(" ")[0] for k in known_vars])
+
+        with col2:
+            target_var_raw = st.selectbox(
+                "I want to find (Target):",
+                options=[
+                    "gamma_dry (Dry Unit Wt)", "gamma_bulk (Bulk Unit Wt)",
+                    "gamma_sat (Saturated Unit Wt)", "gamma_sub (Submerged Unit Wt)",
+                    "e (Void Ratio)", "n (Porosity)", "Sr (Saturation)", "w (Water Content)"
+                ]
+            )
+            target = target_var_raw.split(" ")[0]
+
+        formulas = {
+            'gamma_dry': [
+                ({'Gs', 'e'}, r"\gamma_{dry} = \frac{G_s \gamma_w}{1 + e}", "Basic definition using Void Ratio."),
+                ({'gamma_bulk', 'w'}, r"\gamma_{dry} = \frac{\gamma_{bulk}}{1 + w}", "Derived from Bulk Density and Water Content."),
+                ({'Gs', 'n'}, r"\gamma_{dry} = G_s \gamma_w (1 - n)", "Using Porosity instead of Void Ratio.")
+            ],
+            'gamma_bulk': [
+                ({'Gs', 'e', 'w'}, r"\gamma_{bulk} = \frac{G_s \gamma_w (1 + w)}{1 + e}", "The general relationship for unit weight."),
+                ({'Gs', 'e', 'Sr'}, r"\gamma_{bulk} = \frac{(G_s + S_r e)\gamma_w}{1 + e}", "Using Saturation instead of Water Content.")
+            ],
+            'gamma_sat': [
+                ({'Gs', 'e'}, r"\gamma_{sat} = \frac{(G_s + e)\gamma_w}{1 + e}", "Assumes Sr = 1 (Fully Saturated)."),
+                ({'gamma_dry', 'n'}, r"\gamma_{sat} = \gamma_{dry} + n \gamma_w", "Relation between saturated and dry states.")
+            ],
+            'gamma_sub': [
+                ({'gamma_sat'}, r"\gamma' = \gamma_{sat} - \gamma_w", "Archimedes' principle for submerged soil."),
+                ({'Gs', 'e'}, r"\gamma' = \frac{(G_s - 1)\gamma_w}{1 + e}", "Standard submerged weight formula.")
+            ],
+            'e': [
+                ({'n'}, r"e = \frac{n}{1 - n}", "Conversion from Porosity."),
+                ({'w', 'Gs', 'Sr'}, r"e = \frac{w G_s}{S_r}", "From the fundamental relationship Se = wGs."),
+                ({'gamma_dry', 'Gs'}, r"e = \frac{G_s \gamma_w}{\gamma_{dry}} - 1", "Back-calculated from Dry Unit Weight."),
+                ({'gamma_sat', 'Gs'}, r"e = \frac{G_s \gamma_w - \gamma_{sat}}{\gamma_{sat} - \gamma_w}", "Back-calculated from Saturated Unit Weight.")
+            ],
+            'n': [
+                ({'e'}, r"n = \frac{e}{1 + e}", "Conversion from Void Ratio."),
+                ({'gamma_sat', 'gamma_dry'}, r"n = \frac{\gamma_{sat} - \gamma_{dry}}{\gamma_w}", "Difference between Sat and Dry states.")
+            ],
+            'Sr': [
+                ({'w', 'Gs', 'e'}, r"S_r = \frac{w G_s}{e}", "Rearranged from Se = wGs.")
+            ],
+            'w': [
+                ({'Sr', 'e', 'Gs'}, r"w = \frac{S_r e}{G_s}", "Rearranged from Se = wGs.")
+            ]
+        }
+
+        st.markdown("---")
+        found_any = False
+        
+        if target in formulas:
+            for requirements, latex, description in formulas[target]:
+                if requirements.issubset(cleaned_knowns):
+                    st.success(f"✅ **Formula Found:** {description}")
+                    st.latex(latex)
+                    found_any = True
+        
+        if not found_any:
+            st.warning(f"No direct formula found for **{target}** with the variables you selected.")
+            if target in formulas:
+                st.markdown("**To find this variable, you typically need combinations like:**")
+                for reqs, _, _ in formulas[target]:
+                    pretty_reqs = ", ".join(list(reqs))
+                    st.markdown(f"- {pretty_reqs}")
