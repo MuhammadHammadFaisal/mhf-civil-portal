@@ -4,7 +4,7 @@ from topics import soil_phase
 from topics import effective_stress
 from topics import flow_water
 
-st.set_page_config(page_title="Soil Mechanics", page_icon="", layout="wide")
+st.set_page_config(page_title="Soil Mechanics", page_icon=""assets/logo.png"", layout="wide")
 
 st.header("Soil Mechanics")
 
