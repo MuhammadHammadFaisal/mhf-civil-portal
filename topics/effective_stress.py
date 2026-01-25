@@ -22,7 +22,7 @@ def app():
     tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
 
     # =====================================================
-    # TAB 1 — STRESS PROFILE (Standard)
+    # TAB 1 — STRESS PROFILE
     # =====================================================
     with tab1:
         st.caption("Define soil layers, water table, and surcharge to calculate the stress profile.")
@@ -285,15 +285,12 @@ def app():
                         else: st.latex(line.replace("$", ""))
 
     # =====================================================
-    # TAB 2 — HEAVE CHECK (REBUILT TO MATCH SKETCH)
+    # TAB 2 — HEAVE CHECK (PROFESSIONAL VISUALS)
     # =====================================================
     with tab2:
         st.subheader("Heave & Piping Analysis")
         st.caption("Checks safety against bottom heave for excavations in Clay over Artesian Sand.")
         
-        # -------------------------------------------------
-        # 1. INPUTS
-        # -------------------------------------------------
         col_h_input, col_h_viz = st.columns([1, 2])
 
         with col_h_input:
@@ -305,87 +302,92 @@ def app():
             gamma_w = 9.81
             
             rem_clay = h_clay - d_exc
-            st.info(f"Plug Thickness: **{rem_clay:.2f} m**")
+            st.info(f"Resisting Clay Plug: **{rem_clay:.2f} m**")
             
-            # Button here to trigger calc
             calc_trigger = st.button("Calculate Factor of Safety", type="primary")
 
-        # -------------------------------------------------
-        # 2. VISUALIZATION (GEOMETRY ONLY INITIALLY)
-        # -------------------------------------------------
         with col_h_viz:
-            st.markdown("#### Cross-Section Preview")
+            st.markdown("#### Geotechnical Profile & Failure Analysis")
             
-            # Use subplots BUT hide the right one if not calculated yet
-            # We always create 2 subplots to keep size consistent, but leave right one blank initially
-            fig_h, (ax_geo, ax_stress) = plt.subplots(1, 2, figsize=(10, 5), sharey=True, gridspec_kw={'width_ratios': [1.5, 1]})
+            # Create Plot
+            fig_h, (ax_geo, ax_stress) = plt.subplots(1, 2, figsize=(10, 5), sharey=True, gridspec_kw={'width_ratios': [1.6, 1]})
             plt.subplots_adjust(wspace=0.05)
 
-            # --- LEFT PLOT: GEOMETRY (Always Visible) ---
-            # 1. Clay Layer (Full Block)
-            ax_geo.add_patch(patches.Rectangle((0, 0), 10, h_clay, facecolor='#B0A494', edgecolor='black'))
-            ax_geo.text(1, h_clay/2, "CLAY", fontsize=10, fontweight='bold', color='white')
+            # --- 1. GEOMETRY (LEFT) ---
+            # Colors
+            color_clay = '#BCAAA4'  # Softer Clay
+            color_sand = '#F4E798'  # Softer Sand
+            color_plug = '#8D6E63'  # Darker Clay for Plug
             
-            # 2. Excavation (Cut out)
-            ax_geo.add_patch(patches.Rectangle((4, 0), 6, d_exc, facecolor='white', edgecolor='black'))
-            ax_geo.plot([0, 4, 4, 10], [0, 0, d_exc, d_exc], 'k-', linewidth=2)
+            # Clay Layers
+            ax_geo.add_patch(patches.Rectangle((0, 0), 10, h_clay, facecolor=color_clay, edgecolor='#5D4037', linewidth=1))
             
-            # 3. Sand Layer
-            ax_geo.add_patch(patches.Rectangle((0, h_clay), 10, 4, facecolor='#E6D690', edgecolor='gray'))
-            ax_geo.text(5, h_clay + 2, "SAND (Artesian)", ha='center', fontsize=10)
+            # Excavation
+            ax_geo.add_patch(patches.Rectangle((4, 0), 6, d_exc, facecolor='white', edgecolor='black', linewidth=1.5))
+            
+            # Sand Layer
+            ax_geo.add_patch(patches.Rectangle((0, h_clay), 10, 4, facecolor=color_sand, edgecolor='#FBC02D', hatch='..'))
+            
+            # Highlight Plug (Resistance Zone)
+            if rem_clay > 0:
+                ax_geo.add_patch(patches.Rectangle((4, d_exc), 6, rem_clay, facecolor=color_plug, edgecolor='black', hatch='//', alpha=0.6))
+                ax_geo.text(7, d_exc + rem_clay/2, "CLAY PLUG\n(Resistance)", ha='center', va='center', color='white', fontweight='bold', fontsize=8)
 
-            # 4. Standpipe
+            # Labels
+            ax_geo.text(1, h_clay/2, "CLAY LAYER", fontsize=10, fontweight='bold', color='#3E2723')
+            ax_geo.text(5, h_clay + 2, "SAND LAYER (Artesian)", ha='center', fontsize=10, color='#F57F17')
+
+            # Standpipe Piezometer (Professional Style)
             pipe_x = 2
             ax_geo.plot([pipe_x, pipe_x], [-2, h_clay+1], 'k-', linewidth=1.5)
             ax_geo.plot([pipe_x+0.3, pipe_x+0.3], [-2, h_clay+1], 'k-', linewidth=1.5)
-            wl_y = -h_art
-            ax_geo.plot([pipe_x, pipe_x+0.3], [wl_y, wl_y], 'b-', linewidth=2)
-            ax_geo.plot(pipe_x+0.45, wl_y, marker='v', color='blue')
-            ax_geo.text(pipe_x+0.6, wl_y, f"WT (+{h_art}m)", color='blue', va='center', fontsize=9)
-            
+            # Water fill
+            ax_geo.fill_between([pipe_x, pipe_x+0.3], -h_art, h_clay+1, color='#29B6F6', alpha=0.6)
+            # Head Marker
+            ax_geo.plot(pipe_x+0.45, -h_art, marker='v', color='blue', markersize=8)
+            ax_geo.text(pipe_x+0.6, -h_art, f"Piezometric Head\n(+{h_art}m)", color='blue', va='center', fontsize=9, fontweight='bold')
+
+            # Limits
             ax_geo.set_ylim(h_clay + 3, -h_art - 2)
             ax_geo.set_xlim(0, 10)
             ax_geo.axis('off')
 
-            # --- RIGHT PLOT: STRESS (Blank Initially) ---
-            ax_stress.axis('off') # Hide initially
+            # --- 2. STRESS DIAGRAM (RIGHT) ---
+            ax_stress.axis('off')
             
-            # If Calc Triggered -> Draw the Stress Diagram
-            if calc_trigger:
-                if rem_clay > 0:
-                    ax_stress.axis('on') # Turn on
-                    ax_stress.spines['top'].set_visible(True)
-                    ax_stress.spines['right'].set_visible(False)
-                    ax_stress.spines['bottom'].set_visible(False)
-                    ax_stress.spines['left'].set_visible(True)
-                    
-                    sigma_val = rem_clay * g_clay
-                    u_val = (h_clay + h_art) * gamma_w
-                    
-                    # Setup Axes
-                    ax_stress.axvline(0, color='black', linewidth=1)
-                    ax_stress.set_xlabel("Stress (kPa)")
-                    ax_stress.xaxis.set_label_position('top')
-                    ax_stress.xaxis.tick_top()
-                    
-                    # Pore Pressure (u)
-                    ax_stress.plot([0, u_val], [-h_art, h_clay], 'r-', linewidth=2)
-                    ax_stress.plot([0, u_val], [h_clay, h_clay], 'r--', linewidth=1)
-                    ax_stress.text(u_val, h_clay, f" {u_val:.1f}", color='red', va='bottom', fontsize=9, fontweight='bold')
-                    ax_stress.text(u_val/2, 0, "u (Uplift)", color='red', rotation=-45, fontsize=9)
+            if calc_trigger and rem_clay > 0:
+                ax_stress.axis('on')
+                # Only show top and left axis lines
+                ax_stress.spines['top'].set_visible(True)
+                ax_stress.spines['left'].set_visible(True)
+                ax_stress.spines['right'].set_visible(False)
+                ax_stress.spines['bottom'].set_visible(False)
+                
+                sigma_val = rem_clay * g_clay
+                u_val = (h_clay + h_art) * gamma_w
+                
+                ax_stress.axvline(0, color='black', linewidth=1)
+                ax_stress.set_xlabel("Stress (kPa)", fontweight='bold')
+                ax_stress.xaxis.set_label_position('top')
+                ax_stress.xaxis.tick_top()
+                
+                # U (Uplift) - Red Line
+                ax_stress.plot([0, u_val], [-h_art, h_clay], 'r-', linewidth=2, label="U (Uplift)")
+                ax_stress.plot([0, u_val], [h_clay, h_clay], 'r--', linewidth=1)
+                ax_stress.text(u_val, h_clay, f" {u_val:.1f}", color='r', va='bottom', fontsize=9, fontweight='bold')
+                
+                # Sigma (Resistance) - Blue Line
+                ax_stress.plot([0, sigma_val], [d_exc, h_clay], 'b-', linewidth=2, label="σ (Weight)")
+                ax_stress.plot([0, sigma_val], [h_clay, h_clay], 'b--', linewidth=1)
+                ax_stress.text(sigma_val, h_clay, f" {sigma_val:.1f}", color='b', va='top', fontsize=9, fontweight='bold')
 
-                    # Total Stress (Sigma)
-                    ax_stress.plot([0, sigma_val], [d_exc, h_clay], 'b-', linewidth=2)
-                    ax_stress.plot([0, sigma_val], [h_clay, h_clay], 'b--', linewidth=1)
-                    ax_stress.text(sigma_val, h_clay, f" {sigma_val:.1f}", color='blue', va='top', fontsize=9, fontweight='bold')
-                    ax_stress.text(sigma_val/2, d_exc + (h_clay-d_exc)/2, "σ (Weight)", color='blue', rotation=-45, fontsize=9)
-
-                    # Interface Line
-                    ax_stress.axhline(h_clay, color='gray', linestyle=':', linewidth=1)
-                    ax_geo.axhline(h_clay, color='gray', linestyle=':', linewidth=1)
-
-                    ax_stress.set_xlim(0, max(u_val, sigma_val)*1.2)
-                    ax_stress.grid(True, which='both', linestyle='--', alpha=0.3)
+                # Critical Interface Line
+                ax_stress.axhline(h_clay, color='red', linestyle='--', linewidth=1)
+                ax_geo.axhline(h_clay, color='red', linestyle='--', linewidth=1)
+                
+                ax_stress.legend(loc='lower right', fontsize=8)
+                ax_stress.set_xlim(0, max(u_val, sigma_val)*1.3)
+                ax_stress.grid(True, axis='x', linestyle=':', alpha=0.5)
 
             st.pyplot(fig_h)
 
@@ -405,18 +407,20 @@ def app():
                 with c_res_l:
                     if fs < 1.0:
                         st.error(f"**FS = {fs:.3f}** (UNSAFE)")
-                        st.warning("Bottom Heave Expected!")
+                        st.warning("⚠️ CRITICAL FAILURE: Bottom Heave Expected.")
                     elif fs < 1.2:
                         st.warning(f"**FS = {fs:.3f}** (MARGINAL)")
+                        st.info("⚠️ Risk is high. Increase plug thickness or lower water table.")
                     else:
                         st.success(f"**FS = {fs:.3f}** (SAFE)")
+                        st.balloons()
 
                 with c_res_r:
                     with st.expander("Show Detailed Math", expanded=True):
-                        st.markdown("**1. Resisting Stress (Weight of Clay Plug)**")
+                        st.markdown("**1. Downward Resistance (Weight of Clay Plug)**")
                         st.latex(rf"\sigma_v = H_{{plug}} \times \gamma_{{clay}} = {rem_clay:.2f} \times {g_clay} = \mathbf{{{sigma_val:.2f} \, kPa}}")
                         
-                        st.markdown("**2. Uplift Pressure (Artesian Head)**")
+                        st.markdown("**2. Upward Uplift Pressure (Artesian)**")
                         st.latex(rf"u = (H_{{clay}} + h_{{art}}) \times \gamma_w = ({h_clay} + {h_art}) \times 9.81 = \mathbf{{{u_val:.2f} \, kPa}}")
                         
                         st.markdown("**3. Factor of Safety**")
