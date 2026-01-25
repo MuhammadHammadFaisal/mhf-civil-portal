@@ -12,9 +12,7 @@ st.set_page_config(
 )
 
 def app():
-    # --- SIDEBAR LOGO ---
-    # Ensures consistency with your other pages
-    st.logo(image="assets/logo.png", icon_image="assets/logo.png")
+
 
     # --- HERO SECTION (The Professional Header) ---
     # We use the [1, 2] ratio and vertical centering to align text with the logo
