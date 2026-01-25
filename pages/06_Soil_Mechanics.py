@@ -12,36 +12,39 @@ st.set_page_config(
 )
 
 def app():
+    # --- SIDEBAR LOGO ---
+    st.logo(image="assets/logo.png", icon_image="assets/logo.png")
+
     # --- PROFESSIONAL HEADER ---
-    # We use a standard [1, 5] ratio.
-    # The logo gets a small slot (1), the text gets the rest (5).
-    try:
-        col_logo, col_text = st.columns([1, 5], vertical_alignment="center")
-    except TypeError:
-        col_logo, col_text = st.columns([1, 5])
+    # Column Ratio [1, 5] keeps logo compact
+    col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
-        # [STYLE TWEAK] Round the corners of the white logo box so it looks like an App Icon
+        # [STYLE UPGRADE] 
+        # Since the logo has a white background, we frame it like an "App Icon"
+        # with a subtle border and shadow so it looks intentional.
         st.markdown(
             """
             <style>
-            img[data-testid="stImage"] {
-                border-radius: 12px;
+            div[data-testid="stImage"] > img {
+                border-radius: 15px;
+                border: 2px solid #444;
+                box-shadow: 0px 4px 6px rgba(0,0,0,0.3);
             }
             </style>
             """, 
             unsafe_allow_html=True
         )
-        # Reduced width to 150px. This is the sweet spot for headers.
         st.image("assets/logo.png", width=150) 
 
     with col_text:
-        # Removed left padding to bring text closer to the icon
+        # [ALIGNMENT FIX]
+        # Added 'padding-top: 15px' to push text down so it centers with the logo
         st.markdown(
             """
-            <div style="padding-left: 0px;">
-                <h1 style='font-size: 48px; margin-bottom: 0px; line-height: 1.0;'>Soil Mechanics</h1>
-                <p style='color: #888; font-size: 18px; font-weight: 300; margin-top: 5px;'>
+            <div style="padding-top: 15px; padding-left: 10px;">
+                <h1 style='font-size: 45px; margin-bottom: 5px; line-height: 1.0;'>Soil Mechanics</h1>
+                <p style='color: #888; font-size: 18px; font-weight: 300; margin: 0;'>
                     Phase Relationships, Effective Stress & Flow Analysis
                 </p>
             </div>
@@ -52,7 +55,7 @@ def app():
     st.markdown("---")
 
     # --- TOPIC SELECTION MENU ---
-    # Moved to a visual container to separate it from the header
+    # Wrapped in a container to separate navigation from the header
     with st.container(border=True):
         topic = st.selectbox(
             "Select Calculation Module:", 
