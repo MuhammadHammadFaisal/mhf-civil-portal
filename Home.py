@@ -29,21 +29,25 @@ def get_active_modules():
     return sorted(active_modules)
 
 def main():
-    # --- MAIN PAGE HERO SECTION ---
-    # We use 3 columns to center the content.
-    # [1, 2, 1] creates a center column that isn't too wide or too narrow.
-    col_left, col_center, col_right = st.columns([1, 2, 1])
+    # --- HERO SECTION (SIDE-BY-SIDE) ---
+    # Create two columns: Left for Logo, Right for Text
+    # The ratio [0.8, 2.5] ensures the logo column isn't too wide
+    col_logo, col_text = st.columns([0.8, 2.5])
 
-    with col_center:
-        # [FIX] Set a fixed width (350px) so it doesn't blow up to full screen size
-        st.image("assets/logo.png", width=350) 
-        
-        # Display Title and Caption Centered
+    with col_logo:
+        # Display logo (Adjust width as needed, 250-300 is usually good)
+        st.image("assets/logo.png", width=280) 
+
+    with col_text:
+        # Display Title and Caption
+        # We add 'margin-top' to push the text down so it aligns with the logo's center
         st.markdown(
             """
-            <div style='text-align: left; padding-left: 20px;'>
-                <h1>MHF Civil Portal</h1>
-                <p style='color: gray; font-size: 18px;'>Deterministic Civil Engineering Computation Platform</p>
+            <div style='margin-top: 50px;'>
+                <h1 style='margin-bottom: 10px; font-size: 50px;'>MHF Civil Calc</h1>
+                <p style='color: #666; font-size: 20px; font-weight: 300;'>
+                    Deterministic Civil Engineering Computation Platform
+                </p>
             </div>
             """, 
             unsafe_allow_html=True
