@@ -30,15 +30,11 @@ div[data-testid="stPageLink-NavLink"]:hover {
 }
 
 /* 3. Force Text Color to Dark Green */
-/* We target all text elements inside the link to ensure they turn green */
 div[data-testid="stPageLink-NavLink"] * {
     color: #14532d !important;   /* Dark Green Text */
     font-weight: 600 !important;
     text-decoration: none !important;
 }
-
-/* Optional: Make the second line (Online & Verified) slightly smaller if needed */
-/* Note: Streamlit page_link renders text in a single block, so strict sizing is hard via CSS alone */
 </style>
 """, unsafe_allow_html=True)
 
@@ -96,16 +92,14 @@ def main():
     if modules_list:
         st.subheader("Active Course Calculators")
         
-        # Grid Layout
         cols = st.columns(2)
         
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
-                # We render the entire card as a single clickable Page Link
+                # FIXED: Removed 'icon=""' to prevent the crash
                 st.page_link(
                     f"pages/{file_name}", 
                     label=f"{module_title}\n✅ Online & Verified", 
-                    icon="", 
                     use_container_width=True
                 )
     
