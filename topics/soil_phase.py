@@ -12,7 +12,7 @@ def app():
     # MODE A: NUMERIC
     # ==========================
     if "Numeric" in mode:
-        st.caption("Enter what you know. I will calculate the rest.")
+        st.caption("Enter what you know. Inputs turn GREEN. Calculated values turn RED.")
         
         class SoilState:
             def __init__(self):
@@ -25,6 +25,7 @@ def app():
                 self.rho_w = 1.0
                 self.gamma_w = 9.81
                 self.log = [] 
+                self.inputs = [] # Track what the user typed
 
                 self.latex_map = {
                     'w': 'w', 'Gs': 'G_s', 'e': 'e', 'n': 'n', 'Sr': 'S_r',
@@ -36,7 +37,9 @@ def app():
                 }
 
             def set_param(self, key, value):
-                if value is not None: self.params[key] = float(value)
+                if value is not None: 
+                    self.params[key] = float(value)
+                    self.inputs.append(key) # Mark as user input
 
             def add_log(self, target_key, formula_latex, sub_latex, result):
                 symbol = self.latex_map.get(target_key, target_key)
@@ -64,55 +67,46 @@ def app():
                         changed = True
 
                     # --- 2. THE "Se = wGs" TRIANGLE ---
-                    # Solve for Sr
                     if known('w') and known('Gs') and known('e') and not known('Sr'):
                         p['Sr'] = (p['w'] * p['Gs']) / p['e']
                         self.add_log('Sr', r'\frac{w G_s}{e}', r'Calc...', p['Sr'])
                         changed = True
-                    # Solve for e
                     if known('w') and known('Gs') and known('Sr') and not known('e') and p['Sr'] != 0:
                         p['e'] = (p['w'] * p['Gs']) / p['Sr']
                         self.add_log('e', r'\frac{w G_s}{S_r}', r'Calc...', p['e'])
                         changed = True
-                    # Solve for w
                     if known('Sr') and known('e') and known('Gs') and not known('w'):
                         p['w'] = (p['Sr'] * p['e']) / p['Gs']
                         self.add_log('w', r'\frac{S_r e}{G_s}', r'Calc...', p['w'])
                         changed = True
-                    # Solve for Gs
                     if known('Sr') and known('e') and known('w') and not known('Gs') and p['w'] != 0:
                         p['Gs'] = (p['Sr'] * p['e']) / p['w']
                         self.add_log('Gs', r'\frac{S_r e}{w}', r'Calc...', p['Gs'])
                         changed = True
 
-                    # --- 3. UNIT WEIGHT FORWARD CALCULATIONS (Find Gamma) ---
-                    # Gamma Dry
+                    # --- 3. UNIT WEIGHTS ---
                     if known('Gs') and known('e') and not known('gamma_dry'):
                         p['gamma_dry'] = (p['Gs'] * self.gamma_w) / (1 + p['e'])
                         self.add_log('gamma_dry', r'\frac{G_s \gamma_w}{1 + e}', r'Calc...', p['gamma_dry'])
                         changed = True
-                    # Gamma Bulk
                     if known('Gs') and known('e') and known('w') and not known('gamma_bulk'):
                         p['gamma_bulk'] = (p['Gs'] * self.gamma_w * (1 + p['w'])) / (1 + p['e'])
                         self.add_log('gamma_bulk', r'\frac{G_s \gamma_w (1+w)}{1+e}', r'Calc...', p['gamma_bulk'])
                         changed = True
 
-                    # --- 4. REVERSE CALCULATIONS (Find e from Gamma) ---
-                    # Find e from Gamma Bulk
+                    # --- 4. REVERSE CALCS ---
                     if known('gamma_bulk') and known('Gs') and known('w') and not known('e'):
                         val = (p['Gs'] * (1 + p['w']) * self.gamma_w) / p['gamma_bulk']
                         p['e'] = val - 1
                         self.add_log('e', r'\frac{G_s(1+w)\gamma_w}{\gamma_{bulk}} - 1', r'Calc...', p['e'])
                         changed = True
-
-                    # Find e from Gamma Dry
                     if known('gamma_dry') and known('Gs') and not known('e'):
                         val = (p['Gs'] * self.gamma_w) / p['gamma_dry']
                         p['e'] = val - 1
                         self.add_log('e', r'\frac{G_s \gamma_w}{\gamma_{dry}} - 1', r'Calc...', p['e'])
                         changed = True
 
-                    # --- 5. SATURATION & SUBMERGED CHECKS ---
+                    # --- 5. SATURATION CHECKS ---
                     if known('gamma_bulk') and p['Sr'] == 1.0 and not known('gamma_sat'):
                          p['gamma_sat'] = p['gamma_bulk']
                          
@@ -129,21 +123,26 @@ def app():
                     iterations += 1
 
         # --- DRAWING FUNCTION ---
-        def draw_phase_diagram(solver_params):
-            """Generates the 3-phase diagram using Matplotlib based on calculated results."""
+        def draw_phase_diagram(solver_params, inputs_list):
+            """
+            Draws Phase Diagram. 
+            Features:
+            - Green Text = Input Variable
+            - Red Text = Calculated Variable
+            - Dynamic Heights for Air/Water based on Sr
+            """
             # Extract basic params
-            e = solver_params.get('e', 0.5)
-            if e is None: e = 0.5
-            
-            Gs = solver_params.get('Gs', 2.65)
-            if Gs is None: Gs = 2.7
-            
-            Sr = solver_params.get('Sr', 0.5)
+            e = solver_params.get('e', 0.5) or 0.5
+            Gs = solver_params.get('Gs', 2.65) or 2.7
+            Sr = solver_params.get('Sr', 0.5) 
             if Sr is None: Sr = 0.5
-
             w = solver_params.get('w', 0.1)
-            
-            # Assumptions (Vs = 1)
+
+            # Define Colors based on Input List
+            def get_color(key):
+                return 'green' if key in inputs_list else 'red'
+
+            # Calculation for diagram
             Vs = 1.0
             Vv = e
             Vw = Sr * e
@@ -153,72 +152,63 @@ def app():
             Mw = w * Ms if w is not None else Vw * 1.0 
             Ma = 0
 
-            # Plot Setup - Wider Figure for clearer labels
-            fig, ax = plt.subplots(figsize=(8, 6)) 
-            
-            # Widen the X-axis limits so text doesn't overlap
+            # Plot Setup - Compact Size
+            fig, ax = plt.subplots(figsize=(6, 4)) 
             ax.set_xlim(-2.0, 3.0) 
             ax.set_ylim(0, max(1.5, 1 + e + 0.5)) 
             ax.axis('off')
 
             # --- DRAW RECTANGLES ---
-            # 1. Solids (Bottom) - Always drawn
+            # 1. Solids (Bottom)
             ax.add_patch(patches.Rectangle((0, 0), 1, Vs, linewidth=2, edgecolor='black', facecolor='#D2B48C'))
             ax.text(0.5, Vs/2, 'Solids (S)', ha='center', va='center', fontsize=10, fontweight='bold')
 
             # 2. Water (Middle)
-            if Vw > 0:
+            # Only draw if Water exists (Sr > 0)
+            if Vw > 0.001:
                 ax.add_patch(patches.Rectangle((0, Vs), 1, Vw, linewidth=2, edgecolor='black', facecolor='#87CEEB'))
-                # ONLY draw text if the layer is thick enough (>0.15)
-                if Vw > 0.15:
+                if Vw > 0.15: # Only text if box is big enough
                     ax.text(0.5, Vs + Vw/2, 'Water (W)', ha='center', va='center', fontsize=10, fontweight='bold')
 
             # 3. Air (Top)
+            # Only draw if Air exists (Sr < 1)
             if Va > 0.001:
                 ax.add_patch(patches.Rectangle((0, Vs + Vw), 1, Va, linewidth=2, edgecolor='black', facecolor='#F0F8FF'))
-                # ONLY draw text if the layer is thick enough (>0.15)
                 if Va > 0.15:
                     ax.text(0.5, Vs + Vw + Va/2, 'Air (A)', ha='center', va='center', fontsize=10, fontweight='bold')
 
             # --- ANNOTATIONS (LEFT - VOLUMES) ---
-            # Header
             ax.text(-0.8, 1+e+0.2, r'$Volume \ (V)$', ha='center', fontsize=11, fontweight='bold')
-            
-            # Vs Label
             ax.text(-0.1, Vs/2, f'$V_s = {Vs}$ ', ha='right', va='center', fontsize=10)
             
-            # Vw Label
-            if Vw > 0:
+            if Vw > 0.001:
                 ax.text(-0.1, Vs + Vw/2, f'$V_w = {Vw:.2f}$ ', ha='right', va='center', fontsize=10)
-            
-            # Va Label
             if Va > 0.001:
                 ax.text(-0.1, Vs + Vw + Va/2, f'$V_a = {Va:.2f}$ ', ha='right', va='center', fontsize=10)
 
-            # Curly Brace for 'e'
+            # Curly Brace for 'e' - This is usually calculated/derived unless input directly
             if Vv > 0:
                 brace_x = -0.8
                 brace_y_bottom = Vs
                 brace_y_top = Vs + Vv
-                # Draw brace lines
                 ax.plot([brace_x, brace_x], [brace_y_bottom, brace_y_top], color='black', lw=1)
                 ax.plot([brace_x, brace_x + 0.1], [brace_y_bottom, brace_y_bottom], color='black', lw=1)
                 ax.plot([brace_x, brace_x + 0.1], [brace_y_top, brace_y_top], color='black', lw=1)
-                # Label
-                ax.text(brace_x - 0.1, Vs + Vv/2, f'$e = {e:.3f}$', ha='right', va='center', fontsize=12, color='red', fontweight='bold')
+                
+                # COLOR LOGIC: If 'e' was input, Green. Else Red.
+                ax.text(brace_x - 0.1, Vs + Vv/2, f'$e = {e:.3f}$', 
+                        ha='right', va='center', fontsize=12, fontweight='bold', color=get_color('e'))
 
             # --- ANNOTATIONS (RIGHT - MASSES) ---
-            # Header
             ax.text(1.8, 1+e+0.2, r'$Mass \ (M)$', ha='center', fontsize=11, fontweight='bold')
             
-            # Ms Label
-            ax.text(1.1, Vs/2, f'$M_s = {Ms:.2f}$', ha='left', va='center', fontsize=10)
+            # Ms (Controlled by Gs)
+            ax.text(1.1, Vs/2, f'$M_s = {Ms:.2f}$', ha='left', va='center', fontsize=10, color=get_color('Gs'))
             
-            # Mw Label
-            if Vw > 0:
-                ax.text(1.1, Vs + Vw/2, f'$M_w = {Mw:.2f}$', ha='left', va='center', fontsize=10)
+            # Mw (Controlled by w)
+            if Vw > 0.001:
+                ax.text(1.1, Vs + Vw/2, f'$M_w = {Mw:.2f}$', ha='left', va='center', fontsize=10, color=get_color('w'))
             
-            # Ma Label
             if Va > 0.001:
                 ax.text(1.1, Vs + Vw + Va/2, f'$M_a = 0$', ha='left', va='center', fontsize=10)
 
@@ -230,8 +220,14 @@ def app():
             condition = st.radio("Soil State:", ["Partially Saturated (Input Sr)", "Fully Saturated (Sr=1)", "Dry (Sr=0)"])
         
         solver = SoilState()
-        if "Fully" in condition: solver.set_param('Sr', 1.0)
-        elif "Dry" in condition: solver.set_param('Sr', 0.0)
+        
+        # Handle Condition Presets
+        if "Fully" in condition: 
+            solver.set_param('Sr', 1.0)
+            # Note: Sr is set internally, not by user input box, so it stays default color unless we force it.
+            # But let's keep it red/calculated since user selected a 'mode' not a number.
+        elif "Dry" in condition: 
+            solver.set_param('Sr', 0.0)
 
         col1, col2 = st.columns(2)
         with col1:
@@ -247,7 +243,7 @@ def app():
             gamma_bulk_in = st.number_input("Bulk Unit Wt (kN/m³)", 0.0, step=0.1)
             gamma_dry_in = st.number_input("Dry Unit Wt (kN/m³)", 0.0, step=0.1)
 
-        # Load inputs
+        # Load inputs & Register them
         if w_in > 0: solver.set_param('w', w_in)
         if Gs_in > 0: solver.set_param('Gs', Gs_in)
         if e_in > 0: solver.set_param('e', e_in)
@@ -293,9 +289,9 @@ def app():
             st.subheader("Interactive Phase Diagram")
             st.caption("Visual representation of Volumes (left) and Masses (right) assuming Vs = 1.")
             
-            # Only draw if we have minimum params (e, Gs) to make a valid drawing
+            # Pass the input list to the drawer
             if get_val('e') is not None and get_val('Gs') is not None:
-                fig = draw_phase_diagram(solver.params)
+                fig = draw_phase_diagram(solver.params, solver.inputs)
                 st.pyplot(fig)
             else:
                 st.warning("Need at least 'Void Ratio (e)' and 'Specific Gravity (Gs)' to generate diagram.")
