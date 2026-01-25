@@ -15,7 +15,7 @@ def app():
         st.caption("Enter parameters. The INPUT diagram (top) updates live. The RESULT diagram (bottom) appears after solving.")
         
         # --- CLASS DEFINITION ---
-class SoilState:
+    class SoilState:
             def __init__(self):
                 self.params = {
                     'w': None, 'Gs': None, 'e': None, 'n': None, 'Sr': None,
