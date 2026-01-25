@@ -1,36 +1,26 @@
-import streamlit as st
-# IMPORT MODULES (Ensure these files exist in your 'topics' folder)
-from topics import soil_phase
-from topics import effective_stress
-from topics import flow_water
-
-# 1. PAGE CONFIG (Must be the first Streamlit command)
-st.set_page_config(
-    page_title="Soil Mechanics", 
-    page_icon="assets/logo.png", 
-    layout="wide"
-)
-
 def app():
 
 
-    # --- HERO SECTION (The Professional Header) ---
-    # We use the [1, 2] ratio and vertical centering to align text with the logo
+    # --- PROFESSIONAL HEADER ---
+    # 1. Use a tighter column ratio [1, 4] 
+    #    This reserves 20% width for logo area, 80% for text area.
     try:
-        # [0.6, 2.5] makes the logo column much narrower
-        col_logo, col_text = st.columns([0.6, 2.5], vertical_alignment="center")
+        col_logo, col_text = st.columns([1, 4], vertical_alignment="center")
     except TypeError:
-        col_logo, col_text = st.columns([1, 2])
+        col_logo, col_text = st.columns([1, 4])
 
     with col_logo:
-        st.image("assets/logo.png", use_container_width=True) 
+        # 2. FIXED WIDTH: Set width=180 or 200. 
+        #    This prevents the logo from becoming huge on wide monitors.
+        st.image("assets/logo.png", width=200) 
 
     with col_text:
+        # 3. TEXT ALIGNMENT: Reduced padding-left to bring text closer to logo.
         st.markdown(
             """
-            <div style="padding-top: 10px; padding-left: 10px;">
-                <h1 style='font-size: 45px; margin-bottom: 0px; line-height: 1.1;'>Soil Mechanics</h1>
-                <p style='color: #666; font-size: 18px; font-weight: 300; margin-top: 8px;'>
+            <div style="padding-left: 0px;">
+                <h1 style='font-size: 42px; margin-bottom: 0px; line-height: 1.1;'>Soil Mechanics</h1>
+                <p style='color: #666; font-size: 16px; font-weight: 300; margin-top: 5px;'>
                     Phase Relationships, Effective Stress & Flow Analysis
                 </p>
             </div>
@@ -41,7 +31,6 @@ def app():
     st.markdown("---")
 
     # --- TOPIC SELECTION MENU ---
-    # Using a selectbox to switch between sub-modules
     topic = st.selectbox(
         "Select Calculation Module:", 
         [
@@ -60,6 +49,3 @@ def app():
 
     elif topic == "Flow of Water in Soils":
         flow_water.app()
-
-if __name__ == "__main__":
-    app()
