@@ -8,35 +8,47 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CUSTOM CSS: FORCE GREEN BUTTONS ---
+# --- CUSTOM CSS: PRO GREEN BUTTONS ---
 st.markdown("""
 <style>
-/* 1. Target the Page Link (Generic Selector for robustness) */
+/* 1. The Button Container (Green Box) */
 [data-testid="stPageLink-NavLink"] {
-    background-color: #198754 !important;   /* FORCE SOLID GREEN */
+    background-color: #198754 !important;   /* Solid Green */
     border: 2px solid #198754 !important;
-    border-radius: 10px !important;
-    padding: 20px !important;
-    text-align: center !important;
-    transition: all 0.2s ease-in-out !important;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    text-align: center !important;          /* FORCE CENTER ALIGNMENT */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
 }
 
 /* 2. Hover Effect */
 [data-testid="stPageLink-NavLink"]:hover {
-    background-color: #146c43 !important;   /* Darker Green on Hover */
-    border-color: #146c43 !important;
+    background-color: #146c43 !important;   /* Darker Green */
     transform: translateY(-3px) !important;
-    box-shadow: 0 8px 15px rgba(25, 135, 84, 0.4) !important;
+    box-shadow: 0 8px 12px rgba(20, 108, 67, 0.4) !important;
+    border-color: #146c43 !important;
 }
 
-/* 3. Text Styling (Force White Text inside the button) */
-[data-testid="stPageLink-NavLink"] * {
+/* 3. Text Styling - Base Settings (Normal Weight) */
+[data-testid="stPageLink-NavLink"] p {
     color: white !important;
-    font-size: 18px !important;
-    font-weight: 700 !important;
-    line-height: 1.4 !important;
-    white-space: pre-wrap !important; /* Ensures the new line works */
+    font-size: 16px !important;
+    font-weight: 400 !important;      /* UNBOLD EVERYTHING by default */
+    line-height: 1.5 !important;
+    margin: 0 !important;
+    white-space: pre-wrap !important; /* Respect new lines */
+}
+
+/* 4. TITLE STYLING (First Line Only) */
+/* This makes "Soil Mechanics" Bold and Big, while "Online" stays normal */
+[data-testid="stPageLink-NavLink"] p::first-line {
+    font-weight: 800 !important;      /* BOLD Title */
+    font-size: 20px !important;       /* LARGER Title */
+    line-height: 1.8 !important;      /* More space below title */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -99,10 +111,11 @@ def main():
         
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
-                # --- RENDER BUTTON ---
+                # The \n creates the line break.
+                # CSS ::first-line handles the bolding of the top part.
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n Online & Verified", 
+                    label=f"{module_title}\n✅ Online & Verified", 
                     use_container_width=True
                 )
     
@@ -145,4 +158,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
