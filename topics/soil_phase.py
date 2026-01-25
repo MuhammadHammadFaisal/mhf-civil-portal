@@ -226,4 +226,76 @@ def app():
 
         # Load inputs
         if w_in > 0: solver.set_param('w', w_in)
-        if Gs_in > 0: solver.
+        if Gs_in > 0: solver.set_param('Gs', Gs_in)
+        if e_in > 0: solver.set_param('e', e_in)
+        if n_in > 0: solver.set_param('n', n_in)
+        if "Partially" in condition and Sr_in > 0: solver.set_param('Sr', Sr_in)
+        if gamma_bulk_in > 0: solver.set_param('gamma_bulk', gamma_bulk_in)
+        if gamma_dry_in > 0: solver.set_param('gamma_dry', gamma_dry_in)
+        
+        if st.button("Solve Numeric Problem", type="primary"):
+            solver.solve()
+            st.success("Calculation Complete!")
+            
+            # 1. Standard Results
+            if solver.log:
+                with st.expander("📝 View Step-by-Step Solution", expanded=False):
+                    for step in solver.log:
+                        st.markdown(f"**Found ${step['Variable']}$:**")
+                        st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.4f}}}")
+            else:
+                st.error("Not enough info to solve.")
+
+            st.markdown("### Final Results")
+            res_col1, res_col2 = st.columns(2)
+            def get_val(key): return solver.params.get(key)
+
+            with res_col1:
+                st.markdown("**Physical Properties**")
+                if get_val('w') is not None: st.latex(f"w = {get_val('w'):.4f}")
+                if get_val('Gs') is not None: st.latex(f"G_s = {get_val('Gs'):.3f}")
+                if get_val('e') is not None: st.latex(f"e = {get_val('e'):.4f}")
+                if get_val('n') is not None: st.latex(f"n = {get_val('n'):.4f}")
+                if get_val('Sr') is not None: st.latex(f"S_r = {get_val('Sr'):.4f}")
+                if get_val('na') is not None: st.latex(f"n_a = {get_val('na'):.4f}")
+            
+            with res_col2:
+                st.markdown("**Unit Weights**")
+                if get_val('gamma_bulk') is not None: st.latex(r"\gamma_{bulk} = " + f"{get_val('gamma_bulk'):.2f}")
+                if get_val('gamma_dry') is not None: st.latex(r"\gamma_{dry} = " + f"{get_val('gamma_dry'):.2f}")
+                if get_val('gamma_sub') is not None: st.latex(r"\gamma' = " + f"{get_val('gamma_sub'):.2f}")
+
+            # --- 2. PHASE DIAGRAM ---
+            st.markdown("---")
+            st.subheader("Interactive Phase Diagram")
+            st.caption("Visual representation of Volumes (left) and Masses (right) assuming Vs = 1.")
+            
+            # Only draw if we have minimum params (e, Gs) to make a valid drawing
+            if get_val('e') is not None and get_val('Gs') is not None:
+                fig = draw_phase_diagram(solver.params)
+                st.pyplot(fig)
+            else:
+                st.warning("Need at least 'Void Ratio (e)' and 'Specific Gravity (Gs)' to generate diagram.")
+
+        # --- RELATIVE DENSITY ---
+        st.markdown("---")
+        st.subheader("Relative Density (Dr)")
+        st.caption("Calculate density state based on e_max and e_min.")
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: e_curr = st.number_input("Current Void Ratio (e)", 0.0, step=0.01, key="dr_e")
+        with c2: e_max = st.number_input("Max Void Ratio (e_max)", 0.0, step=0.01, key="dr_emax")
+        with c3: e_min = st.number_input("Min Void Ratio (e_min)", 0.0, step=0.01, key="dr_emin")
+        
+        if st.button("Calculate Relative Density", type="primary"):
+            if e_max > e_min and e_max > 0:
+                Dr = (e_max - e_curr) / (e_max - e_min)
+                st.latex(r"D_r = \frac{e_{max} - e}{e_{max} - e_{min}} = " + f"{Dr*100:.1f}\\%")
+                
+                if Dr < 0.15: st.info("State: Very Loose")
+                elif Dr < 0.35: st.info("State: Loose")
+                elif Dr < 0.65: st.info("State: Medium Dense")
+                elif Dr < 0.85: st.info("State: Dense")
+                else: st.info("State: Very Dense")
+            else:
+                st.error("Check your inputs. e_max must be greater than e_min.")
