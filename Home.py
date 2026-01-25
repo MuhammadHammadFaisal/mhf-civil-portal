@@ -18,8 +18,10 @@ def get_active_modules():
                 try:
                     with open(os.path.join("pages", f), "r", encoding="utf-8") as file_content:
                         content = file_content.read()
+                        # Simple check to exclude files marked as construction
                         if "Module Under Construction" not in content:
                             clean_name = f.replace(".py", "").replace("_", " ").replace("-", " ")
+                            # Remove numbering like "01_Structure" -> "Structure"
                             parts = clean_name.split(" ", 1)
                             if parts[0].isdigit():
                                 clean_name = parts[1]
@@ -29,11 +31,17 @@ def get_active_modules():
     return sorted(active_modules)
 
 def main():
-    # --- [NEW] SIDEBAR LOGO (Nav Bar) ---
-    # This ensures the logo appears in the top-left sidebar like your other pages
-    st.logo(image="assets/logo.png", icon_image="assets/logo.png")
+    # --- [FIX] SIDEBAR LOGO ---
+    # This renders the logo in the top-left sidebar (Nav Bar) 
+    # 'image' is the large version (sidebar open)
+    # 'icon_image' is the small version (sidebar closed)
+    st.logo(
+        image="assets/logo.png", 
+        icon_image="assets/logo.png"
+    )
 
     # --- MAIN PAGE BODY LOGO ---
+    # This keeps the big logo in the center of the Home page
     col1, col2 = st.columns([1, 1]) 
     with col1:
         st.image("assets/logo.png", width=300) 
