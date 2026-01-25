@@ -76,7 +76,6 @@ def app():
                     layer_bot = depth_tracker + thickness
                     
                     # --- LOGIC TO DETERMINE REQUIRED INPUTS ---
-                    # Effective Water Table (Considering Capillary Rise)
                     eff_wt = water_depth - hc
                     
                     # 1. Is any part of layer DRY? (Above eff_wt)
@@ -90,13 +89,11 @@ def app():
                     g_sat_input = 20.0
                     
                     # --- RENDER INPUTS ---
-                    # Gamma Sat Input
                     if needs_sat:
                         g_sat_input = cols[2].number_input(f"γ_sat", value=20.0, key=f"gs{i}")
                     else:
                         cols[2].text_input(f"γ_sat", value="N/A", disabled=True, key=f"gs_dis_{i}")
 
-                    # Gamma Dry Input
                     if needs_dry:
                         g_dry_input = cols[3].number_input(f"γ_dry", value=17.0, key=f"gd{i}")
                     else:
@@ -175,26 +172,26 @@ def app():
         st.markdown("---")
         if st.button("Calculate Stress Profile", type="primary"):
             
-            # 1. CREATE Z-POINTS (Discretization)
-            # We must split the soil at:
-            # - Top (0)
-            # - Bottom (Total Depth)
-            # - Every Layer Interface
-            # - Water Table
-            # - Capillary Top
+            # --- 1. CREATE Z-POINTS (Every 1m + Critical Points) ---
             
-            z_points = {0.0, total_depth}
+            # Start with Critical Points (Boundaries, WT, Capillary)
+            z_points_set = {0.0, total_depth}
             cur = 0
             for l in layers:
                 cur += l['H']
-                z_points.add(round(cur, 3))
+                z_points_set.add(round(cur, 3))
             
-            if 0 < water_depth < total_depth: z_points.add(water_depth)
+            if 0 < water_depth < total_depth: z_points_set.add(water_depth)
             
             cap_top = water_depth - hc
-            if 0 < cap_top < total_depth: z_points.add(cap_top)
+            if 0 < cap_top < total_depth: z_points_set.add(cap_top)
                 
-            sorted_z = sorted(list(z_points))
+            # Add Regular 1m Intervals
+            # We create a range from 0 to Total Depth with step 1
+            for d in range(1, int(total_depth) + 1):
+                z_points_set.add(float(d))
+
+            sorted_z = sorted(list(z_points_set))
             
             results = []
             sigma_prev = surcharge
@@ -226,8 +223,6 @@ def app():
                             break
                     
                     # Decide which Gamma to use for THIS interval
-                    # If z_mid is above effective WT -> Dry
-                    # If z_mid is below effective WT -> Sat
                     eff_wt_boundary = water_depth - hc
                     
                     if z_mid > eff_wt_boundary:
@@ -242,8 +237,6 @@ def app():
                 # --- C. Excess Pore Pressure (Undrained Clay) ---
                 u_excess = 0.0
                 
-                # Check if we are in a clay layer at this depth
-                # To be precise at boundaries, we look slightly up if we are at the bottom of a layer
                 check_z = z
                 if i > 0 and z == total_depth: check_z = z - 0.01 
                 
@@ -255,10 +248,6 @@ def app():
                         if l['type'] == 'Clay': is_clay = True
                         break
                 
-                # Only apply excess pore pressure if:
-                # 1. Short Term Mode
-                # 2. It is Clay
-                # 3. It is BELOW water table (Saturated)
                 if "Short Term" in analysis_mode and is_clay and z > water_depth:
                     u_excess = surcharge
 
@@ -282,6 +271,7 @@ def app():
             c_res1, c_res2 = st.columns([1, 2])
             
             with c_res1:
+                # Format to 2 decimal places
                 st.dataframe(df.style.format("{:.2f}"))
             
             with c_res2:
