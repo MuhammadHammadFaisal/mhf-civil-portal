@@ -8,6 +8,37 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- CUSTOM CSS FOR GREEN CLICKABLE CARDS ---
+st.markdown("""
+<style>
+/* Target the Page Link buttons inside the main area */
+div[data-testid="stPageLink-NavLink"] {
+    background-color: #F0FDF4;  /* Light Green Background */
+    border: 1px solid #22c55e;   /* Green Border */
+    border-radius: 12px;         /* Rounded Corners */
+    padding: 20px;               /* Spacious Padding */
+    transition: all 0.3s ease;   /* Smooth Animation */
+    text-align: left;            /* Align Text Left */
+}
+
+/* Hover Effect */
+div[data-testid="stPageLink-NavLink"]:hover {
+    background-color: #DCFCE7;   /* Slightly Darker Green on Hover */
+    transform: translateY(-3px); /* Lift Up Effect */
+    box-shadow: 0 6px 12px rgba(34, 197, 94, 0.2); /* Green Shadow */
+    border-color: #16a34a;
+}
+
+/* Text Styling inside the link */
+div[data-testid="stPageLink-NavLink"] p {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #14532d !important;   /* Dark Green Text */
+    margin: 0;
+}
+</style>
+""", unsafe_allow_html=True)
+
 def get_active_modules():
     """
     Scans 'pages/' directory for active modules.
@@ -26,7 +57,6 @@ def get_active_modules():
                             parts = clean_name.split(" ", 1)
                             if parts[0].isdigit():
                                 clean_name = parts[1]
-                            # Append tuple: (filename, Title Case Name)
                             active_modules.append((f, clean_name.title()))
                 except Exception:
                     pass 
@@ -34,7 +64,6 @@ def get_active_modules():
 
 def main():
     # --- HERO SECTION ---
-    # Tight layout [1, 2] ratio with vertical centering
     try:
         col_logo, col_text = st.columns([1, 2], vertical_alignment="center")
     except TypeError:
@@ -44,7 +73,6 @@ def main():
         st.image("assets/logo.png", use_container_width=True) 
 
     with col_text:
-        # Pushes text slightly down to align with logo center
         st.markdown(
             """
             <div style="padding-top: 10px; padding-left: 10px;">
@@ -59,42 +87,25 @@ def main():
 
     st.markdown("---")
     
-    # --- AUTOMATIC DASHBOARD (UPDATED) ---
+    # --- AUTOMATIC DASHBOARD ---
     modules_list = get_active_modules()
 
     if modules_list:
         st.subheader("Active Course Calculators")
+        
+        # Grid Layout
         cols = st.columns(2)
         
-        # We iterate through (filename, title) tuples
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
-                with st.container(border=True):
-                    
-                    # 1. Module Title
-                    st.markdown(f"### {module_title}")
-                    
-                    # 2. Professional "Online" Badge (Green Pill Style)
-                    # This HTML creates a subtle green background with dark green text
-                    st.markdown(
-                        """
-                        <div style="margin-bottom: 15px;">
-                            <span style='background-color: #d1e7dd; color: #0f5132; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;'>
-                                ✅ ONLINE & VERIFIED
-                            </span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    
-                    # 3. Clickable Redirect Button
-                    # This creates a full-width button that links to the page
-                    st.page_link(
-                        f"pages/{file_name}", 
-                        label="Launch Calculator", 
-                        icon="🚀", 
-                        use_container_width=True
-                    )
+                # We render the entire card as a single clickable Page Link
+                # The CSS above turns this into a big green box
+                st.page_link(
+                    f"pages/{file_name}", 
+                    label=f"{module_title}\n✅ Online & Verified", 
+                    icon="🌿",  # Leaf icon for the green theme
+                    use_container_width=True
+                )
     
     # --- MISSION STATEMENT ---
     st.markdown("---")
