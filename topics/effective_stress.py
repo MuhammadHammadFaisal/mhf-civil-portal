@@ -39,20 +39,20 @@ def app():
             )
         
         with col_glob2:
-            st.info("💡 **Diagram Logic:** The schematic below updates automatically as you add layers or change the water table.")
+            st.info("💡 **Diagram Logic:** The schematic below updates automatically. Layers crossing the Water Table will require both Dry and Saturated Unit Weights.")
 
         st.divider()
 
         # -------------------------------------------------
         # 2. INPUTS (Side-by-Side with Visualizer)
         # -------------------------------------------------
-        col_input, col_viz = st.columns([1, 1])
+        col_input, col_viz = st.columns([1.1, 1])
 
         with col_input:
             st.markdown("### A. Global Parameters")
             c1, c2, c3 = st.columns(3)
             with c1:
-                water_depth = st.number_input("Water Table Depth (m)", value=2.0, step=0.5)
+                water_depth = st.number_input("Water Table Depth (m)", value=3.0, step=0.5)
             with c2:
                 hc = st.number_input("Capillary Rise (m)", value=0.0, step=0.1)
             with c3:
@@ -72,25 +72,39 @@ def app():
                     soil_type = cols[0].selectbox(f"Type", ["Sand", "Clay"], key=f"t{i}")
                     thickness = cols[1].number_input(f"Height (m)", 0.1, 20.0, 4.0, step=0.5, key=f"h{i}")
                     
-                    # Logic: Only ask for relevant Unit Weight
+                    layer_top = depth_tracker
                     layer_bot = depth_tracker + thickness
-                    is_sat = layer_bot > (water_depth - hc)
                     
-                    if is_sat:
-                        g_sat = cols[2].number_input(f"γ_sat", value=20.0, key=f"gs{i}")
-                        g_dry = 18.0 # Default
-                    else:
-                        g_sat = 20.0 # Default
-                        cols[2].markdown("*(Dry)*")
+                    # --- LOGIC TO DETERMINE REQUIRED INPUTS ---
+                    # Effective Water Table (Considering Capillary Rise)
+                    eff_wt = water_depth - hc
                     
-                    if not is_sat:
-                        g_dry = cols[3].number_input(f"γ_dry", value=18.0, key=f"gd{i}")
+                    # 1. Is any part of layer DRY? (Above eff_wt)
+                    needs_dry = layer_top < eff_wt
+                    
+                    # 2. Is any part of layer WET? (Below eff_wt)
+                    needs_sat = layer_bot > eff_wt
+                    
+                    # 3. Default Values
+                    g_dry_input = 17.0
+                    g_sat_input = 20.0
+                    
+                    # --- RENDER INPUTS ---
+                    # Gamma Sat Input
+                    if needs_sat:
+                        g_sat_input = cols[2].number_input(f"γ_sat", value=20.0, key=f"gs{i}")
                     else:
-                        cols[3].markdown("*(Sat)*")
+                        cols[2].text_input(f"γ_sat", value="N/A", disabled=True, key=f"gs_dis_{i}")
+
+                    # Gamma Dry Input
+                    if needs_dry:
+                        g_dry_input = cols[3].number_input(f"γ_dry", value=17.0, key=f"gd{i}")
+                    else:
+                        cols[3].text_input(f"γ_dry", value="N/A", disabled=True, key=f"gd_dis_{i}")
 
                     layers.append({
                         "type": soil_type, "H": thickness, 
-                        "g_sat": g_sat, "g_dry": g_dry, 
+                        "g_sat": g_sat_input, "g_dry": g_dry_input, 
                         "color": colors[soil_type]
                     })
                     depth_tracker += thickness
@@ -98,53 +112,49 @@ def app():
             total_depth = depth_tracker
 
         # -------------------------------------------------
-        # 3. SOIL PROFILE VISUALIZER (The "Correct" Diagram)
+        # 3. SOIL PROFILE VISUALIZER
         # -------------------------------------------------
         with col_viz:
             st.markdown("### Soil Profile Preview")
             
-            # Create Plot
             fig, ax = plt.subplots(figsize=(6, 5))
             
-            # 1. Draw Surcharge (q) Arrows
+            # Draw Surcharge
             if surcharge > 0:
-                arrow_y_start = -0.5  # Slightly above ground
-                arrow_y_end = 0       # Ground surface
                 for x in np.linspace(0.5, 4.5, 8):
-                    ax.arrow(x, arrow_y_start, 0, 0.4, head_width=0.15, head_length=0.1, fc='red', ec='red')
+                    ax.arrow(x, -0.5, 0, 0.4, head_width=0.15, head_length=0.1, fc='red', ec='red')
                 ax.text(2.5, -0.6, f"q = {surcharge} kPa", ha='center', color='red', fontweight='bold')
 
-            # 2. Draw Layers
+            # Draw Layers
             current_depth = 0
             for lay in layers:
-                # Rectangle (x, y, width, height)
-                # Note: y increases downwards in our logic, but matplotlib y increases upwards.
-                # We will invert y-axis at the end.
                 rect = patches.Rectangle((0, current_depth), 5, lay['H'], facecolor=lay['color'], edgecolor='black')
                 ax.add_patch(rect)
                 
-                # Center Text (Layer Info)
                 mid_y = current_depth + lay['H']/2
-                label_text = f"{lay['type']}\n"
                 
-                # Check which gamma is active for display
-                if mid_y > (water_depth - hc):
-                    label_text += f"$\\gamma_{{sat}}={lay['g_sat']}$"
-                else:
-                    label_text += f"$\\gamma_{{dry}}={lay['g_dry']}$"
+                # Dynamic Labeling based on what inputs were active
+                l_top = current_depth
+                l_bot = current_depth + lay['H']
+                eff_wt = water_depth - hc
                 
-                ax.text(2.5, mid_y, label_text, ha='center', va='center', fontsize=9)
-                
-                # Height Dimension
+                label = f"{lay['type']}\n"
+                if l_top < eff_wt and l_bot > eff_wt: # Crossing
+                    label += f"$\\gamma_{{d}}={lay['g_dry']}$ / $\\gamma_{{s}}={lay['g_sat']}$"
+                elif l_bot <= eff_wt: # Fully Dry
+                    label += f"$\\gamma_{{dry}}={lay['g_dry']}$"
+                else: # Fully Sat
+                    label += f"$\\gamma_{{sat}}={lay['g_sat']}$"
+
+                ax.text(2.5, mid_y, label, ha='center', va='center', fontsize=8)
                 ax.text(-0.2, mid_y, f"{lay['H']}m", ha='right', va='center', fontsize=9)
-                
                 current_depth += lay['H']
 
-            # 3. Draw Water Table
+            # Draw Water Table
             ax.axhline(water_depth, color='blue', linestyle='--', linewidth=2)
             ax.text(5.1, water_depth, "WT ▽", color='blue', va='center')
 
-            # 4. Capillary Rise
+            # Draw Capillary Rise
             if hc > 0:
                 cap_top = water_depth - hc
                 if cap_top < 0: cap_top = 0
@@ -152,12 +162,9 @@ def app():
                 ax.add_patch(rect_cap)
                 ax.text(5.1, cap_top, f"Capillary\n({hc}m)", color='blue', va='center', fontsize=8)
 
-            # Styling
             ax.set_xlim(-1, 6)
-            ax.set_ylim(total_depth * 1.1, -1.5) # Invert Y-axis to show depth downwards
-            ax.axis('off') # Turn off standard axis
-            
-            # Ground Line
+            ax.set_ylim(total_depth * 1.1, -1.5)
+            ax.axis('off')
             ax.plot([0, 5], [0, 0], 'k-', linewidth=2) 
             
             st.pyplot(fig)
@@ -168,7 +175,14 @@ def app():
         st.markdown("---")
         if st.button("Calculate Stress Profile", type="primary"):
             
-            # Discretize Depths
+            # 1. CREATE Z-POINTS (Discretization)
+            # We must split the soil at:
+            # - Top (0)
+            # - Bottom (Total Depth)
+            # - Every Layer Interface
+            # - Water Table
+            # - Capillary Top
+            
             z_points = {0.0, total_depth}
             cur = 0
             for l in layers:
@@ -176,9 +190,9 @@ def app():
                 z_points.add(round(cur, 3))
             
             if 0 < water_depth < total_depth: z_points.add(water_depth)
-            if hc > 0:
-                ct = water_depth - hc
-                if 0 < ct < total_depth: z_points.add(ct)
+            
+            cap_top = water_depth - hc
+            if 0 < cap_top < total_depth: z_points.add(cap_top)
                 
             sorted_z = sorted(list(z_points))
             
@@ -186,21 +200,23 @@ def app():
             sigma_prev = surcharge
             z_prev = 0.0
             
+            # 2. CALCULATION LOOP
             for i, z in enumerate(sorted_z):
-                # Pore Pressure
+                
+                # --- A. Pore Pressure (u) ---
                 if z > water_depth:
                     u = (z - water_depth) * gamma_w
                 elif z > (water_depth - hc):
-                    u = -(water_depth - z) * gamma_w
+                    u = -(water_depth - z) * gamma_w # Suction
                 else:
                     u = 0.0
                 
-                # Total Stress
+                # --- B. Total Stress (Sigma) ---
                 if i > 0:
                     dz = z - z_prev
                     z_mid = (z + z_prev)/2
                     
-                    # Find Layer
+                    # Find which layer z_mid is in
                     d_search = 0
                     active_l = layers[-1]
                     for l in layers:
@@ -209,37 +225,59 @@ def app():
                             active_l = l
                             break
                     
-                    # Gamma
-                    gam = active_l['g_sat'] if z_mid > (water_depth - hc) else active_l['g_dry']
+                    # Decide which Gamma to use for THIS interval
+                    # If z_mid is above effective WT -> Dry
+                    # If z_mid is below effective WT -> Sat
+                    eff_wt_boundary = water_depth - hc
+                    
+                    if z_mid > eff_wt_boundary:
+                        gam = active_l['g_sat']
+                    else:
+                        gam = active_l['g_dry']
+                        
                     sigma = sigma_prev + (gam * dz)
                 else:
                     sigma = surcharge
 
-                # Excess Pore Pressure (Short Term Clay)
+                # --- C. Excess Pore Pressure (Undrained Clay) ---
                 u_excess = 0.0
-                # Check if Clay
-                check_d = 0
+                
+                # Check if we are in a clay layer at this depth
+                # To be precise at boundaries, we look slightly up if we are at the bottom of a layer
+                check_z = z
+                if i > 0 and z == total_depth: check_z = z - 0.01 
+                
+                d_check = 0
                 is_clay = False
                 for l in layers:
-                    check_d += l['H']
-                    if z <= check_d and z > (check_d - l['H']):
+                    d_check += l['H']
+                    if check_z <= d_check:
                         if l['type'] == 'Clay': is_clay = True
                         break
                 
+                # Only apply excess pore pressure if:
+                # 1. Short Term Mode
+                # 2. It is Clay
+                # 3. It is BELOW water table (Saturated)
                 if "Short Term" in analysis_mode and is_clay and z > water_depth:
                     u_excess = surcharge
 
                 u_tot = u + u_excess
                 sig_eff = sigma - u_tot
                 
-                results.append({"Depth (z)": z, "Total Stress (σ)": sigma, "Pore Pressure (u)": u_tot, "Eff. Stress (σ')": sig_eff})
+                results.append({
+                    "Depth (z)": z, 
+                    "Total Stress (σ)": sigma, 
+                    "Pore Pressure (u)": u_tot, 
+                    "Eff. Stress (σ')": sig_eff
+                })
                 
                 sigma_prev = sigma
                 z_prev = z
             
             df = pd.DataFrame(results)
             
-            # Display Results
+            # 3. DISPLAY RESULTS
             st.markdown("### Results")
             c_res1, c_res2 = st.columns([1, 2])
             
@@ -255,9 +293,13 @@ def app():
                 ax_res.invert_yaxis()
                 ax_res.set_xlabel("Stress (kPa)")
                 ax_res.set_ylabel("Depth (m)")
-                ax_res.grid(True, linestyle="--")
+                ax_res.grid(True, linestyle="--", alpha=0.6)
                 ax_res.legend()
                 ax_res.set_title("Stress Distribution")
+                
+                # Draw WT line on graph
+                ax_res.axhline(water_depth, color='blue', linestyle='-.', alpha=0.5)
+                
                 st.pyplot(fig_res)
 
     # =====================================================
