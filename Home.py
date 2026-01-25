@@ -18,10 +18,8 @@ def get_active_modules():
                 try:
                     with open(os.path.join("pages", f), "r", encoding="utf-8") as file_content:
                         content = file_content.read()
-                        # Simple check to exclude files marked as construction
                         if "Module Under Construction" not in content:
                             clean_name = f.replace(".py", "").replace("_", " ").replace("-", " ")
-                            # Remove numbering like "01_Structure" -> "Structure"
                             parts = clean_name.split(" ", 1)
                             if parts[0].isdigit():
                                 clean_name = parts[1]
@@ -31,31 +29,32 @@ def get_active_modules():
     return sorted(active_modules)
 
 def main():
-    # --- [FIX] SIDEBAR LOGO ---
-    # This renders the logo in the top-left sidebar (Nav Bar) 
-    # 'image' is the large version (sidebar open)
-    # 'icon_image' is the small version (sidebar closed)
-    st.logo(
-        image="assets/logo.png", 
-        icon_image="assets/logo.png"
-    )
+    # --- MAIN PAGE HERO SECTION ---
+    # We use 3 columns to center the content professionally
+    col_left, col_center, col_right = st.columns([1, 2, 1])
 
-    # --- MAIN PAGE BODY LOGO ---
-    # This keeps the big logo in the center of the Home page
-    col1, col2 = st.columns([1, 1]) 
-    with col1:
-        st.image("assets/logo.png", width=300) 
-    
-    # --- HEADER ---
-    st.markdown("# MHF Civil Portal")
-    st.caption("Deterministic Civil Engineering Computation Platform")
+    with col_center:
+        # Display logo centered
+        st.image("assets/logo.png", use_container_width=True) 
+        
+        # Display Title and Caption Centered
+        st.markdown(
+            """
+            <div style='text-align: center;'>
+                <h1>MHF Civil Portal</h1>
+                <p style='color: gray; font-size: 18px;'>Deterministic Civil Engineering Computation Platform</p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
     st.markdown("---")
     
     # --- AUTOMATIC DASHBOARD ---
     available_modules = get_active_modules()
 
     if available_modules:
-        st.subheader("Active Course Calculator")
+        st.subheader("Active Course Calculators")
         cols = st.columns(2)
         for index, module_name in enumerate(available_modules):
             with cols[index % 2]:
@@ -83,7 +82,7 @@ def main():
     **Final Year Civil Engineering Student (METU)** Founder — MHF Civil
     
     MHF Civil is built on a simple principle:  
-    **engineering results should be reproducible, transparent, and mathematically defensible.**
+    **Engineering results should be reproducible, transparent, and mathematically defensible.**
     """)
 
     st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229")
