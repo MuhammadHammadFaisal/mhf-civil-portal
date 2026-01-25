@@ -100,7 +100,6 @@ def app():
                     # --- 4. REVERSE CALCULATIONS (Find e from Gamma) ---
                     # Find e from Gamma Bulk
                     if known('gamma_bulk') and known('Gs') and known('w') and not known('e'):
-                        # Derivation: gamma_bulk = Gs(1+w)gamma_w / (1+e) -> 1+e = ...
                         val = (p['Gs'] * (1 + p['w']) * self.gamma_w) / p['gamma_bulk']
                         p['e'] = val - 1
                         self.add_log('e', r'\frac{G_s(1+w)\gamma_w}{\gamma_{bulk}} - 1', r'Calc...', p['e'])
@@ -108,7 +107,6 @@ def app():
 
                     # Find e from Gamma Dry
                     if known('gamma_dry') and known('Gs') and not known('e'):
-                        # Derivation: gamma_dry = Gs*gamma_w / (1+e)
                         val = (p['Gs'] * self.gamma_w) / p['gamma_dry']
                         p['e'] = val - 1
                         self.add_log('e', r'\frac{G_s \gamma_w}{\gamma_{dry}} - 1', r'Calc...', p['e'])
@@ -133,7 +131,7 @@ def app():
         # --- DRAWING FUNCTION ---
         def draw_phase_diagram(solver_params):
             """Generates the 3-phase diagram using Matplotlib based on calculated results."""
-            # Extract basic params needed for drawing (Use defaults if missing to avoid crash)
+            # Extract basic params
             e = solver_params.get('e', 0.5)
             if e is None: e = 0.5
             
@@ -145,79 +143,84 @@ def app():
 
             w = solver_params.get('w', 0.1)
             
-            # Assumptions for Phase Diagram (Basis: Vs = 1)
+            # Assumptions (Vs = 1)
             Vs = 1.0
             Vv = e
             Vw = Sr * e
             Va = Vv - Vw
             
-            Ms = Gs # Since rho_w = 1 g/cm3 implicitly in this unitless scaling
-            Mw = w * Ms if w is not None else Vw * 1.0 # Fallback
+            Ms = Gs 
+            Mw = w * Ms if w is not None else Vw * 1.0 
             Ma = 0
 
-            # Plot Setup
-            fig, ax = plt.subplots(figsize=(3, 2.5))
-            ax.set_xlim(-1, 2)
-            ax.set_ylim(0, 1 + e + 0.2)
+            # Plot Setup - Wider Figure for clearer labels
+            fig, ax = plt.subplots(figsize=(8, 6)) 
+            
+            # Widen the X-axis limits so text doesn't overlap
+            ax.set_xlim(-2.0, 3.0) 
+            ax.set_ylim(0, max(1.5, 1 + e + 0.5)) 
             ax.axis('off')
 
             # --- DRAW RECTANGLES ---
-            # 1. Solids (Bottom)
+            # 1. Solids (Bottom) - Always drawn
             ax.add_patch(patches.Rectangle((0, 0), 1, Vs, linewidth=2, edgecolor='black', facecolor='#D2B48C'))
-            ax.text(0.5, Vs/2, 'Solids (S)', ha='center', va='center', fontsize=12, fontweight='bold')
+            ax.text(0.5, Vs/2, 'Solids (S)', ha='center', va='center', fontsize=10, fontweight='bold')
 
             # 2. Water (Middle)
             if Vw > 0:
                 ax.add_patch(patches.Rectangle((0, Vs), 1, Vw, linewidth=2, edgecolor='black', facecolor='#87CEEB'))
-                ax.text(0.5, Vs + Vw/2, 'Water (W)', ha='center', va='center', fontsize=12, fontweight='bold')
+                # ONLY draw text if the layer is thick enough (>0.15)
+                if Vw > 0.15:
+                    ax.text(0.5, Vs + Vw/2, 'Water (W)', ha='center', va='center', fontsize=10, fontweight='bold')
 
             # 3. Air (Top)
-            if Va > 0.01:
+            if Va > 0.001:
                 ax.add_patch(patches.Rectangle((0, Vs + Vw), 1, Va, linewidth=2, edgecolor='black', facecolor='#F0F8FF'))
-                ax.text(0.5, Vs + Vw + Va/2, 'Air (A)', ha='center', va='center', fontsize=12, fontweight='bold')
+                # ONLY draw text if the layer is thick enough (>0.15)
+                if Va > 0.15:
+                    ax.text(0.5, Vs + Vw + Va/2, 'Air (A)', ha='center', va='center', fontsize=10, fontweight='bold')
 
             # --- ANNOTATIONS (LEFT - VOLUMES) ---
             # Header
-            ax.text(-0.5, 1+e+0.1, r'$Volume \ (V)$', ha='center', fontsize=10, fontweight='bold')
+            ax.text(-0.8, 1+e+0.2, r'$Volume \ (V)$', ha='center', fontsize=11, fontweight='bold')
             
             # Vs Label
-            ax.text(0, Vs/2, f'$V_s = {Vs}$ ', ha='right', va='center')
+            ax.text(-0.1, Vs/2, f'$V_s = {Vs}$ ', ha='right', va='center', fontsize=10)
             
             # Vw Label
             if Vw > 0:
-                ax.text(0, Vs + Vw/2, f'$V_w = {Vw:.2f}$ ', ha='right', va='center')
+                ax.text(-0.1, Vs + Vw/2, f'$V_w = {Vw:.2f}$ ', ha='right', va='center', fontsize=10)
             
             # Va Label
-            if Va > 0.01:
-                ax.text(0, Vs + Vw + Va/2, f'$V_a = {Va:.2f}$ ', ha='right', va='center')
+            if Va > 0.001:
+                ax.text(-0.1, Vs + Vw + Va/2, f'$V_a = {Va:.2f}$ ', ha='right', va='center', fontsize=10)
 
-            # Curly Brace for 'e' (Void Ratio)
+            # Curly Brace for 'e'
             if Vv > 0:
-                brace_x = -0.6
+                brace_x = -0.8
                 brace_y_bottom = Vs
                 brace_y_top = Vs + Vv
-                # Draw main line
+                # Draw brace lines
                 ax.plot([brace_x, brace_x], [brace_y_bottom, brace_y_top], color='black', lw=1)
-                # Draw top/bottom ticks
                 ax.plot([brace_x, brace_x + 0.1], [brace_y_bottom, brace_y_bottom], color='black', lw=1)
                 ax.plot([brace_x, brace_x + 0.1], [brace_y_top, brace_y_top], color='black', lw=1)
                 # Label
-                ax.text(brace_x - 0.1, Vs + Vv/2, f'$e = {e:.3f}$', ha='right', va='center', fontsize=12, color='red')
+                ax.text(brace_x - 0.1, Vs + Vv/2, f'$e = {e:.3f}$', ha='right', va='center', fontsize=12, color='red', fontweight='bold')
 
             # --- ANNOTATIONS (RIGHT - MASSES) ---
             # Header
-            ax.text(1.5, 1+e+0.1, r'$Mass \ (M)$', ha='center', fontsize=10, fontweight='bold')
+            ax.text(1.8, 1+e+0.2, r'$Mass \ (M)$', ha='center', fontsize=11, fontweight='bold')
             
             # Ms Label
-            ax.text(1.05, Vs/2, f'$M_s = {Ms:.2f}$', ha='left', va='center')
+            ax.text(1.1, Vs/2, f'$M_s = {Ms:.2f}$', ha='left', va='center', fontsize=10)
             
             # Mw Label
             if Vw > 0:
-                ax.text(1.05, Vs + Vw/2, f'$M_w = {Mw:.2f}$', ha='left', va='center')
+                ax.text(1.1, Vs + Vw/2, f'$M_w = {Mw:.2f}$', ha='left', va='center', fontsize=10)
             
             # Ma Label
-            if Va > 0.01:
-                ax.text(1.05, Vs + Vw + Va/2, f'$M_a = 0$', ha='left', va='center')
+            if Va > 0.001:
+                ax.text(1.1, Vs + Vw + Va/2, f'$M_a = 0$', ha='left', va='center', fontsize=10)
 
             return fig
 
@@ -259,7 +262,7 @@ def app():
             
             # 1. Standard Results
             if solver.log:
-                with st.expander("View Step-by-Step Solution", expanded=False):
+                with st.expander("📝 View Step-by-Step Solution", expanded=False):
                     for step in solver.log:
                         st.markdown(f"**Found ${step['Variable']}$:**")
                         st.latex(f"{step['Variable']} = {step['Formula']} = {step['Substitution']} = \\mathbf{{{step['Result']:.4f}}}")
