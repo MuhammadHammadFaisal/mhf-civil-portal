@@ -7,7 +7,7 @@ from topics import flow_water
 st.set_page_config(page_title="Soil Mechanics", page_icon="", layout="wide")
 
 st.header("Soil Mechanics")
-st.logo("assets/logo.png")  # Replace with your actual file path
+
 # THE MENU
 topic = st.selectbox("Select Topic:", [
     "Phase Relationships",
