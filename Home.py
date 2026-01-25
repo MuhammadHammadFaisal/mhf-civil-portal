@@ -8,34 +8,40 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CUSTOM CSS FOR GREEN CLICKABLE CARDS ---
+# --- CUSTOM CSS: TURN LINKS INTO SOLID GREEN BUTTONS ---
 st.markdown("""
 <style>
-/* 1. Target the Page Link Card Container */
+/* 1. The Button Container */
 div[data-testid="stPageLink-NavLink"] {
-    background-color: #dcfce7;   /* Light Green Background */
-    border: 2px solid #22c55e;   /* Strong Green Border */
-    border-radius: 10px;
-    padding: 15px;
-    transition: all 0.2s ease-in-out;
-    text-align: center;          /* Center text */
+    background-color: #198754;   /* SOLID GREEN (Bootstrap Success Color) */
+    border: 2px solid #198754;   /* Matching Border */
+    border-radius: 8px;          /* Slightly rounded like a button */
+    padding: 15px;               /* Comfortable padding */
+    transition: all 0.2s ease;   /* Smooth click animation */
+    text-align: center;          /* Center the text */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Subtle shadow for depth */
 }
 
-/* 2. Hover Effect */
+/* 2. Hover Effect (Brightens up) */
 div[data-testid="stPageLink-NavLink"]:hover {
-    background-color: #bbf7d0;   /* Slightly Darker Green */
-    transform: scale(1.02);      /* Slight Zoom Pop */
-    box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3);
-    border-color: #15803d;
+    background-color: #157347;   /* Darker Green on Hover */
+    border-color: #146c43;
+    transform: translateY(-2px); /* Button 'lifts' when hovered */
+    box-shadow: 0 6px 12px rgba(25, 135, 84, 0.3); /* Green Glow */
 }
 
-/* 3. Text Styling & New Line Enforcement */
+/* 3. Text Styling (Force White Text) */
 div[data-testid="stPageLink-NavLink"] p {
-    color: #14532d !important;      /* Dark Green Text */
-    font-size: 18px !important;
-    font-weight: 700 !important;
-    line-height: 1.5 !important;    /* Space between lines */
-    white-space: pre-wrap !important; /* CRITICAL: Forces \n to create a new line */
+    color: white !important;        /* White text */
+    font-size: 18px !important;     /* Larger text */
+    font-weight: 700 !important;    /* Bold */
+    line-height: 1.4 !important;
+    white-space: pre-wrap !important; /* Respects the new line */
+    margin: 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -98,11 +104,11 @@ def main():
         
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
-                # We use \n to break the line
-                # The CSS 'white-space: pre-wrap' ensures this \n is respected
+                # FIXED: Removed 'type="primary"' (which caused the crash)
+                # The CSS above now handles the Green Color automatically.
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n Online & Verified", type="primary" 
+                    label=f"{module_title}\n✅ Online & Verified", 
                     use_container_width=True
                 )
     
@@ -145,4 +151,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
