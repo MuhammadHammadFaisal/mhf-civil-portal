@@ -1,1 +1,2 @@
-
+[server]
+runOnSave = false  # <--- DELETE THIS LINE if it exists
