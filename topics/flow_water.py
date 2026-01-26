@@ -96,7 +96,7 @@ def app():
 
 
     # =================================================================
-    # TAB 2: PERMEABILITY (Lab Tests) - UPDATED RESULT DISPLAY
+    # TAB 2: PERMEABILITY (Lab Tests) - UPDATED DIAGRAMS
     # =================================================================
     with tab2:
         st.caption("Calculate Coefficient of Permeability (k). Input variables are marked on the diagram.")
@@ -121,13 +121,8 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A*h*t > 0: 
                         k_val = (Q*L)/(A*h*t)
-                        # --- NEW PROFESSIONAL RESULT DISPLAY ---
-                        st.markdown(f"""
-                        <div style="background-color: #d1e7dd; padding: 20px; border-radius: 10px; border: 1px solid #0f5132; text-align: center; margin-top: 20px;">
-                            <p style="color: #0f5132; margin-bottom: 5px; font-size: 16px; font-weight: 600;">Permeability Coefficient (k)</p>
-                            <h2 style="color: #0f5132; margin: 0; font-size: 32px; font-weight: 800;">{k_val:.4e} cm/sec</h2>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.success("Calculation Successful")
+                        st.metric("Permeability Coefficient (k)", f"{k_val:.4e} cm/sec")
                     else:
                         st.error("Inputs must be positive.")
 
@@ -146,13 +141,8 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A_soil*t_fall > 0 and h2 > 0: 
                         k_val = (2.303*a*L_fall/(A_soil*t_fall))*np.log10(h1/h2)
-                        # --- NEW PROFESSIONAL RESULT DISPLAY ---
-                        st.markdown(f"""
-                        <div style="background-color: #d1e7dd; padding: 20px; border-radius: 10px; border: 1px solid #0f5132; text-align: center; margin-top: 20px;">
-                            <p style="color: #0f5132; margin-bottom: 5px; font-size: 16px; font-weight: 600;">Permeability Coefficient (k)</p>
-                            <h2 style="color: #0f5132; margin: 0; font-size: 32px; font-weight: 800;">{k_val:.4e} cm/sec</h2>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.success("Calculation Successful")
+                        st.metric("Permeability Coefficient (k)", f"{k_val:.4e} cm/sec")
                     else:
                         st.error("Inputs invalid. h2 must be > 0.")
 
@@ -169,9 +159,11 @@ def app():
 
             if "Constant" in test_type:
                 # --- CONSTANT HEAD (Vertical Stack) ---
+                
                 # 1. Top Supply Tank (y=8 to 9.5)
                 ax2.add_patch(patches.Rectangle((2, 8), 4, 1.5, facecolor=water_color, edgecolor=wall_color))
                 ax2.text(2.2, 8.2, "Supply\nTank", fontsize=8)
+                # Top Water Level
                 ax2.plot([2, 6], [9, 9], 'b-', lw=2)
                 ax2.plot(4, 9, marker='v', color='blue')
                 
@@ -185,58 +177,82 @@ def app():
                 ax2.text(4, 5, "SOIL\nArea A", ha='center', va='center', fontweight='bold')
                 
                 # 4. Bottom Outlet Tank (y=1 to 2.5)
+                # Connection Pipe
                 ax2.add_patch(patches.Rectangle((3.8, 2.5), 0.4, 1.5, facecolor=water_color, edgecolor='none'))
                 ax2.plot([3.8, 3.8], [2.5, 4], 'k-')
                 ax2.plot([4.2, 4.2], [2.5, 4], 'k-')
+                
+                # The Tank
                 ax2.add_patch(patches.Rectangle((3.5, 1), 3, 1.5, facecolor=water_color, edgecolor=wall_color))
                 ax2.text(6, 0.5, "Collection\nTank", ha='center')
-                ax2.plot([3.5, 6.5], [2.2, 2.2], 'b-', lw=2)
+                # Outlet Water Level (Constant)
+                ax2.plot([3.5, 6.5], [2.2, 2.2], 'b-', lw=2) # Outlet level
                 ax2.plot(6, 2.2, marker='v', color='blue')
 
-                # Dimensions
+                # --- DIMENSIONS (THE IMPORTANT PART) ---
+                
+                # Dimension h (Total Head Difference)
+                # From Top Level (9) to Bottom Level (2.2)
                 ax2.annotate('', xy=(8, 2.2), xytext=(8, 9), arrowprops=dict(arrowstyle='<->', lw=1.5))
                 ax2.text(8.2, 5.5, "h (Head Diff)", ha='left', fontweight='bold', fontsize=12, color='blue')
+                # Extension lines
                 ax2.plot([6, 8.2], [9, 9], 'k--', lw=0.5)
                 ax2.plot([6.5, 8.2], [2.2, 2.2], 'k--', lw=0.5)
 
+                # Dimension L (Soil Length)
                 ax2.annotate('', xy=(1.5, 4), xytext=(1.5, 6), arrowprops=dict(arrowstyle='<->', lw=1.5))
                 ax2.text(1.2, 5, "L", ha='right', fontweight='bold', fontsize=12)
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5)
                 ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
                 
+                # Q (Volume)
                 ax2.text(6.8, 1.5, "-> Q (Vol)", ha='left', fontstyle='italic')
 
             else:
                 # --- FALLING HEAD (Standpipe on Top) ---
+                
+                # 1. Standpipe (Narrow) y=6 to 9.5
                 ax2.add_patch(patches.Rectangle((3.8, 6), 0.4, 3.5, facecolor=water_color, edgecolor=wall_color))
                 ax2.text(3.5, 8, "Standpipe\n(Area a)", ha='right', fontsize=9)
                 
+                # 2. Soil Chamber y=4 to 6
                 ax2.add_patch(patches.Rectangle((3, 4), 2, 2, facecolor=soil_color, hatch='X', edgecolor=wall_color, lw=2))
                 ax2.text(4, 5, "SOIL\nArea A", ha='center', va='center', fontweight='bold')
                 
+                # 3. Bottom Tank y=1 to 2
+                # Connection
                 ax2.add_patch(patches.Rectangle((3.8, 2), 0.4, 2, facecolor=water_color, edgecolor='none'))
                 ax2.plot([3.8, 3.8], [2, 4], 'k-')
                 ax2.plot([4.2, 4.2], [2, 4], 'k-')
+                # Tank
                 ax2.add_patch(patches.Rectangle((3.5, 1), 3, 1.5, facecolor=water_color, edgecolor=wall_color))
-                ax2.plot([3.5, 6.5], [2, 2], 'b-', lw=2)
+                ax2.plot([3.5, 6.5], [2, 2], 'b-', lw=2) # Bottom Constant Level
                 ax2.plot(6, 2, marker='v', color='blue')
 
-                # Dimensions
+                # --- DIMENSIONS ---
+                
+                # Water Levels in Standpipe
+                # h1 (Start)
                 ax2.plot([3.8, 4.2], [9, 9], 'r-', lw=2)
                 ax2.text(4.4, 9, "Start", fontsize=8, color='red')
+                # h2 (End)
                 ax2.plot([3.8, 4.2], [7, 7], 'r-', lw=2)
                 ax2.text(4.4, 7, "End", fontsize=8, color='red')
 
+                # Dimension h1 (From Bottom Level to Start)
                 ax2.annotate('', xy=(8, 2), xytext=(8, 9), arrowprops=dict(arrowstyle='<->', color='red'))
                 ax2.text(8.2, 9, "h1", ha='left', fontweight='bold', color='red')
                 ax2.plot([4.2, 8.2], [9, 9], 'r--', lw=0.5)
                 
+                # Dimension h2 (From Bottom Level to End)
                 ax2.annotate('', xy=(7, 2), xytext=(7, 7), arrowprops=dict(arrowstyle='<->', color='red'))
                 ax2.text(7.2, 7, "h2", ha='left', fontweight='bold', color='red')
                 ax2.plot([4.2, 7.2], [7, 7], 'r--', lw=0.5)
                 
+                # Extension for bottom level
                 ax2.plot([6.5, 8.2], [2, 2], 'b--', lw=0.5)
 
+                # Dimension L (Soil Length)
                 ax2.annotate('', xy=(1.5, 4), xytext=(1.5, 6), arrowprops=dict(arrowstyle='<->', lw=1.5))
                 ax2.text(1.2, 5, "L", ha='right', fontweight='bold', fontsize=12)
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5)
