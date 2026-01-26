@@ -37,11 +37,7 @@ def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, y_
         delta_h = 0
         
     # 3. Total Head at Point (H_point)
-    # H_point is relative to the upstream water level reference
-    # We assume upstream water level is at elevation h_upstream relative to ground 0
-    # But usually in flow nets, Total Head is defined relative to the Tail Water or a Datum.
-    # Standard Convention: Total Head = Elevation Head + Pressure Head
-    # Let's assume the input h_upstream is the Total Head at the start.
+    # H_point = H_upstream - (n_d * delta_h)
     h_point = h_upstream - (drops_passed * delta_h)
     
     # 4. Elevation Head (z)
@@ -354,14 +350,14 @@ def app():
 
             st.pyplot(fig2)
 
- # =================================================================
-    # TAB 3: FLOW NETS (TEXTBOOK SOLVER + VISUALS)
+# =================================================================
+    # TAB 3: FLOW NETS (TEXTBOOK SOLVER + CORRECT VISUALS)
     # =================================================================
     with tab3:
         st.markdown("### Flow Net Analysis")
         st.caption("Solve Flow Net problems for Dams or Sheet Piles using the counting method.")
         
-        col_input, col_plot = st.columns([1, 1.1])
+        col_input, col_plot = st.columns([1, 1.2])
 
         with col_input:
             # --- 1. VISUAL SETUP ---
@@ -390,7 +386,7 @@ def app():
 
             c_p1, c_p2, c_p3 = st.columns(3)
             # Default values adjust based on structure for better UX
-            def_x = 2.5 if struct_type == "Sheet Pile" else 0.0
+            def_x = 2.0 if struct_type == "Sheet Pile" else 4.0
             def_y = -4.0
             
             x_point = c_p1.number_input("Point X [m]", value=def_x, step=0.5)
@@ -435,63 +431,94 @@ def app():
                 st.latex(rf"z = Y_{{pt}} - Y_{{datum}} = {y_point} - ({datum}) = {results['z']:.2f} \text{{ m}}")
                 st.latex(rf"\frac{{u}}{{\gamma_w}} = H_{{point}} - z = {results['h_point']:.2f} - ({results['z']:.2f}) = {results['hp']:.2f} \text{{ m}}")
                 st.latex(rf"u = {results['hp']:.2f} \times 9.81 = \mathbf{{{results['u']:.2f} \text{{ kPa}}}}")
-
+        
         with col_plot:
             fig, ax = plt.subplots(figsize=(6, 6))
-            ax.set_xlim(-8, 8)
-            ax.set_ylim(-10, 6)
+            ax.set_xlim(-10, 10)
+            ax.set_ylim(-12, 6)
             ax.set_aspect('equal')
             
-            # Grid & Datum
-            ax.grid(True, which='both', linestyle='--', linewidth=0.5, color='gray', alpha=0.5, zorder=0)
-            ax.axhline(0, color='black', linewidth=1) 
-            ax.axhline(datum, color='green', linewidth=2, linestyle='-.', zorder=1)
-            ax.text(-7.5, datum + 0.2, f"DATUM (z=0) @ {datum}m", color='green', fontweight='bold', fontsize=9)
+            # --- 1. SETUP GRID & AXIS ---
+            ax.axhline(0, color='black', linewidth=1.5) # Ground line
+            
+            # Datum Line
+            ax.axhline(datum, color='green', linewidth=1.5, linestyle='-.', zorder=1)
+            ax.text(-9.5, datum + 0.2, f"DATUM (z=0)", color='green', fontweight='bold', fontsize=8)
 
-            # --- DYNAMIC STRUCTURE DRAWING ---
-            gx = np.linspace(-8, 8, 100)
-            gy = np.linspace(-10, 0, 100)
+            # --- 2. GENERATE MATH FOR "SQUARE" GRID ---
+            # We use Elliptic/Hyperbolic coordinates for correct orthogonality
+            # U = const -> Ellipses (Flow Lines)
+            # V = const -> Hyperbolas (Equipotential Lines)
+            
+            gx = np.linspace(-10, 10, 200)
+            gy = np.linspace(-12, 0, 200)
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
             
             if struct_type == "Sheet Pile":
-                # PILE DRAWING
                 pile_depth = 6.0
-                ax.add_patch(patches.Rectangle((-0.1, -pile_depth), 0.2, pile_depth + 4, facecolor='#444', edgecolor='black', zorder=5))
-                # Pile Flow Net Math
-                Z_shift = Z + 1j*pile_depth
-                with np.errstate(invalid='ignore'): W = -1j * np.sqrt(Z_shift)
+                # Correct function for Sheet Pile flow: z = c * cosh(w)
+                # Inverse: w = arccosh(z/c)
+                # C is the focal length, here it maps to pile depth
+                with np.errstate(invalid='ignore', divide='ignore'):
+                    W = np.arccosh(Z / pile_depth)
                 
-            else:
-                # DAM DRAWING
+                # Draw Structure
+                ax.add_patch(patches.Rectangle((-0.15, -pile_depth), 0.3, pile_depth + 4, facecolor='#444', edgecolor='black', zorder=5))
+                
+            else: # Concrete Dam
                 dam_width = 4.0
                 C = dam_width / 2.0
+                # Correct function for Flat Base Dam: w = arccosh(z/c)
+                with np.errstate(invalid='ignore', divide='ignore'):
+                    W = np.arccosh(Z / C)
+                
+                # Draw Structure
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', edgecolor='black', zorder=5))
                 ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=6)
-                # Dam Flow Net Math
-                with np.errstate(invalid='ignore', divide='ignore'): W = np.arccosh(Z / C)
 
-            # --- COMMON VISUALS ---
-            Phi, Psi = np.real(W), np.imag(W)
-            ax.contour(X, Y, Phi, levels=Nd+1, colors='red', linewidths=1, linestyles='dashed', alpha=0.5)
-            ax.contour(X, Y, Psi, levels=Nf+1, colors='blue', linewidths=1, linestyles='solid', alpha=0.5)
+            Phi = np.real(W) # Equipotential (Hyperbolas)
+            Psi = np.imag(W) # Flow Lines (Ellipses)
 
-            # Water
-            ax.add_patch(patches.Rectangle((-8, 0), 8, 4, facecolor='#D6EAF8', alpha=0.5, zorder=1))
-            ax.add_patch(patches.Rectangle((0, 0), 8, 1, facecolor='#D6EAF8', alpha=0.5, zorder=1))
-            ax.text(-7, 4.2, f"Upstream: {h_up}m", color='blue', fontsize=8)
-
-            # Point Marker
-            ax.scatter(x_point, y_point, color='red', s=150, marker='X', edgecolors='black', zorder=10)
-            ax.text(x_point + 0.3, y_point, f"n_d={nd_point}", color='red', fontweight='bold', fontsize=10, zorder=10, bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+            # --- 3. DRAW LINES WITH ORTHOGONALITY ---
+            # Flow Lines (Blue, Solid) -> Need Nf channels
+            # We select specific levels to make them look evenly spaced
+            ax.contour(X, Y, Psi, levels=np.linspace(0.1, np.pi-0.1, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.7)
             
-            # Z arrow
+            # Equipotential Lines (Red, Dashed) -> Need Nd drops
+            ax.contour(X, Y, Phi, levels=np.linspace(0, 2.5, Nd+1), colors='red', linewidths=1.2, linestyles='dashed', alpha=0.7)
+
+            # --- 4. WATER LEVELS ---
+            ax.add_patch(patches.Rectangle((-10, 0), 10, h_up, facecolor='#D6EAF8', alpha=0.5, zorder=1))
+            ax.plot([-10, 0], [h_up, h_up], 'b-', lw=2)
+            ax.text(-9, h_up + 0.2, f"H_up={h_up}m", color='blue', fontsize=8)
+
+            ax.add_patch(patches.Rectangle((0, 0), 10, h_down, facecolor='#D6EAF8', alpha=0.5, zorder=1))
+            ax.plot([0, 10], [h_down, h_down], 'b-', lw=2)
+            
+            # --- 5. POINT MARKER & ANNOTATIONS ---
+            ax.scatter(x_point, y_point, color='red', s=120, marker='X', edgecolors='black', zorder=10)
+            ax.text(x_point + 0.5, y_point, f"n_d={nd_point}", color='red', fontweight='bold', fontsize=9, zorder=10, bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=1))
+            
+            # Z dimension arrow
             ax.annotate('', xy=(x_point, y_point), xytext=(x_point, datum), arrowprops=dict(arrowstyle='<->', color='green', lw=1.5), zorder=9)
-            ax.text(x_point + 0.1, (y_point + datum)/2, f"z={results['z']:.1f}", color='green', fontsize=9, fontweight='bold')
+            ax.text(x_point + 0.2, (y_point + datum)/2, f"z", color='green', fontsize=9, fontweight='bold')
 
-            ax.legend([patches.Patch(color='red', alpha=0.5), patches.Patch(color='blue', alpha=0.5)], 
-                      [f'{Nd} Drops (Equipotential)', f'{Nf} Channels (Flow)'], loc='upper right', fontsize=8)
+            # --- 6. LEGEND & RULES ---
+            # Add custom dummy lines for legend to match the textbook rules
+            ax.plot([], [], 'b-', label='Flow Line (Impervious Boundary)')
+            ax.plot([], [], 'r--', label='Equipotential Line (Head Drop)')
+            ax.legend(loc='lower center', ncol=2, fontsize=8, framealpha=1)
             
+            ax.axis('off')
             st.pyplot(fig)
+            
+            # Guidelines Caption
+            st.caption("""
+            **Flow Net Rules (Visual Check):**
+            1. Flow lines and Equipotential lines must cross at **90° angles**.
+            2. The shapes formed should be approximately **square**.
+            3. Flow lines never cross each other.
+            """)
 if __name__ == "__main__":
     app()
