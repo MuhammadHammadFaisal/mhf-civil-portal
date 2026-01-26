@@ -16,7 +16,6 @@ def format_scientific(val):
     exponent = int(np.floor(np.log10(abs(val))))
     mantissa = val / (10**exponent)
     
-    # Check if we really need scientific notation (for very small/large numbers)
     if -3 < exponent < 4:
         return f"{val:.4f}"
     else:
@@ -37,7 +36,6 @@ def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, y_
         delta_h = 0
         
     # 3. Total Head at Point (H_point)
-    # H_point = H_upstream - (n_d * delta_h)
     h_point = h_upstream - (drops_passed * delta_h)
     
     # 4. Elevation Head (z)
@@ -381,7 +379,6 @@ def app():
             # --- NEW INPUT: IMPERVIOUS LAYER ---
             st.markdown("---")
             st.markdown("#### 2. Soil Profile")
-            # This input defines the "Hard Stratum" depth
             soil_depth = st.number_input("Depth of Impervious Layer (T) [m]", value=12.0, step=1.0, help="Depth from ground surface to bedrock.")
 
             # --- 3. HYDRAULIC CONDITIONS ---
@@ -450,7 +447,6 @@ def app():
         
         with col_plot:
             fig, ax = plt.subplots(figsize=(6, 6))
-            # Set Y limit based on Impervious Depth
             ax.set_xlim(-10, 10)
             ax.set_ylim(-soil_depth - 2, max(h_up, h_down) + 2)
             ax.set_aspect('equal')
@@ -458,9 +454,8 @@ def app():
             # --- 1. SETUP GRID & BOUNDARIES ---
             ax.axhline(0, color='black', linewidth=1.5) # Ground
             
-            # IMPERVIOUS BOUNDARY (BEDROCK)
+            # IMPERVIOUS BOUNDARY (ROCK)
             ax.axhline(-soil_depth, color='black', linewidth=2) 
-            # Hatch pattern for rock
             ax.add_patch(patches.Rectangle((-10, -soil_depth - 2), 20, 2, facecolor='gray', hatch='///', edgecolor='black'))
             ax.text(0, -soil_depth - 1, "IMPERVIOUS BOUNDARY (ROCK)", ha='center', color='white', fontweight='bold', fontsize=9)
 
@@ -468,9 +463,9 @@ def app():
             ax.axhline(datum, color='green', linewidth=1.5, linestyle='-.', zorder=1)
             ax.text(-9.5, datum + 0.2, f"DATUM (z=0)", color='green', fontweight='bold', fontsize=8)
 
-            # --- 2. GENERATE MATH (CONFOCAL CONICS) ---
+            # --- 2. GENERATE MATH ---
             gx = np.linspace(-10, 10, 200)
-            gy = np.linspace(-soil_depth, 0, 200) # Grid stops at rock
+            gy = np.linspace(-soil_depth, 0, 200) 
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
             
@@ -487,17 +482,34 @@ def app():
                 W = np.zeros_like(Z)
 
             Phi = np.real(W) 
-            Psi = np.abs(np.imag(W)) # Force positive to fix visibility
+            Psi = np.abs(np.imag(W)) # Force positive to display ellipses
 
-            # --- 3. DRAW LINES ---
+            # --- 3. CALCULATE MAX PSI AT ROCK DEPTH ---
+            # We evaluate Psi at the center-bottom point (0, -soil_depth)
+            # This value represents the streamline that touches the bedrock.
+            
+            z_rock = 0 + 1j * (-soil_depth)
+            if has_pile:
+                z_rock_shifted = (0 - pile_x) + 1j * (-soil_depth)
+                with np.errstate(invalid='ignore'):
+                    w_rock = np.arccosh(z_rock_shifted / pile_depth)
+            elif has_dam:
+                with np.errstate(invalid='ignore'):
+                    w_rock = np.arccosh(z_rock / (dam_width/2.0))
+            else:
+                w_rock = 0
+            
+            Psi_max = np.abs(np.imag(w_rock))
+            if np.isnan(Psi_max) or Psi_max == 0: Psi_max = 3.14 # Fallback
+
+            # --- 4. DRAW LINES (CONFINED) ---
             if has_pile or has_dam:
-                # Flow Lines (Blue) -> Ensure last line is near the rock boundary if possible
-                # We limit lines to max PI, but visually clamping them helps
-                ax.contour(X, Y, Psi, levels=np.linspace(0, np.pi, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.6)
-                # Equipotential Lines (Red)
+                # Plot Nf channels from 0 (Structure) to Psi_max (Rock)
+                ax.contour(X, Y, Psi, levels=np.linspace(0, Psi_max, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.6)
+                # Plot Nd drops
                 ax.contour(X, Y, Phi, levels=np.linspace(0, 3.0, Nd+1), colors='red', linewidths=1.2, linestyles='dashed', alpha=0.6)
 
-            # --- 4. STRUCTURES ---
+            # --- 5. STRUCTURES ---
             if has_dam:
                 C = dam_width / 2.0
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', edgecolor='black', zorder=5))
@@ -508,7 +520,7 @@ def app():
                 ax.add_patch(patches.Rectangle((pile_x - pw/2, -pile_depth), pw, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=6))
                 ax.text(pile_x, -pile_depth/2, "PILE", rotation=90, color='white', ha='center', va='center', fontsize=8, zorder=7)
 
-            # --- 5. WATER ---
+            # --- 6. WATER ---
             ax.add_patch(patches.Rectangle((-10, 0), 10, h_up, facecolor='#D6EAF8', alpha=0.5, zorder=1))
             ax.plot([-10, 0], [h_up, h_up], 'b-', lw=2)
             ax.text(-9, h_up + 0.2, f"H_up", color='blue', fontsize=8)
@@ -516,7 +528,7 @@ def app():
             ax.add_patch(patches.Rectangle((0, 0), 10, h_down, facecolor='#D6EAF8', alpha=0.5, zorder=1))
             ax.plot([0, 10], [h_down, h_down], 'b-', lw=2)
             
-            # --- 6. MARKERS ---
+            # --- 7. MARKERS ---
             ax.scatter(x_point, y_point, color='red', s=120, marker='X', edgecolors='black', zorder=10)
             ax.text(x_point + 0.5, y_point, f"n_d={nd_point}", color='red', fontweight='bold', fontsize=9, zorder=10, bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=1))
             
