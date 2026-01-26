@@ -363,9 +363,11 @@ def app():
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5); ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
 
             st.pyplot(fig2)
+# =================================================================
+    # TAB 3: FLOW NETS (UNDER MAINTENANCE)
     # =================================================================
-    # TAB 3: FLOW NETS (FINAL)
-    # =================================================================
+    with tab3:
+        st.warning("🚧 **Under Maintenance:** This module is currently being updated to ensure 100% accuracy with standard Soil Mechanics theory. Please check back later!")
     with tab3:
         st.markdown("### Flow Net Analysis")
         col_in, col_gr = st.columns([1, 1.3])
