@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+from config import APP_VERSION
 
 # ==================================================
 # GLOBAL APP VERSION (CACHE BUSTING SOURCE OF TRUTH)
@@ -172,3 +173,4 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
