@@ -69,38 +69,83 @@ def render_seepage():
             st.metric("Effective Stress (σ')", f"{sigma - u:.2f} kPa")
 
     with c2:
-        fig, ax = plt.subplots(figsize=(6, 8))
-        wl_top = val_z + val_y
-        wl_bot = val_x
+        # --- RESTORED DETAILED DIAGRAM ---
+        fig, ax = plt.subplots(figsize=(7, 8))
         
-        # Soil
-        ax.add_patch(patches.Rectangle((3.5, 0), 2.5, val_z, facecolor='#E3C195', hatch='.'))
-        # Top Tank
-        tank_base = max(val_z, wl_top - 0.5)
-        ax.add_patch(patches.Rectangle((3.75, tank_base), 2.0, max(0.5, wl_top-tank_base), facecolor='#D6EAF8', edgecolor='black'))
+        # Dimensions
+        datum_y, soil_w, soil_x = 0.0, 2.5, 3.5
+        wl_top = val_z + val_y  
+        wl_bot = val_x          
         
-        # Walls
-        ax.plot([3.5, 3.5], [0, val_z], 'k-', lw=2)
-        ax.plot([6, 6], [0, val_z], 'k-', lw=2)
+        # 1. SOIL SAMPLE
+        ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, val_z, facecolor='#E3C195', hatch='...', edgecolor='none'))
+        ax.text(soil_x + soil_w/2, datum_y + val_z/2, "SOIL", ha='center', fontweight='bold', fontsize=12, zorder=3)
+
+        # 2. TOP TANK (RESERVOIR)
+        tank_w = 2.0
+        tank_x = soil_x + (soil_w - tank_w)/2
+        neck_w = 0.8
+        neck_x = soil_x + (soil_w - neck_w)/2
         
-        # Water Levels
-        ax.plot([3.75, 5.75], [wl_top, wl_top], 'b-', lw=2)
+        # The tank base should start exactly where the soil ends (or slightly above if water is high)
+        tank_base_y = max(datum_y + val_z, wl_top - 1.5) 
+        if tank_base_y < datum_y + val_z: tank_base_y = datum_y + val_z
+
+        # Draw Tank Water
+        ax.add_patch(patches.Rectangle((tank_x, tank_base_y), tank_w, max(0.5, wl_top - tank_base_y), facecolor='#D6EAF8', edgecolor='none'))
+        # Draw Neck Water (Connection)
+        ax.add_patch(patches.Rectangle((neck_x, datum_y + val_z), neck_w, tank_base_y - (datum_y + val_z) + 0.1, facecolor='#D6EAF8', edgecolor='none'))
+
+        # 3. BOTTOM TANK (PIEZOMETER RESERVOIR)
+        tube_w = 0.6
+        left_tank_x = 0.5
+        l_tank_base_y = min(datum_y - 1.0, wl_bot - 1.0) # Ensure tank moves down if water is low
         
-        # Piezometer Level (Dynamic Arrow)
-        ax.annotate(f"Head: {wl_bot}m", xy=(3.5, 0), xytext=(1, wl_bot), arrowprops=dict(arrowstyle='->', color='blue'))
-        ax.plot([1, 3.5], [wl_bot, wl_bot], 'b--', lw=1)
+        tube_start_x = soil_x + (soil_w - tube_w)/2
         
+        # Draw U-Tube Water Path
+        tube_left_end = left_tank_x + (tank_w - tube_w)/2
+        ax.add_patch(patches.Rectangle((tube_start_x, datum_y - 1.0), tube_w, 1.0, facecolor='#D6EAF8', edgecolor='none')) # Down
+        ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_start_x - tube_left_end + tube_w, tube_w, facecolor='#D6EAF8', edgecolor='none')) # Horizontal
+        ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_w, l_tank_base_y - (datum_y - 1.0) + 0.1, facecolor='#D6EAF8', edgecolor='none')) # Up
+        ax.add_patch(patches.Rectangle((left_tank_x, l_tank_base_y), tank_w, max(0.5, wl_bot - l_tank_base_y), facecolor='#D6EAF8', edgecolor='none')) # The Tank
+
+        # 4. WALLS (Black Outlines)
+        wall_color = 'black'
+        lw = 2
+        # Top Tank Walls
+        ax.plot([tank_x, tank_x, neck_x, neck_x], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=lw)
+        ax.plot([tank_x+tank_w, tank_x+tank_w, neck_x+neck_w, neck_x+neck_w], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=lw)
+        # Soil Walls
+        ax.plot([soil_x, soil_x], [datum_y, datum_y+val_z], color=wall_color, lw=lw)
+        ax.plot([soil_x+soil_w, soil_x+soil_w], [datum_y, datum_y+val_z], color=wall_color, lw=lw)
+        # Bottom Tube Walls
+        path_outer_x = [tube_start_x, tube_start_x, tube_left_end+tube_w, tube_left_end+tube_w, left_tank_x+tank_w, left_tank_x+tank_w]
+        path_outer_y = [datum_y, datum_y-1.0+tube_w, datum_y-1.0+tube_w, l_tank_base_y, l_tank_base_y, wl_bot+0.5]
+        ax.plot(path_outer_x, path_outer_y, color=wall_color, lw=lw)
+        path_inner_x = [tube_start_x+tube_w, tube_start_x+tube_w, tube_left_end, tube_left_end, left_tank_x, left_tank_x]
+        path_inner_y = [datum_y, datum_y-1.0, datum_y-1.0, l_tank_base_y, l_tank_base_y, wl_bot+0.5]
+        ax.plot(path_inner_x, path_inner_y, color=wall_color, lw=lw)
+
+        # 5. WATER LEVELS & DETAILS
+        ax.plot([tank_x, tank_x+tank_w], [wl_top, wl_top], 'b-', lw=2)
+        ax.plot([left_tank_x, left_tank_x+tank_w], [wl_bot, wl_bot], 'b-', lw=2)
+        ax.plot(tank_x+tank_w/2, wl_top, marker='v', color='blue', markersize=8)
+        ax.plot(left_tank_x+tank_w/2, wl_bot, marker='v', color='blue', markersize=8)
+
         # Point A
-        ax.scatter(4.75, val_A, c='red', s=80, zorder=5)
-        ax.text(5, val_A, "A", fontweight='bold')
-        
-        # FIX: Dynamic Y-Limit to prevent cut-off
+        ax.scatter(soil_x + soil_w/2, val_A, c='red', s=80, zorder=5)
+        ax.text(soil_x + soil_w/2 + 0.2, val_A, "Point A", fontweight='bold')
+
+        # FIX: Ensure plot limits include the full tanks
         max_y = max(wl_top, wl_bot) + 2
-        ax.set_ylim(-2, max_y)
+        min_y = -2
+        ax.set_ylim(min_y, max_y)
         ax.set_xlim(0, 9)
         ax.axis('off')
+        
         st.pyplot(fig)
-        plt.close(fig) # FIX: Prevents memory leak
+        plt.close(fig)
 
 def render_permeability():
     st.subheader("Permeability Lab Tests")
@@ -137,7 +182,7 @@ def render_permeability():
         ax.text(5,5,"SOIL SAMPLE", ha='center', fontweight='bold')
         ax.axis('off')
         st.pyplot(fig)
-        plt.close(fig) # FIX: Prevents memory leak
+        plt.close(fig) 
 
 def render_flownet():
     st.subheader("2D Flow Net Analysis")
@@ -187,7 +232,7 @@ def render_flownet():
         
         ax.set_ylim(-12, max(h_up, h_dw)+1); ax.set_xlim(-12, 12); ax.axis('off')
         st.pyplot(fig)
-        plt.close(fig) # FIX: Prevents memory leak
+        plt.close(fig) 
 
 # --- 3. MAIN APP (CALLED BY ROUTER) ---
 def app():
