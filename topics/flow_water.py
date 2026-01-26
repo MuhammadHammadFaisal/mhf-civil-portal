@@ -61,6 +61,7 @@ def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, y_
         "Nd_total": total_Nd,
         "datum": datum_elev
     }
+
 # --- MAIN APP ---
 
 def app():
@@ -348,7 +349,7 @@ def app():
 
             st.pyplot(fig2)
 
-# =================================================================
+    # =================================================================
     # TAB 3: FLOW NETS (TEXTBOOK SOLVER + COMBINED VISUALS)
     # =================================================================
     with tab3:
@@ -462,37 +463,34 @@ def app():
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
             
-            # MATH SELECTION:
-            # If Pile exists, the flow net is governed by the deep pile (Confocal Conics).
-            # If Dam only, it's governed by the flat base (Confocal Conics with different focus).
+            # MATH SELECTION (Visuals only, calc uses counting)
+            # If Pile exists, flow net is governed by pile (Confocal Conics)
+            # If Dam only, governed by flat base (Confocal Conics with different focus)
             
             if has_pile:
-                # Pile governs the flow shape
-                # Focus is at the tip of the pile (pile_depth)
                 focus = pile_depth
                 # Shift Z to center around the pile's X location
                 Z_shifted = (X - pile_x) + 1j * Y
                 
                 with np.errstate(invalid='ignore', divide='ignore'):
-                    # Correct mapping for vertical cut: w = arccosh(z/c)
-                    # Rotated 90 deg for vertical pile: w = -1j * sqrt(z) approximation
                     W = np.arccosh(Z_shifted / focus)
                     
             elif has_dam:
-                # Dam base governs flow
                 C = dam_width / 2.0
                 with np.errstate(invalid='ignore', divide='ignore'):
                     W = np.arccosh(Z / C)
-            
             else:
                 W = np.zeros_like(Z)
 
-            Phi = np.real(W) # Equipotential
-            Psi = np.imag(W) # Flow Lines
+            Phi = np.real(W) 
+            # FIX: Force Psi to be positive to ensure levels [0..pi] are visible
+            Psi = np.abs(np.imag(W)) 
 
             # --- 3. DRAW LINES ---
             if has_pile or has_dam:
-                ax.contour(X, Y, Psi, levels=np.linspace(0.1, np.pi-0.1, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.6)
+                # Flow Lines (Blue, Solid)
+                ax.contour(X, Y, Psi, levels=np.linspace(0, np.pi, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.6)
+                # Equipotential Lines (Red, Dashed)
                 ax.contour(X, Y, Phi, levels=np.linspace(0, 3.0, Nd+1), colors='red', linewidths=1.2, linestyles='dashed', alpha=0.6)
 
             # --- 4. DRAW STRUCTURES ---
@@ -502,7 +500,6 @@ def app():
                 ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=6)
 
             if has_pile:
-                # Pile width
                 pw = 0.3
                 ax.add_patch(patches.Rectangle((pile_x - pw/2, -pile_depth), pw, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=6))
                 ax.text(pile_x, -pile_depth/2, "PILE", rotation=90, color='white', ha='center', va='center', fontsize=8, zorder=7)
@@ -529,5 +526,6 @@ def app():
             
             ax.axis('off')
             st.pyplot(fig)
+
 if __name__ == "__main__":
     app()
