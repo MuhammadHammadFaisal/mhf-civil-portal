@@ -25,7 +25,7 @@ def app():
     st.subheader("Flow of Water & Seepage Analysis")
 
     # TABS FOR DIFFERENT PROBLEM TYPES
-    tab1, tab2, tab3 = st.tabs(["1D Seepage (Effective Stress)", "Permeability Tests", "Flow Nets & Piping"])
+    tab1, tab2, tab3 = st.tabs(["1D Seepage (Effective Stress)", "Permeability Tests", "2D Flow Net Analysis"])
 
     # =================================================================
     # TAB 1: 1D SEEPAGE (Effective Stress)
@@ -200,8 +200,6 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A*h*t > 0: 
                         k_val = (Q*L)/(A*h*t)
-                        
-                        # --- PROFESSIONAL FORMATTING (LaTeX Scientific) ---
                         k_formatted = format_scientific(k_val)
                         
                         st.markdown(f"""
@@ -228,8 +226,6 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A_soil*t_fall > 0 and h2 > 0: 
                         k_val = (2.303*a*L_fall/(A_soil*t_fall))*np.log10(h1/h2)
-                        
-                        # --- PROFESSIONAL FORMATTING (LaTeX Scientific) ---
                         k_formatted = format_scientific(k_val)
 
                         st.markdown(f"""
@@ -302,32 +298,88 @@ def app():
             st.pyplot(fig2)
 
     # =================================================================
-    # TAB 3: FLOW NETS (Quick Sand)
+    # TAB 3: 2D FLOW NET ANALYSIS (Graphical Solution from Page 41-44)
     # =================================================================
     with tab3:
-        st.caption("Calculate Critical Hydraulic Gradient and visualize Seepage Force.")
+        st.caption("Graphical Solution using Flow Net parameters (Pages 41-44).")
         col_input_3, col_plot_3 = st.columns([1, 1.2])
 
         with col_input_3:
-            st.markdown("### 1. Soil Parameters")
-            st.latex(r"i_{cr} = \frac{G_s - 1}{1+e}")
-            Gs = st.number_input("Specific Gravity (Gs)", 2.0, 3.0, 2.65, step=0.01)
-            e = st.number_input("Void Ratio (e)", 0.1, 2.0, 0.60, step=0.01)
+            st.markdown("### 1. Seepage Quantity (q)")
+            st.latex(r"q = k \cdot H \cdot \frac{N_f}{N_d}")
+            
+            k3 = st.number_input("Permeability (k) [m/day]", value=0.0864, format="%.5f")
+            H3 = st.number_input("Total Head Loss (H) [m]", value=8.0, step=0.1)
+            Nf = st.number_input("Number of Flow Channels (Nf)", value=3.0, step=0.5)
+            Nd = st.number_input("Number of Equipotential Drops (Nd)", value=8.0, step=0.5)
+            
+            if st.button("Calculate Seepage Rate", type="primary"):
+                q_val = k3 * H3 * (Nf / Nd)
+                st.markdown(f"""
+                <div style="background-color: #d1e7dd; padding: 15px; border-radius: 10px; border: 1px solid #0f5132; text-align: center;">
+                    <p style="color: #0f5132; margin: 0; font-weight: 600;">Seepage Rate (q)</p>
+                    <h2 style="color: #0f5132; margin: 0;">{q_val:.4f} m³/day/m</h2>
+                </div>
+                """, unsafe_allow_html=True)
+
             st.markdown("---")
-            if st.button("Calculate Critical Gradient", type="primary"):
-                icr = (Gs - 1) / (1 + e)
-                st.success("Calculation Successful")
-                st.metric("Critical Gradient (i_cr)", f"{icr:.3f}")
+            st.markdown("### 2. Pore Pressure at a Point")
+            st.latex(r"u = \gamma_w \cdot (H_{total} - z_{elev})")
+            
+            st.caption("Calculate head at a point by counting drops from upstream.")
+            drops_to_point = st.number_input("Drops to Point (nd)", value=2.2, step=0.1, help="How many drops crossed to reach the point?")
+            z_point = st.number_input("Elevation of Point (z) [m]", value=-7.0, step=0.5)
+            H_upstream = st.number_input("Upstream Total Head [m]", value=8.0, step=0.1, help="Total head at the first equipotential line")
+            
+            if st.button("Calculate Pore Pressure"):
+                # Head loss per drop
+                delta_h = H3 / Nd
+                # Total Head at point = Upstream Head - (drops * delta_h)
+                H_point = H_upstream - (drops_to_point * delta_h)
+                # Pressure Head = Total Head - Elevation Head
+                h_pressure = H_point - z_point
+                u_pressure = h_pressure * 9.81
+                
+                st.info(f"**Total Head at Point:** {H_point:.2f} m")
+                st.success(f"**Pore Pressure (u):** {u_pressure:.2f} kPa")
 
         with col_plot_3:
+            # --- SCHEMATIC FLOW NET DIAGRAM ---
             fig3, ax3 = plt.subplots(figsize=(6, 6))
             ax3.set_xlim(0, 10); ax3.set_ylim(0, 10); ax3.axis('off')
-            ax3.add_patch(patches.Rectangle((3, 3), 4, 4, facecolor='#E3C195', hatch='X', edgecolor='black', lw=2))
-            ax3.text(5, 5, "Soil\nElement", ha='center', fontweight='bold')
-            ax3.annotate('', xy=(5, 4), xytext=(5, 8.5), arrowprops=dict(arrowstyle='->', color='black', lw=3))
-            ax3.text(5.2, 8, "Weight (Down)", ha='left')
-            ax3.annotate('', xy=(5, 6), xytext=(5, 1.5), arrowprops=dict(arrowstyle='->', color='red', lw=3))
-            ax3.text(5.2, 2, "Seepage (Up)", ha='left', color='red', fontweight='bold')
+            
+            # Ground and Sheet Pile
+            ax3.add_patch(patches.Rectangle((0, 4), 10, 6, facecolor='#E3C195', alpha=0.3)) # Soil
+            ax3.plot([0, 10], [8, 8], 'k-', lw=1) # Ground surface
+            ax3.add_patch(patches.Rectangle((4.8, 4), 0.4, 6, facecolor='gray')) # Sheet Pile
+            
+            # Water Levels
+            ax3.add_patch(patches.Rectangle((0, 8), 4.8, 1.5, facecolor='#D6EAF8', alpha=0.6)) # Upstream water
+            ax3.plot([0, 4.8], [9.5, 9.5], 'b-', lw=2)
+            ax3.text(1, 9.7, "Upstream H", color='blue')
+            
+            ax3.add_patch(patches.Rectangle((5.2, 8), 4.8, 0.5, facecolor='#D6EAF8', alpha=0.6)) # Downstream water
+            ax3.plot([5.2, 10], [8.5, 8.5], 'b-', lw=2)
+            
+            # Flow Lines (Curved approximation)
+            flow_x = np.linspace(0, 10, 100)
+            ax3.plot(flow_x, 8 - 3*np.exp(-0.5*(flow_x-5)**2), 'b--', alpha=0.5) # Streamline 1
+            ax3.plot(flow_x, 8 - 5*np.exp(-0.3*(flow_x-5)**2), 'b--', alpha=0.5) # Streamline 2
+            
+            # Equipotential Lines (Vertical-ish)
+            ax3.plot([3, 3], [4, 8], 'r:', alpha=0.5)
+            ax3.plot([4, 4], [3, 8], 'r:', alpha=0.5)
+            ax3.plot([6, 6], [3, 8], 'r:', alpha=0.5)
+            ax3.plot([7, 7], [4, 8], 'r:', alpha=0.5)
+            
+            # Labels
+            ax3.text(2, 6, "Flow Line", color='blue', rotation=-20, fontsize=8)
+            ax3.text(3.1, 7, "Equipotential", color='red', rotation=90, fontsize=8)
+            
+            # Nf and Nd visualization
+            ax3.text(5, 2, "Nf = Number of Flow Channels", ha='center', fontweight='bold')
+            ax3.text(5, 1.5, "Nd = Number of Head Drops", ha='center', fontweight='bold')
+            
             st.pyplot(fig3)
 
 if __name__ == "__main__":
