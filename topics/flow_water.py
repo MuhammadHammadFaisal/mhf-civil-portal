@@ -449,23 +449,24 @@ def app():
                         p_x, p_y, has_dam, dam_width, has_pile, pile_depth, pile_x, h_up, h_down
                     )
 
-            if results:
-                # --- PROFESSIONAL RESULT CARD ---
+           if results:
+                # --- PROFESSIONAL RESULT CARD (FIXED COLORS) ---
+                # Added 'color: #333333' to force dark text on the light background
                 st.markdown(f"""
-                <div style="background-color: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-top: 10px;">
+                <div style="background-color: #e3f2fd; color: #333333; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-top: 10px;">
                     <h4 style="color: #1565c0; margin-top: 0;">Results at Point ({p_x}, {p_y})</h4>
-                    <table style="width: 100%; border-collapse: collapse;">
+                    <table style="width: 100%; border-collapse: collapse; color: #333333;">
                         <tr>
                             <td style="padding: 5px;"><strong>Total Head ($h$)</strong></td>
-                            <td style="text-align: right; font-family: monospace; font-size: 1.1em;">{results['h']:.2f} m</td>
+                            <td style="text-align: right; font-family: monospace; font-size: 1.1em; color: #333333;">{results['h']:.2f} m</td>
                         </tr>
                         <tr>
                             <td style="padding: 5px;"><strong>Elevation Head ($z$)</strong></td>
-                            <td style="text-align: right; font-family: monospace; font-size: 1.1em;">{results['z']:.2f} m</td>
+                            <td style="text-align: right; font-family: monospace; font-size: 1.1em; color: #333333;">{results['z']:.2f} m</td>
                         </tr>
                         <tr>
-                            <td style="padding: 5px; border-top: 1px solid #ccc;"><strong>Pore Pressure ($u$)</strong></td>
-                            <td style="text-align: right; font-family: monospace; font-size: 1.2em; color: #d63384; font-weight: bold; border-top: 1px solid #ccc;">{results['u']:.2f} kPa</td>
+                            <td style="padding: 5px; border-top: 1px solid #bdc3c7;"><strong>Pore Pressure ($u$)</strong></td>
+                            <td style="text-align: right; font-family: monospace; font-size: 1.2em; color: #d63384; font-weight: bold; border-top: 1px solid #bdc3c7;">{results['u']:.2f} kPa</td>
                         </tr>
                     </table>
                 </div>
