@@ -25,7 +25,7 @@ def format_scientific(val):
 def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, y_point, datum_elev):
     """
     Calculates head and pressure using Flow Net Counting Method.
-    Adjusts for a variable Datum.
+    Works for Dam, Pile, or Combined structures.
     """
     # 1. Total Head Loss (H_diff)
     H_diff = h_upstream - h_downstream
@@ -41,11 +41,9 @@ def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, y_
     h_point = h_upstream - (drops_passed * delta_h)
     
     # 4. Elevation Head (z)
-    # z is the vertical distance from the point to the Datum.
     z = y_point - datum_elev
     
     # 5. Pressure Head (hp)
-    # h = z + hp  ->  hp = h - z
     hp = h_point - z
     
     # 6. Pore Pressure (u)
@@ -351,19 +349,38 @@ def app():
             st.pyplot(fig2)
 
 # =================================================================
-    # TAB 3: FLOW NETS (TEXTBOOK SOLVER + CORRECT VISUALS)
+    # TAB 3: FLOW NETS (TEXTBOOK SOLVER + COMBINED VISUALS)
     # =================================================================
     with tab3:
         st.markdown("### Flow Net Analysis")
-        st.caption("Solve Flow Net problems for Dams or Sheet Piles using the counting method.")
+        st.caption("Design Flow Nets for Dams, Sheet Piles, or Combined systems.")
         
         col_input, col_plot = st.columns([1, 1.2])
 
         with col_input:
             # --- 1. VISUAL SETUP ---
-            st.markdown("#### 1. Structure Visual")
-            struct_type = st.radio("Select Diagram Type:", ["Sheet Pile", "Concrete Dam"], horizontal=True)
+            st.markdown("#### 1. Structure Configuration")
             
+            # CHECKBOXES for "Both"
+            has_dam = st.checkbox("Include Concrete Dam", value=True)
+            has_pile = st.checkbox("Include Sheet Pile (Cutoff)", value=False)
+            
+            dam_width = 0.0
+            pile_depth = 0.0
+            pile_x = 0.0
+
+            # Dynamic Inputs based on selection
+            if has_dam:
+                dam_width = st.number_input("Dam Base Width (B) [m]", value=6.0, step=0.5)
+            
+            if has_pile:
+                c_p1, c_p2 = st.columns(2)
+                pile_depth = c_p1.number_input("Pile Depth (D) [m]", value=5.0, step=0.5)
+                
+                # Constrain pile location input
+                limit_x = dam_width/2.0 if has_dam else 8.0
+                pile_x = c_p2.number_input("Pile X Location [m]", value=0.0, step=0.5, min_value=-limit_x, max_value=limit_x)
+
             # --- 2. HYDRAULIC CONDITIONS ---
             st.markdown("---")
             st.markdown("#### 2. Hydraulic Conditions")
@@ -384,14 +401,10 @@ def app():
             
             datum = st.number_input("Datum Elevation ($z=0$)", value=-6.0, step=1.0)
 
-            c_p1, c_p2, c_p3 = st.columns(3)
-            # Default values adjust based on structure for better UX
-            def_x = 2.0 if struct_type == "Sheet Pile" else 4.0
-            def_y = -4.0
-            
-            x_point = c_p1.number_input("Point X [m]", value=def_x, step=0.5)
-            y_point = c_p2.number_input("Point Y [m]", value=def_y, step=0.5)
-            nd_point = c_p3.number_input("Drops Passed ($n_d$)", value=2.0, step=0.1, help="Count how many equipotential lines crossed to reach this point.")
+            c_pt1, c_pt2, c_pt3 = st.columns(3)
+            x_point = c_pt1.number_input("Point X [m]", value=2.0, step=0.5)
+            y_point = c_pt2.number_input("Point Y [m]", value=-4.0, step=0.5)
+            nd_point = c_pt3.number_input("Drops Passed ($n_d$)", value=2.0, step=0.1, help="Count equipotential lines crossed.")
             
             # Calculate Logic
             results = solve_flow_net_at_point(h_up, h_down, Nd, nd_point, y_point, datum)
@@ -439,86 +452,82 @@ def app():
             ax.set_aspect('equal')
             
             # --- 1. SETUP GRID & AXIS ---
-            ax.axhline(0, color='black', linewidth=1.5) # Ground line
-            
-            # Datum Line
+            ax.axhline(0, color='black', linewidth=1.5) # Ground
             ax.axhline(datum, color='green', linewidth=1.5, linestyle='-.', zorder=1)
             ax.text(-9.5, datum + 0.2, f"DATUM (z=0)", color='green', fontweight='bold', fontsize=8)
 
-            # --- 2. GENERATE MATH FOR "SQUARE" GRID ---
-            # We use Elliptic/Hyperbolic coordinates for correct orthogonality
-            # U = const -> Ellipses (Flow Lines)
-            # V = const -> Hyperbolas (Equipotential Lines)
-            
+            # --- 2. GENERATE SQUARE GRID (MATH) ---
             gx = np.linspace(-10, 10, 200)
             gy = np.linspace(-12, 0, 200)
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
             
-            if struct_type == "Sheet Pile":
-                pile_depth = 6.0
-                # Correct function for Sheet Pile flow: z = c * cosh(w)
-                # Inverse: w = arccosh(z/c)
-                # C is the focal length, here it maps to pile depth
+            # MATH SELECTION:
+            # If Pile exists, the flow net is governed by the deep pile (Confocal Conics).
+            # If Dam only, it's governed by the flat base (Confocal Conics with different focus).
+            
+            if has_pile:
+                # Pile governs the flow shape
+                # Focus is at the tip of the pile (pile_depth)
+                focus = pile_depth
+                # Shift Z to center around the pile's X location
+                Z_shifted = (X - pile_x) + 1j * Y
+                
                 with np.errstate(invalid='ignore', divide='ignore'):
-                    W = np.arccosh(Z / pile_depth)
-                
-                # Draw Structure
-                ax.add_patch(patches.Rectangle((-0.15, -pile_depth), 0.3, pile_depth + 4, facecolor='#444', edgecolor='black', zorder=5))
-                
-            else: # Concrete Dam
-                dam_width = 4.0
+                    # Correct mapping for vertical cut: w = arccosh(z/c)
+                    # Rotated 90 deg for vertical pile: w = -1j * sqrt(z) approximation
+                    W = np.arccosh(Z_shifted / focus)
+                    
+            elif has_dam:
+                # Dam base governs flow
                 C = dam_width / 2.0
-                # Correct function for Flat Base Dam: w = arccosh(z/c)
                 with np.errstate(invalid='ignore', divide='ignore'):
                     W = np.arccosh(Z / C)
-                
-                # Draw Structure
+            
+            else:
+                W = np.zeros_like(Z)
+
+            Phi = np.real(W) # Equipotential
+            Psi = np.imag(W) # Flow Lines
+
+            # --- 3. DRAW LINES ---
+            if has_pile or has_dam:
+                ax.contour(X, Y, Psi, levels=np.linspace(0.1, np.pi-0.1, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.6)
+                ax.contour(X, Y, Phi, levels=np.linspace(0, 3.0, Nd+1), colors='red', linewidths=1.2, linestyles='dashed', alpha=0.6)
+
+            # --- 4. DRAW STRUCTURES ---
+            if has_dam:
+                C = dam_width / 2.0
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', edgecolor='black', zorder=5))
                 ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=6)
 
-            Phi = np.real(W) # Equipotential (Hyperbolas)
-            Psi = np.imag(W) # Flow Lines (Ellipses)
+            if has_pile:
+                # Pile width
+                pw = 0.3
+                ax.add_patch(patches.Rectangle((pile_x - pw/2, -pile_depth), pw, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=6))
+                ax.text(pile_x, -pile_depth/2, "PILE", rotation=90, color='white', ha='center', va='center', fontsize=8, zorder=7)
 
-            # --- 3. DRAW LINES WITH ORTHOGONALITY ---
-            # Flow Lines (Blue, Solid) -> Need Nf channels
-            # We select specific levels to make them look evenly spaced
-            ax.contour(X, Y, Psi, levels=np.linspace(0.1, np.pi-0.1, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.7)
-            
-            # Equipotential Lines (Red, Dashed) -> Need Nd drops
-            ax.contour(X, Y, Phi, levels=np.linspace(0, 2.5, Nd+1), colors='red', linewidths=1.2, linestyles='dashed', alpha=0.7)
-
-            # --- 4. WATER LEVELS ---
+            # --- 5. WATER LEVELS ---
             ax.add_patch(patches.Rectangle((-10, 0), 10, h_up, facecolor='#D6EAF8', alpha=0.5, zorder=1))
             ax.plot([-10, 0], [h_up, h_up], 'b-', lw=2)
-            ax.text(-9, h_up + 0.2, f"H_up={h_up}m", color='blue', fontsize=8)
+            ax.text(-9, h_up + 0.2, f"H_up", color='blue', fontsize=8)
 
             ax.add_patch(patches.Rectangle((0, 0), 10, h_down, facecolor='#D6EAF8', alpha=0.5, zorder=1))
             ax.plot([0, 10], [h_down, h_down], 'b-', lw=2)
             
-            # --- 5. POINT MARKER & ANNOTATIONS ---
+            # --- 6. MARKERS ---
             ax.scatter(x_point, y_point, color='red', s=120, marker='X', edgecolors='black', zorder=10)
             ax.text(x_point + 0.5, y_point, f"n_d={nd_point}", color='red', fontweight='bold', fontsize=9, zorder=10, bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=1))
             
-            # Z dimension arrow
             ax.annotate('', xy=(x_point, y_point), xytext=(x_point, datum), arrowprops=dict(arrowstyle='<->', color='green', lw=1.5), zorder=9)
             ax.text(x_point + 0.2, (y_point + datum)/2, f"z", color='green', fontsize=9, fontweight='bold')
 
-            # --- 6. LEGEND & RULES ---
-            # Add custom dummy lines for legend to match the textbook rules
-            ax.plot([], [], 'b-', label='Flow Line (Impervious Boundary)')
-            ax.plot([], [], 'r--', label='Equipotential Line (Head Drop)')
+            # Legend
+            ax.plot([], [], 'b-', label='Flow Line')
+            ax.plot([], [], 'r--', label='Equipotential Line')
             ax.legend(loc='lower center', ncol=2, fontsize=8, framealpha=1)
             
             ax.axis('off')
             st.pyplot(fig)
-            
-            # Guidelines Caption
-            st.caption("""
-            **Flow Net Rules (Visual Check):**
-            1. Flow lines and Equipotential lines must cross at **90° angles**.
-            2. The shapes formed should be approximately **square**.
-            3. Flow lines never cross each other.
-            """)
 if __name__ == "__main__":
     app()
