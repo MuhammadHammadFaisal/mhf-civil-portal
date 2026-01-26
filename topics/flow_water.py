@@ -305,34 +305,6 @@ def app():
 
             st.pyplot(fig2)
 
-    # =================================================================
-    # TAB 3: FLOW NETS (Quick Sand)
-    # =================================================================
-    with tab3:
-        st.caption("Calculate Critical Hydraulic Gradient and visualize Seepage Force.")
-        col_input_3, col_plot_3 = st.columns([1, 1.2])
-
-        with col_input_3:
-            st.markdown("### 1. Soil Parameters")
-            st.latex(r"i_{cr} = \frac{G_s - 1}{1+e}")
-            Gs = st.number_input("Specific Gravity (Gs)", 2.0, 3.0, 2.65, step=0.01)
-            e = st.number_input("Void Ratio (e)", 0.1, 2.0, 0.60, step=0.01)
-            st.markdown("---")
-            if st.button("Calculate Critical Gradient", type="primary"):
-                icr = (Gs - 1) / (1 + e)
-                st.success("Calculation Successful")
-                st.metric("Critical Gradient (i_cr)", f"{icr:.3f}")
-
-        with col_plot_3:
-            fig3, ax3 = plt.subplots(figsize=(6, 6))
-            ax3.set_xlim(0, 10); ax3.set_ylim(0, 10); ax3.axis('off')
-            ax3.add_patch(patches.Rectangle((3, 3), 4, 4, facecolor='#E3C195', hatch='X', edgecolor='black', lw=2))
-            ax3.text(5, 5, "Soil\nElement", ha='center', fontweight='bold')
-            ax3.annotate('', xy=(5, 4), xytext=(5, 8.5), arrowprops=dict(arrowstyle='->', color='black', lw=3))
-            ax3.text(5.2, 8, "Weight (Down)", ha='left')
-            ax3.annotate('', xy=(5, 6), xytext=(5, 1.5), arrowprops=dict(arrowstyle='->', color='red', lw=3))
-            ax3.text(5.2, 2, "Seepage (Up)", ha='left', color='red', fontweight='bold')
-            st.pyplot(fig3)
-
+    
 if __name__ == "__main__":
     app()
