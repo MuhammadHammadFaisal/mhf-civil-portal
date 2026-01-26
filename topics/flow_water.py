@@ -362,7 +362,6 @@ def app():
             # --- 1. VISUAL SETUP ---
             st.markdown("#### 1. Structure Configuration")
             
-            # CHECKBOXES for "Both"
             has_dam = st.checkbox("Include Concrete Dam", value=True)
             has_pile = st.checkbox("Include Sheet Pile (Cutoff)", value=False)
             
@@ -370,37 +369,40 @@ def app():
             pile_depth = 0.0
             pile_x = 0.0
 
-            # Dynamic Inputs based on selection
             if has_dam:
                 dam_width = st.number_input("Dam Base Width (B) [m]", value=6.0, step=0.5)
             
             if has_pile:
                 c_p1, c_p2 = st.columns(2)
                 pile_depth = c_p1.number_input("Pile Depth (D) [m]", value=5.0, step=0.5)
-                
-                # Constrain pile location input
                 limit_x = dam_width/2.0 if has_dam else 8.0
                 pile_x = c_p2.number_input("Pile X Location [m]", value=0.0, step=0.5, min_value=-limit_x, max_value=limit_x)
 
-            # --- 2. HYDRAULIC CONDITIONS ---
+            # --- NEW INPUT: IMPERVIOUS LAYER ---
             st.markdown("---")
-            st.markdown("#### 2. Hydraulic Conditions")
+            st.markdown("#### 2. Soil Profile")
+            # This input defines the "Hard Stratum" depth
+            soil_depth = st.number_input("Depth of Impervious Layer (T) [m]", value=12.0, step=1.0, help="Depth from ground surface to bedrock.")
+
+            # --- 3. HYDRAULIC CONDITIONS ---
+            st.markdown("---")
+            st.markdown("#### 3. Hydraulic Conditions")
             c_h1, c_h2 = st.columns(2)
             h_up = c_h1.number_input("Upstream Total Head ($H_{up}$) [m]", value=4.5, step=0.1)
             h_down = c_h2.number_input("Downstream Total Head ($H_{down}$) [m]", value=0.5, step=0.1)
             
-            # --- 3. FLOW NET PROPERTIES ---
+            # --- 4. FLOW NET COUNTING ---
             st.markdown("---")
-            st.markdown("#### 3. Flow Net Counting")
+            st.markdown("#### 4. Flow Net Counting")
             c_net1, c_net2 = st.columns(2)
             Nd = c_net1.number_input("Total Potential Drops ($N_d$)", value=7, step=1, min_value=1)
             Nf = c_net2.number_input("Total Flow Channels ($N_f$)", value=3, step=1, min_value=1)
             
-            # --- 4. POINT CALCULATOR ---
+            # --- 5. POINT CALCULATOR ---
             st.markdown("---")
-            st.markdown("#### 4. Point Calculator")
+            st.markdown("#### 5. Point Calculator")
             
-            datum = st.number_input("Datum Elevation ($z=0$)", value=-6.0, step=1.0)
+            datum = st.number_input("Datum Elevation ($z=0$)", value=-soil_depth, step=1.0)
 
             c_pt1, c_pt2, c_pt3 = st.columns(3)
             x_point = c_pt1.number_input("Point X [m]", value=2.0, step=0.5)
@@ -448,33 +450,35 @@ def app():
         
         with col_plot:
             fig, ax = plt.subplots(figsize=(6, 6))
+            # Set Y limit based on Impervious Depth
             ax.set_xlim(-10, 10)
-            ax.set_ylim(-12, 6)
+            ax.set_ylim(-soil_depth - 2, max(h_up, h_down) + 2)
             ax.set_aspect('equal')
             
-            # --- 1. SETUP GRID & AXIS ---
+            # --- 1. SETUP GRID & BOUNDARIES ---
             ax.axhline(0, color='black', linewidth=1.5) # Ground
+            
+            # IMPERVIOUS BOUNDARY (BEDROCK)
+            ax.axhline(-soil_depth, color='black', linewidth=2) 
+            # Hatch pattern for rock
+            ax.add_patch(patches.Rectangle((-10, -soil_depth - 2), 20, 2, facecolor='gray', hatch='///', edgecolor='black'))
+            ax.text(0, -soil_depth - 1, "IMPERVIOUS BOUNDARY (ROCK)", ha='center', color='white', fontweight='bold', fontsize=9)
+
+            # DATUM LINE
             ax.axhline(datum, color='green', linewidth=1.5, linestyle='-.', zorder=1)
             ax.text(-9.5, datum + 0.2, f"DATUM (z=0)", color='green', fontweight='bold', fontsize=8)
 
-            # --- 2. GENERATE SQUARE GRID (MATH) ---
+            # --- 2. GENERATE MATH (CONFOCAL CONICS) ---
             gx = np.linspace(-10, 10, 200)
-            gy = np.linspace(-12, 0, 200)
+            gy = np.linspace(-soil_depth, 0, 200) # Grid stops at rock
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
             
-            # MATH SELECTION (Visuals only, calc uses counting)
-            # If Pile exists, flow net is governed by pile (Confocal Conics)
-            # If Dam only, governed by flat base (Confocal Conics with different focus)
-            
             if has_pile:
                 focus = pile_depth
-                # Shift Z to center around the pile's X location
                 Z_shifted = (X - pile_x) + 1j * Y
-                
                 with np.errstate(invalid='ignore', divide='ignore'):
-                    W = np.arccosh(Z_shifted / focus)
-                    
+                    W = np.arccosh(Z_shifted / focus)     
             elif has_dam:
                 C = dam_width / 2.0
                 with np.errstate(invalid='ignore', divide='ignore'):
@@ -483,17 +487,17 @@ def app():
                 W = np.zeros_like(Z)
 
             Phi = np.real(W) 
-            # FIX: Force Psi to be positive to ensure levels [0..pi] are visible
-            Psi = np.abs(np.imag(W)) 
+            Psi = np.abs(np.imag(W)) # Force positive to fix visibility
 
             # --- 3. DRAW LINES ---
             if has_pile or has_dam:
-                # Flow Lines (Blue, Solid)
+                # Flow Lines (Blue) -> Ensure last line is near the rock boundary if possible
+                # We limit lines to max PI, but visually clamping them helps
                 ax.contour(X, Y, Psi, levels=np.linspace(0, np.pi, Nf+1), colors='blue', linewidths=1.2, linestyles='solid', alpha=0.6)
-                # Equipotential Lines (Red, Dashed)
+                # Equipotential Lines (Red)
                 ax.contour(X, Y, Phi, levels=np.linspace(0, 3.0, Nd+1), colors='red', linewidths=1.2, linestyles='dashed', alpha=0.6)
 
-            # --- 4. DRAW STRUCTURES ---
+            # --- 4. STRUCTURES ---
             if has_dam:
                 C = dam_width / 2.0
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', edgecolor='black', zorder=5))
@@ -504,7 +508,7 @@ def app():
                 ax.add_patch(patches.Rectangle((pile_x - pw/2, -pile_depth), pw, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=6))
                 ax.text(pile_x, -pile_depth/2, "PILE", rotation=90, color='white', ha='center', va='center', fontsize=8, zorder=7)
 
-            # --- 5. WATER LEVELS ---
+            # --- 5. WATER ---
             ax.add_patch(patches.Rectangle((-10, 0), 10, h_up, facecolor='#D6EAF8', alpha=0.5, zorder=1))
             ax.plot([-10, 0], [h_up, h_up], 'b-', lw=2)
             ax.text(-9, h_up + 0.2, f"H_up", color='blue', fontsize=8)
