@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 
+# --- HELPER FUNCTIONS ---
+
 def format_scientific(val):
     """
     Converts a number to a professional LaTeX scientific string.
@@ -19,6 +21,66 @@ def format_scientific(val):
         return f"{val:.4f}"
     else:
         return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
+
+def solve_flow_net_at_point(px, py, structure_type, dimension_val, h_upstream, h_downstream):
+    """
+    Calculates head and pressure at a specific point (px, py).
+    Returns: (Total Head, Elevation Head, Pressure Head, Pore Pressure)
+    """
+    # 1. Elevation Head (z)
+    # In geotechnical engineering, z is simply the elevation (y-coordinate)
+    z = py 
+    
+    # 2. Total Head (h)
+    # This approximates the head loss based on position.
+    # In a real scenario, this requires solving the Laplace equation (Flow Net).
+    # Here we use a linear approximation for the calculator to function.
+    delta_H = h_upstream - h_downstream
+    
+    # Avoid division by zero
+    if dimension_val <= 0:
+        dimension_val = 1.0
+        
+    fraction_lost = 0.0
+    
+    if structure_type == "Concrete Dam":
+        # Dam width is B (dim_val). Assume linear loss across the base width.
+        # Upstream of dam (x < -B/2) -> No loss
+        # Downstream of dam (x > B/2) -> Full loss
+        # Under dam -> Linear loss
+        half_width = dimension_val / 2.0
+        if px < -half_width:
+            fraction_lost = 0.0
+        elif px > half_width:
+            fraction_lost = 1.0
+        else:
+            # Linear interpolation under the dam
+            # (px - left_edge) / total_width
+            fraction_lost = (px - (-half_width)) / dimension_val
+            
+    else: # Sheet Pile
+        # Flow travels down one side and up the other.
+        # Simplified: loss depends on depth and side of pile.
+        # This is a very rough approximation for the calculator.
+        if px < 0: # Upstream side
+            fraction_lost = 0.2 # Slight loss entering soil
+        elif px > 0: # Downstream side
+            fraction_lost = 0.8 # Major loss after passing pile
+        else:
+            fraction_lost = 0.5
+
+    h = h_upstream - (delta_H * fraction_lost)
+
+    # 3. Pressure Head (hp) = Total Head - Elevation Head
+    hp = h - z
+
+    # 4. Pore Pressure (u) = hp * gamma_w
+    gamma_w = 9.81
+    u = hp * gamma_w
+    
+    return h, z, hp, u
+
+# --- MAIN APP ---
 
 def app():
     st.markdown("---")
@@ -94,7 +156,7 @@ def app():
 
             # 1. SOIL FILL
             ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, val_z, 
-                                           facecolor='#E3C195', hatch='...', edgecolor='none', zorder=1))
+                                            facecolor='#E3C195', hatch='...', edgecolor='none', zorder=1))
             ax.text(soil_x + soil_w/2, datum_y + val_z/2, "SOIL", ha='center', fontweight='bold', fontsize=12, zorder=3)
             
             # 2. WATER FILLS & TANKS
@@ -304,7 +366,8 @@ def app():
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5); ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
 
             st.pyplot(fig2)
-                # =================================================================
+            
+    # =================================================================
     # TAB 3: 2D FLOW NET (UPDATED WITH POINT CALC)
     # =================================================================
     with tab3:
@@ -343,6 +406,7 @@ def app():
                 st.error("Point Y must be negative (in the soil).")
                 res_h, res_z, res_hp, res_u = 0,0,0,0
             else:
+                # THIS WAS THE MISSING FUNCTION CALL
                 res_h, res_z, res_hp, res_u = solve_flow_net_at_point(p_x, p_y, struct_type, dim_val, h_up, h_down)
 
             if res_h is not None:
