@@ -22,9 +22,10 @@ def format_scientific(val):
     else:
         return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
 
-def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, z_point):
+def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, y_point, datum_elev):
     """
-    Calculates head and pressure using Flow Net Counting Method (Standard Textbook Approach).
+    Calculates head and pressure using Flow Net Counting Method.
+    Adjusts for a variable Datum.
     """
     # 1. Total Head Loss (H_diff)
     H_diff = h_upstream - h_downstream
@@ -36,16 +37,22 @@ def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, z_
         delta_h = 0
         
     # 3. Total Head at Point (H_point)
-    # H_point = H_start - (drops_passed * loss_per_drop)
-    # Note: H_start is usually equal to h_upstream (assuming datum is at 0 or consistent)
+    # H_point is relative to the upstream water level reference
+    # We assume upstream water level is at elevation h_upstream relative to ground 0
+    # But usually in flow nets, Total Head is defined relative to the Tail Water or a Datum.
+    # Standard Convention: Total Head = Elevation Head + Pressure Head
+    # Let's assume the input h_upstream is the Total Head at the start.
     h_point = h_upstream - (drops_passed * delta_h)
     
-    # 4. Pressure Head (hp)
-    # Bernoulli: Total Head = Elevation Head + Pressure Head
-    # h = z + hp  ->  hp = h - z
-    hp = h_point - z_point
+    # 4. Elevation Head (z)
+    # z is the vertical distance from the point to the Datum.
+    z = y_point - datum_elev
     
-    # 5. Pore Pressure (u)
+    # 5. Pressure Head (hp)
+    # h = z + hp  ->  hp = h - z
+    hp = h_point - z
+    
+    # 6. Pore Pressure (u)
     gamma_w = 9.81
     u = hp * gamma_w
     
@@ -55,9 +62,10 @@ def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, z_
         "h_point": h_point,
         "hp": hp,
         "u": u,
-        "z": z_point,
+        "z": z,
         "nd_passed": drops_passed,
-        "Nd_total": total_Nd
+        "Nd_total": total_Nd,
+        "datum": datum_elev
     }
 # --- MAIN APP ---
 
@@ -346,7 +354,7 @@ def app():
 
             st.pyplot(fig2)
 
-  # =================================================================
+ # =================================================================
     # TAB 3: FLOW NETS & PIPING (TEXTBOOK SOLVER)
     # =================================================================
     with tab3:
@@ -358,8 +366,8 @@ def app():
         with col_input:
             st.markdown("#### 1. Hydraulic Conditions")
             c_h1, c_h2 = st.columns(2)
-            h_up = c_h1.number_input("Upstream Head ($H_{up}$) [m]", value=4.5, step=0.1)
-            h_down = c_h2.number_input("Downstream Head ($H_{down}$) [m]", value=0.5, step=0.1)
+            h_up = c_h1.number_input("Upstream Total Head ($H_{up}$) [m]", value=4.5, step=0.1)
+            h_down = c_h2.number_input("Downstream Total Head ($H_{down}$) [m]", value=0.5, step=0.1)
             
             st.markdown("---")
             st.markdown("#### 2. Flow Net Properties")
@@ -369,19 +377,23 @@ def app():
             
             st.markdown("---")
             st.markdown("#### 3. Point Calculator")
-            st.caption("Look at your diagram. Where is the point located?")
             
-            # Point Inputs
-            z_point = st.number_input("Elevation of Point ($z$) [m]", value=-4.0, step=0.5, help="Vertical distance from datum")
-            nd_point = st.number_input("Drops Passed to reach Point ($n_d$)", value=2.0, step=0.1, help="How many equipotential lines has the water crossed to get here?")
+            # DATUM INPUT
+            datum = st.number_input("Datum Elevation [m] (Reference Level)", value=-6.0, step=1.0, help="The level where Elevation Head z = 0")
+
+            # POINT INPUTS
+            c_p1, c_p2, c_p3 = st.columns(3)
+            x_point = c_p1.number_input("Point X [m]", value=2.5, step=0.5)
+            y_point = c_p2.number_input("Point Y [m]", value=-4.0, step=0.5)
+            nd_point = c_p3.number_input("Drops Passed ($n_d$)", value=2.0, step=0.1)
             
             # Calculate Logic
-            results = solve_flow_net_at_point(h_up, h_down, Nd, nd_point, z_point)
+            results = solve_flow_net_at_point(h_up, h_down, Nd, nd_point, y_point, datum)
             
             # --- RESULTS DISPLAY ---
             st.markdown(f"""
             <div style="background-color: #e3f2fd; color: #333333; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-top: 10px;">
-                <h4 style="color: #1565c0; margin-top: 0;">Results at Point</h4>
+                <h4 style="color: #1565c0; margin-top: 0;">Results at Point ({x_point}, {y_point})</h4>
                 <table style="width: 100%; border-collapse: collapse; color: #333333;">
                     <tr>
                         <td style="padding: 5px;"><strong>Total Head ($h$)</strong></td>
@@ -399,83 +411,82 @@ def app():
             </div>
             """, unsafe_allow_html=True)
             
-            # --- SEEPAGE RATE CALCULATION (Part a of image) ---
-            k_val = st.number_input("Permeability ($k$) [m/sec] (for q calc)", value=1e-6, format="%.1e")
+            # --- SEEPAGE RATE ---
+            k_val = st.number_input("Permeability ($k$) [m/sec]", value=1e-6, format="%.1e")
             q = k_val * results['H_diff'] * (Nf / Nd)
-            
             st.info(f"**Seepage Rate (q):** {format_scientific(q)} m³/sec/m")
 
-            # --- DETAILED STEPS (Matches Handwritten Note) ---
-            with st.expander("See Calculation Steps (Textbook Style)"):
+            with st.expander("See Calculation Steps"):
                 st.markdown("**Step 1: Calculate Head Loss per Drop**")
-                st.latex(rf"\Delta H = H_{{up}} - H_{{down}} = {h_up} - {h_down} = {results['H_diff']:.2f} \text{{ m}}")
+                st.latex(rf"\Delta H = {h_up} - {h_down} = {results['H_diff']:.2f} \text{{ m}}")
                 st.latex(rf"\Delta h = \frac{{\Delta H}}{{N_d}} = \frac{{{results['H_diff']:.2f}}}{{{Nd}}} = {results['delta_h']:.3f} \text{{ m}}")
                 
-                st.markdown("**Step 2: Calculate Total Head at Point**")
-                st.write("Using the formula: $H_{point} = H_{start} - (n \times \Delta h)$")
-                st.latex(rf"H_{{point}} = {h_up} - ({nd_point} \times {results['delta_h']:.3f}) = \mathbf{{{results['h_point']:.2f} \text{{ m}}}}")
+                st.markdown("**Step 2: Elevation Head ($z$)**")
+                st.latex(rf"z = Y_{{point}} - Y_{{datum}} = {y_point} - ({datum}) = \mathbf{{{results['z']:.2f} \text{{ m}}}}")
                 
-                st.markdown("**Step 3: Calculate Pore Pressure**")
-                st.write("Using Bernoulli: $H = z + \frac{u}{\gamma_w}$")
-                st.latex(rf"\frac{{u}}{{\gamma_w}} = H_{{point}} - z = {results['h_point']:.2f} - ({results['z']}) = {results['hp']:.2f} \text{{ m}}")
+                st.markdown("**Step 3: Total Head at Point**")
+                st.latex(rf"H_{{point}} = H_{{up}} - (n_d \times \Delta h) = {h_up} - ({nd_point} \times {results['delta_h']:.3f}) = \mathbf{{{results['h_point']:.2f} \text{{ m}}}}")
+                
+                st.markdown("**Step 4: Pore Pressure**")
+                st.latex(rf"\frac{{u}}{{\gamma_w}} = H_{{point}} - z = {results['h_point']:.2f} - ({results['z']:.2f}) = {results['hp']:.2f} \text{{ m}}")
                 st.latex(rf"u = {results['hp']:.2f} \times 9.81 = \mathbf{{{results['u']:.2f} \text{{ kPa}}}}")
 
         with col_plot:
-            # Dynamic Plot Visualization
-            fig, ax = plt.subplots(figsize=(6, 5))
+            fig, ax = plt.subplots(figsize=(6, 6))
             
-            # Setup Limits
-            ax.set_xlim(-10, 10)
-            ax.set_ylim(-12, 6)
+            # --- 1. SETUP GRID & AXIS ---
+            ax.set_xlim(-8, 8)
+            ax.set_ylim(-10, 6)
             ax.set_aspect('equal')
-            ax.axis('off')
             
-            # 1. Draw Structure (Generic Sheet Pile)
+            # Add Coordinate Grid
+            ax.grid(True, which='both', linestyle='--', linewidth=0.5, color='gray', alpha=0.5, zorder=0)
+            ax.axhline(0, color='black', linewidth=1) # Ground line
+            ax.axvline(0, color='black', linewidth=0.5, linestyle=':') # Center line
+            
+            # --- 2. DRAW DATUM LINE ---
+            ax.axhline(datum, color='green', linewidth=2, linestyle='-.', zorder=1)
+            ax.text(-7.5, datum + 0.2, f"DATUM (z=0) @ {datum}m", color='green', fontweight='bold', fontsize=9, zorder=2)
+
+            # --- 3. DRAW STRUCTURE (Sheet Pile) ---
             pile_depth = 6.0
-            ax.add_patch(patches.Rectangle((-0.2, -pile_depth), 0.4, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=5))
+            ax.add_patch(patches.Rectangle((-0.1, -pile_depth), 0.2, pile_depth + 4, facecolor='#444', edgecolor='black', zorder=5))
             
-            # 2. Draw Water Levels
-            ax.plot([-10, 0], [h_up, h_up], 'b-', lw=2)
-            ax.add_patch(patches.Rectangle((-10, 0), 10, h_up, facecolor='#D6EAF8', alpha=0.5))
-            ax.text(-8, h_up + 0.5, f"Upstream: {h_up}m", fontsize=8, color='blue')
-
-            ax.plot([0, 10], [h_down, h_down], 'b-', lw=2)
-            ax.add_patch(patches.Rectangle((0, 0), 10, h_down, facecolor='#D6EAF8', alpha=0.5))
-            ax.text(2, h_down + 0.5, f"Downstream: {h_down}m", fontsize=8, color='blue')
+            # Water
+            ax.add_patch(patches.Rectangle((-8, 0), 8, 4, facecolor='#D6EAF8', alpha=0.5, zorder=1))
+            ax.add_patch(patches.Rectangle((0, 0), 8, 1, facecolor='#D6EAF8', alpha=0.5, zorder=1))
+            ax.text(-7, 4.2, f"Upstream: {h_up}m", color='blue', fontsize=8)
             
-            # 3. Draw Ground Line
-            ax.plot([-10, 10], [0, 0], 'k-', lw=2)
-
-            # 4. Generate Flow Net Lines (Approximation for visuals)
-            # We use complex potentials for a theoretical sheet pile to draw curves
-            # But we limit the number of lines to exactly what the user typed (Nf, Nd)
-            
-            gx = np.linspace(-10, 10, 100)
-            gy = np.linspace(-12, 0, 100)
+            # --- 4. FLOW NET VISUALS ---
+            gx = np.linspace(-8, 8, 100)
+            gy = np.linspace(-10, 0, 100)
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
             Z_shift = Z + 1j*pile_depth
+            with np.errstate(invalid='ignore'): W = -1j * np.sqrt(Z_shift)
+            Phi, Psi = np.real(W), np.imag(W)
             
-            with np.errstate(invalid='ignore'):
-                W = -1j * np.sqrt(Z_shift)
-            Phi = np.real(W) # Potentials
-            Psi = np.imag(W) # Flow lines
-            
-            # Draw Equipotential Lines (Nd)
-            # We want Nd drops, so we need Nd+1 lines roughly
-            ax.contour(X, Y, Phi, levels=Nd+1, colors='red', linewidths=1, linestyles='dashed', alpha=0.6)
-            
-            # Draw Flow Lines (Nf)
-            ax.contour(X, Y, Psi, levels=Nf+1, colors='blue', linewidths=1, linestyles='solid', alpha=0.6)
+            ax.contour(X, Y, Phi, levels=Nd+1, colors='red', linewidths=1, linestyles='dashed', alpha=0.5)
+            ax.contour(X, Y, Psi, levels=Nf+1, colors='blue', linewidths=1, linestyles='solid', alpha=0.5)
 
-            # 5. Highlight the "Elevation" line
-            ax.plot([-10, 10], [z_point, z_point], 'k:', lw=1, alpha=0.5)
-            ax.text(-9, z_point + 0.2, f"Elevation z={z_point}", fontsize=8)
+            # --- 5. PLOT THE STUDENT POINT ---
+            # High visibility marker
+            ax.scatter(x_point, y_point, color='red', s=150, marker='X', edgecolors='black', linewidth=1.5, zorder=10, label='Point')
+            
+            # Add coordinates text next to point
+            ax.text(x_point + 0.3, y_point, f"({x_point}, {y_point})\nu={results['u']:.1f}", 
+                    color='red', fontweight='bold', fontsize=10, zorder=10,
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+
+            # Visual arrow for z
+            ax.annotate('', xy=(x_point, y_point), xytext=(x_point, datum), 
+                        arrowprops=dict(arrowstyle='<->', color='green', lw=1.5), zorder=9)
+            ax.text(x_point + 0.1, (y_point + datum)/2, f"z={results['z']:.1f}", color='green', fontsize=9, fontweight='bold')
 
             # Legend
-            ax.plot([], [], 'b-', label=f'{Nf} Flow Channels')
-            ax.plot([], [], 'r--', label=f'{Nd} Potential Drops')
-            ax.legend(loc='lower center', ncol=2, fontsize=8)
+            ax.plot([], [], 'g-.', label='Datum')
+            ax.scatter([], [], c='red', marker='X', label='Point')
+            ax.legend(loc='upper right', fontsize=8, framealpha=1)
             
             st.pyplot(fig)
 if __name__ == "__main__":
