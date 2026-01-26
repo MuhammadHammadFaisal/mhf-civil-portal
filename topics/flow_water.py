@@ -19,9 +19,7 @@ def get_complex_potential(x, y, has_pile, pile_depth, pile_x, has_dam, dam_width
     """
     z = x + 1j * y
     
-    # --- FIX IS HERE ---
-    # Only check for singularity if 'z' is a single number (for the Point Calculator)
-    # If 'z' is an array (for the Graph), skip this check to avoid ValueError.
+    # FIX: Only check for singularity if 'z' is a single number (not a grid for plotting)
     if np.isscalar(z):
         if abs(z - (pile_x + 0j)) < 0.01: 
             z = pile_x + 0.01j
@@ -53,7 +51,7 @@ def solve_smart_point(x, y, h_up, h_down, datum, has_pile, pile_depth, pile_x, h
     W_point = get_complex_potential(x, y, has_pile, pile_depth, pile_x, has_dam, dam_width)
     phi_point = np.real(W_point)
     
-    # 2. Establish Boundary Ranges
+    # 2. Establish Boundary Ranges (Sample far field)
     W_far_left = get_complex_potential(-20, -0.1, has_pile, pile_depth, pile_x, has_dam, dam_width)
     W_far_right = get_complex_potential(20, -0.1, has_pile, pile_depth, pile_x, has_dam, dam_width)
     
@@ -381,28 +379,29 @@ def app():
             
             # --- CONDITIONAL INPUTS ---
             if has_dam: 
-                dam_w = st.number_input("Dam Width (B) [m]", 6.0, step=0.5)
+                dam_w = st.number_input("Dam Width (B) [m]", value=6.0, step=0.5)
             
             if has_pile: 
-                pile_d = st.number_input("Pile Depth (D) [m]", 5.0, step=0.5)
+                pile_d = st.number_input("Pile Depth (D) [m]", value=5.0, step=0.5)
                 # Limit pile location to ensure it's near the dam if both exist
                 limit = dam_w/2 if has_dam else 8.0
-                pile_loc = st.number_input("Pile X Location [m]", 0.0, step=0.5, min_value=-limit, max_value=limit)
+                # FIXED: Explicitly use 'value=' to avoid argument collision
+                pile_loc = st.number_input("Pile X Location [m]", value=0.0, step=0.5, min_value=-limit, max_value=limit)
 
             st.markdown("#### 2. Soil & Water")
-            soil_d = st.number_input("Impervious Layer Depth (T) [m]", 12.0, step=1.0)
-            h_up = st.number_input("Upstream Head [m]", 10.0)
-            h_down = st.number_input("Downstream Head [m]", 2.0)
+            soil_d = st.number_input("Impervious Layer Depth (T) [m]", value=12.0, step=1.0)
+            h_up = st.number_input("Upstream Head [m]", value=10.0)
+            h_down = st.number_input("Downstream Head [m]", value=2.0)
             
             c_n1, c_n2 = st.columns(2)
-            Nd_visual = c_n1.number_input("Drops (Nd)", 12)
-            Nf_visual = c_n2.number_input("Channels (Nf)", 4)
+            Nd_visual = c_n1.number_input("Drops (Nd)", value=12)
+            Nf_visual = c_n2.number_input("Channels (Nf)", value=4)
 
             st.markdown("#### 3. Smart Point Check")
-            datum = st.number_input("Datum Elevation", -soil_d)
+            datum = st.number_input("Datum Elevation", value=-soil_d)
             c_pt1, c_pt2 = st.columns(2)
-            px = c_pt1.number_input("X", 2.0, step=0.5)
-            py = c_pt2.number_input("Y", -4.0, step=0.5)
+            px = c_pt1.number_input("X", value=2.0, step=0.5)
+            py = c_pt2.number_input("Y", value=-4.0, step=0.5)
 
             # --- CALCULATION ---
             if py > 0: 
@@ -422,7 +421,7 @@ def app():
                 </div>
                 """, unsafe_allow_html=True)
                 
-                k_val = st.number_input("k [m/s]", 1e-6, format="%.1e")
+                k_val = st.number_input("k [m/s]", value=1e-6, format="%.1e")
                 q_val = k_val * (h_up - h_down) * (Nf_visual / Nd_visual)
                 st.info(f"Seepage q = {format_scientific(q_val)} m³/sec/m")
 
@@ -449,28 +448,26 @@ def app():
             Phi = np.real(W)
             Psi = np.abs(np.imag(W))
             
-            # Clamp flow to bedrock
-            center_x = pile_loc if has_pile else 0
-            w_bed = get_complex_potential(center_x + 0.01, -soil_d, has_pile, pile_d, pile_loc, has_dam, dam_w)
+            # Auto-Scale Psi to fit bedrock
+            center_check_x = pile_loc if has_pile else 0
+            w_bed = get_complex_potential(center_check_x + 0.01, -soil_d, has_pile, pile_d, pile_loc, has_dam, dam_w)
             psi_max = np.abs(np.imag(w_bed))
             if np.isnan(psi_max) or psi_max < 0.1: psi_max = 3.14
             
-            # --- 3. DRAW LINES ---
+            # 3. Plot Lines
             if has_dam or has_pile:
                 # Flow Lines (Blue)
                 ax.contour(X, Y, Psi, levels=np.linspace(0, psi_max, Nf_visual+1), colors='blue', lw=1, alpha=0.6, linestyles='solid')
                 # Equipotentials (Red)
                 ax.contour(X, Y, Phi, levels=Nd_visual+2, colors='red', lw=1, linestyles='dashed', alpha=0.6)
 
-            # --- 4. DRAW STRUCTURES ---
-            # A. DAM
+            # 4. Structures (DRAW BOTH IF CHECKED)
             if has_dam:
                 C = dam_w / 2.0
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', ec='k', zorder=10))
                 ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=11)
                 ax.plot([-C, C], [0, 0], 'b-', lw=2, zorder=11) 
 
-            # B. SHEET PILE
             if has_pile:
                 pw = 0.4
                 ax.add_patch(patches.Rectangle((pile_loc-pw/2, -pile_d), pw, pile_d+h_up+1, facecolor='#222', ec='k', zorder=12))
