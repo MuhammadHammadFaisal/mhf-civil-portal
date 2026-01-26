@@ -19,21 +19,23 @@ def get_complex_potential(x, y, has_pile, pile_depth, pile_x, has_dam, dam_width
     """
     z = x + 1j * y
     
-    # Avoid singularity
-    if abs(z - (pile_x + 0j)) < 0.01: z = pile_x + 0.01j
+    # FIX: Only check for singularity if 'z' is a single number (not a grid for plotting)
+    if np.isscalar(z):
+        if abs(z - (pile_x + 0j)) < 0.01: 
+            z = pile_x + 0.01j
 
     if has_pile:
         # VERTICAL CUT MATH (Dominant)
-        # Maps flow around a vertical barrier at pile_x
         z_shifted = (z - pile_x)
+        # Avoid division by zero if depth is 0
+        d = pile_depth if pile_depth > 0 else 0.1
         with np.errstate(invalid='ignore', divide='ignore'):
-             W = np.arcsinh(z_shifted / pile_depth)
+             W = np.arcsinh(z_shifted / d)
         return W
 
     elif has_dam:
         # HORIZONTAL CUT MATH (Flat Base)
-        # Maps flow under a flat plate of width B
-        c = dam_width / 2.0
+        c = dam_width / 2.0 if dam_width > 0 else 0.1
         with np.errstate(invalid='ignore', divide='ignore'):
             W = np.arccosh(z / c)
         return W
@@ -49,8 +51,7 @@ def solve_smart_point(x, y, h_up, h_down, datum, has_pile, pile_depth, pile_x, h
     W_point = get_complex_potential(x, y, has_pile, pile_depth, pile_x, has_dam, dam_width)
     phi_point = np.real(W_point)
     
-    # 2. Establish Boundary Ranges
-    # We sample far field to find the max/min potential values
+    # 2. Establish Boundary Ranges (Sample far field)
     W_far_left = get_complex_potential(-20, -0.1, has_pile, pile_depth, pile_x, has_dam, dam_width)
     W_far_right = get_complex_potential(20, -0.1, has_pile, pile_depth, pile_x, has_dam, dam_width)
     
@@ -58,7 +59,7 @@ def solve_smart_point(x, y, h_up, h_down, datum, has_pile, pile_depth, pile_x, h
     phi_R = np.real(W_far_right)
     
     # 3. Calculate Ratio (0 to 1)
-    if phi_R != phi_L:
+    if abs(phi_R - phi_L) > 1e-6:
         ratio = (phi_R - phi_point) / (phi_R - phi_L)
     else:
         ratio = 0.5
@@ -370,7 +371,7 @@ def app():
 
         with col_in:
             st.markdown("#### 1. Structure Configuration")
-            # --- CHECKBOXES ALLOW BOTH TO BE SELECTED ---
+            # --- CHECKBOXES ---
             has_dam = st.checkbox("Include Concrete Dam", value=True)
             has_pile = st.checkbox("Include Sheet Pile", value=False)
             
@@ -382,7 +383,6 @@ def app():
             
             if has_pile: 
                 pile_d = st.number_input("Pile Depth (D) [m]", 5.0, step=0.5)
-                # Limit pile location to ensure it's near the dam if both exist
                 limit = dam_w/2 if has_dam else 8.0
                 pile_loc = st.number_input("Pile X Location [m]", 0.0, step=0.5, min_value=-limit, max_value=limit)
 
@@ -436,43 +436,39 @@ def app():
             ax.axhline(datum, color='green', ls='-.', alpha=0.5)
             ax.text(-11, datum+0.2, "DATUM", color='green', fontsize=8)
 
-            # --- 2. MATH ENGINE ---
+            # 2. Math & Grid
             gx = np.linspace(-12, 12, 200)
             gy = np.linspace(-soil_d, 0, 150)
             X, Y = np.meshgrid(gx, gy)
             
             W = get_complex_potential(X, Y, has_pile, pile_d, pile_loc, has_dam, dam_w)
+
             Phi = np.real(W)
             Psi = np.abs(np.imag(W))
             
-            # Clamp flow to bedrock
-            center_x = pile_loc if has_pile else 0
-            w_bed = get_complex_potential(center_x + 0.01, -soil_d, has_pile, pile_d, pile_loc, has_dam, dam_w)
+            # Auto-Scale Psi to fit bedrock
+            center_check_x = pile_loc if has_pile else 0
+            w_bed = get_complex_potential(center_check_x + 0.01, -soil_d, has_pile, pile_d, pile_loc, has_dam, dam_w)
             psi_max = np.abs(np.imag(w_bed))
             if np.isnan(psi_max) or psi_max < 0.1: psi_max = 3.14
             
-            # --- 3. DRAW LINES ---
+            # 3. Plot Lines
             if has_dam or has_pile:
+                # Flow Lines (Blue)
                 ax.contour(X, Y, Psi, levels=np.linspace(0, psi_max, Nf_visual+1), colors='blue', lw=1, alpha=0.6, linestyles='solid')
+                # Equipotentials (Red)
                 ax.contour(X, Y, Phi, levels=Nd_visual+2, colors='red', lw=1, linestyles='dashed', alpha=0.6)
 
-            # --- 4. DRAW STRUCTURES (VISUAL LAYERING) ---
-            
-            # A. DAM (Bottom Layer)
+            # 4. Structures (DRAW BOTH IF CHECKED)
             if has_dam:
                 C = dam_w / 2.0
-                # Draw Dam Body
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', ec='k', zorder=10))
                 ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=11)
-                # Base Line
                 ax.plot([-C, C], [0, 0], 'b-', lw=2, zorder=11) 
 
-            # B. SHEET PILE (Top Layer - zorder=12)
             if has_pile:
                 pw = 0.4
-                # Draw Pile
                 ax.add_patch(patches.Rectangle((pile_loc-pw/2, -pile_d), pw, pile_d+h_up+1, facecolor='#222', ec='k', zorder=12))
-                # White Mask to hide lines inside pile thickness
                 ax.add_patch(patches.Rectangle((pile_loc-0.15, -pile_d), 0.3, pile_d, fc='white', zorder=9))
                 ax.text(pile_loc, -pile_d/2, "PILE", rotation=90, color='white', ha='center', va='center', fontsize=8, zorder=13)
 
@@ -484,6 +480,9 @@ def app():
 
             ax.scatter(px, py, c='red', s=100, marker='X', zorder=20, ec='white')
             ax.text(px+0.5, py, f"u={res['u']:.1f}", color='red', fontweight='bold', zorder=20, fontsize=9)
+            
+            ax.plot([], [], 'b-', label='Flow Line'); ax.plot([], [], 'r--', label='Equipotential')
+            ax.legend(loc='lower center', ncol=2, fontsize=8)
             
             ax.axis('off'); st.pyplot(fig)
 
