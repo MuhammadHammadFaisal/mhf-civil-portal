@@ -8,7 +8,7 @@ st.set_page_config(
 )
 
 # --- 2. IMPORT TOPIC MODULES ---
-# These files must exist in your 'topics' folder
+# These imports link to the files in your 'topics' folder
 from topics import flow_water
 from topics import soil_phase
 from topics import effective_stress
@@ -17,11 +17,11 @@ def app():
     # --- HEADER SECTION ---
     try:
         col_logo, col_text = st.columns([1, 5], vertical_alignment="center")
-    except TypeError: # Fallback for older Streamlit versions
+    except TypeError:
         col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
-        # If you have a logo, un-comment the line below
+        # If you have a logo, uncomment the line below
         # st.image("assets/logo.png", width=120) 
         pass
 
@@ -39,26 +39,28 @@ def app():
 
     # --- SIDEBAR NAVIGATION ---
     st.sidebar.header("Select Module")
+    
+    # This radio button determines which file gets loaded
     topic = st.sidebar.radio(
         "Available Topics:",
         [
-            "Flow of Water (Seepage)",
             "Phase Relationships", 
+            "Flow of Water (Seepage)",
             "Effective Stress"
         ]
     )
 
     # --- ROUTER LOGIC ---
-    if topic == "Flow of Water (Seepage)":
-        # Calls the main app function inside topics/flow_water.py
-        flow_water.app()
-
-    elif topic == "Phase Relationships":
-        # Calls the main app function inside topics/soil_phase.py
+    if topic == "Phase Relationships":
+        # Loads the code from topics/soil_phase.py
         soil_phase.app()
 
+    elif topic == "Flow of Water (Seepage)":
+        # Loads the code from topics/flow_water.py
+        flow_water.app()
+
     elif topic == "Effective Stress":
-        # Calls the main app function inside topics/effective_stress.py
+        # Loads the code from topics/effective_stress.py
         effective_stress.app()
 
 if __name__ == "__main__":
