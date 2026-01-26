@@ -3,6 +3,7 @@ import streamlit as st
 from topics import soil_phase
 from topics import effective_stress
 from topics import flow_water
+from config import APP_VERSION
 
 # 1. PAGE CONFIG
 st.set_page_config(
@@ -66,13 +67,14 @@ def app():
 
     # --- ROUTER LOGIC ---
     if topic == "Phase Relationships":
-        soil_phase.app()
+    soil_phase.app(APP_VERSION)
 
     elif topic == "Effective Stress":
-        effective_stress.app()
+    effective_stress.app(APP_VERSION)
 
     elif topic == "Flow of Water in Soils":
-        flow_water.app()
+    flow_water.app(APP_VERSION)
+
 
 if __name__ == "__main__":
     app()
