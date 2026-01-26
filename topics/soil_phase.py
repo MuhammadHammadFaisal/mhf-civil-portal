@@ -70,34 +70,40 @@ def app():
                     # 2. Se = wGs
                     if known('w') and known('Gs') and known('e') and not known('Sr'):
                         p['Sr'] = (p['w'] * p['Gs']) / p['e']
-                        sub = r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}'
+                        # FIX: Used \\cdot instead of \cdot inside f-string
+                        sub = r'\frac{' + f"{p['w']:.3f} \\cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}'
                         self.add_log('Sr', r'\frac{w G_s}{e}', sub, p['Sr'])
                         changed = True
                     if known('w') and known('Gs') and known('Sr') and not known('e') and p['Sr'] != 0:
                         p['e'] = (p['w'] * p['Gs']) / p['Sr']
-                        sub = r'\frac{' + f"{p['w']:.3f} \cdot {p['Gs']:.2f}" + r'}{' + f"{p['Sr']:.3f}" + r'}'
+                        # FIX: Used \\cdot
+                        sub = r'\frac{' + f"{p['w']:.3f} \\cdot {p['Gs']:.2f}" + r'}{' + f"{p['Sr']:.3f}" + r'}'
                         self.add_log('e', r'\frac{w G_s}{S_r}', sub, p['e'])
                         changed = True
                     if known('Sr') and known('e') and known('Gs') and not known('w'):
                         p['w'] = (p['Sr'] * p['e']) / p['Gs']
-                        sub = r'\frac{' + f"{p['Sr']:.3f} \cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}'
+                        # FIX: Used \\cdot
+                        sub = r'\frac{' + f"{p['Sr']:.3f} \\cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}'
                         self.add_log('w', r'\frac{S_r e}{G_s}', sub, p['w'])
                         changed = True
                     if known('Sr') and known('e') and known('w') and not known('Gs') and p['w'] != 0:
                         p['Gs'] = (p['Sr'] * p['e']) / p['w']
-                        sub = r'\frac{' + f"{p['Sr']:.3f} \cdot {p['e']:.3f}" + r'}{' + f"{p['w']:.3f}" + r'}'
+                        # FIX: Used \\cdot
+                        sub = r'\frac{' + f"{p['Sr']:.3f} \\cdot {p['e']:.3f}" + r'}{' + f"{p['w']:.3f}" + r'}'
                         self.add_log('Gs', r'\frac{S_r e}{w}', sub, p['Gs'])
                         changed = True
 
                     # 3. Unit Weights
                     if known('Gs') and known('e') and not known('gamma_dry'):
                         p['gamma_dry'] = (p['Gs'] * self.gamma_w) / (1 + p['e'])
-                        sub = r'\frac{' + f"{p['Gs']:.2f} \cdot 9.81" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
+                        # FIX: Used \\cdot
+                        sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
                         self.add_log('gamma_dry', r'\frac{G_s \gamma_w}{1 + e}', sub, p['gamma_dry'])
                         changed = True
                     if known('Gs') and known('e') and known('w') and not known('gamma_bulk'):
                         p['gamma_bulk'] = (p['Gs'] * self.gamma_w * (1 + p['w'])) / (1 + p['e'])
-                        sub = r'\frac{' + f"{p['Gs']:.2f} \cdot 9.81 (1 + {p['w']:.3f})" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
+                        # FIX: Used \\cdot
+                        sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81 (1 + {p['w']:.3f})" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
                         self.add_log('gamma_bulk', r'\frac{G_s \gamma_w (1+w)}{1+e}', sub, p['gamma_bulk'])
                         changed = True
 
@@ -111,7 +117,8 @@ def app():
                     if known('gamma_dry') and known('Gs') and not known('e'):
                         val = (p['Gs'] * self.gamma_w) / p['gamma_dry']
                         p['e'] = val - 1
-                        sub = r'\frac{' + f"{p['Gs']:.2f} \cdot 9.81" + r'}{' + f"{p['gamma_dry']:.2f}" + r'} - 1'
+                        # FIX: Used \\cdot
+                        sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81" + r'}{' + f"{p['gamma_dry']:.2f}" + r'} - 1'
                         self.add_log('e', r'\frac{G_s \gamma_w}{\gamma_{dry}} - 1', sub, p['e'])
                         changed = True
 
@@ -147,13 +154,18 @@ def app():
                 Gs = raw_Gs if raw_Gs is not None else 2.7
                 w = raw_w if raw_w is not None else 0.2
 
+            # Guard against crazy values for plotting
+            if e > 5: e = 5
+            if e < 0: e = 0.1
+
             Vs = 1.0
             Vv = e
             Vw = Sr * e
             Va = Vv - Vw
             
             Ms = Gs 
-            Mw = w * Ms if w is not None else Vw * 1.0 
+            # Mw calculation for display (not logic)
+            Mw = w * Ms if (w is not None and Gs is not None) else Vw * 1.0 
 
             fig, ax = plt.subplots(figsize=(5, 3.5))
             ax.set_xlim(-1.5, 2.5) 
@@ -250,10 +262,12 @@ def app():
 
         with top_col2:
             st.markdown("### Input Monitor")
+            # PASS THE FIGURE OBJECT, NOT SAVE TO FILE
             fig_preview = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=False)
             st.pyplot(fig_preview)
+            plt.close(fig_preview) # Good practice to close figure
 
-      
+        
         solve_btn = st.button("Solve Numeric Problem", type="primary", use_container_width=True)
 
         # --- BOTTOM SECTION: RESULTS ---
@@ -268,16 +282,17 @@ def app():
                 with bot_col1:
                     st.success("Calculation Complete!")
                     p = solver.params
-                    st.latex(f"w = {p['w']:.4f}")
-                    st.latex(f"G_s = {p['Gs']:.3f}")
-                    st.latex(f"e = {p['e']:.4f}")
-                    st.latex(f"S_r = {p['Sr']:.4f}")
+                    if p['w'] is not None: st.latex(f"w = {p['w']:.4f}")
+                    if p['Gs'] is not None: st.latex(f"G_s = {p['Gs']:.3f}")
+                    if p['e'] is not None: st.latex(f"e = {p['e']:.4f}")
+                    if p['Sr'] is not None: st.latex(f"S_r = {p['Sr']:.4f}")
                     if p['gamma_bulk']: st.latex(r"\gamma_{bulk} = " + f"{p['gamma_bulk']:.2f}")
                     if p['gamma_dry']: st.latex(r"\gamma_{dry} = " + f"{p['gamma_dry']:.2f}")
 
                 with bot_col2:
                     fig_final = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=True)
                     st.pyplot(fig_final)
+                    plt.close(fig_final)
 
                 with st.expander("Show Calculation Steps", expanded=True):
                     for step in solver.log:
