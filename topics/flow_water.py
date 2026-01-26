@@ -22,53 +22,85 @@ def format_scientific(val):
     else:
         return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
 
-def solve_flow_net_at_point(px, py, structure_type, dimension_val, h_upstream, h_downstream):
+def solve_flow_net_at_point(px, py, has_dam, dam_width, has_pile, pile_depth, pile_x, h_upstream, h_downstream):
     """
-    Calculates head and pressure at a specific point (px, py).
-    Returns: (Total Head, Elevation Head, Pressure Head, Pore Pressure)
+    Calculates head and pressure using Bligh's Creep Theory (Linear Loss).
+    Handles Dam, Sheet Pile, or Both.
     """
     # 1. Elevation Head (z)
-    # In geotechnical engineering, z is simply the elevation (y-coordinate)
     z = py 
     
     # 2. Total Head (h)
-    # This approximates the head loss based on position.
-    # In a real scenario, this requires solving the Laplace equation (Flow Net).
-    # Here we use a linear approximation for the calculator to function.
     delta_H = h_upstream - h_downstream
     
-    # Avoid division by zero
-    if dimension_val <= 0:
-        dimension_val = 1.0
-        
-    fraction_lost = 0.0
+    # --- GEOMETRY SETUP ---
+    # Define the "Creep Path" (The path water follows along the contact)
+    # L_total = Horizontal Length + Vertical Lengths
     
-    if structure_type == "Concrete Dam":
-        # Dam width is B (dim_val). Assume linear loss across the base width.
-        # Upstream of dam (x < -B/2) -> No loss
-        # Downstream of dam (x > B/2) -> Full loss
-        # Under dam -> Linear loss
-        half_width = dimension_val / 2.0
-        if px < -half_width:
-            fraction_lost = 0.0
-        elif px > half_width:
-            fraction_lost = 1.0
-        else:
-            # Linear interpolation under the dam
-            # (px - left_edge) / total_width
-            fraction_lost = (px - (-half_width)) / dimension_val
-            
-    else: # Sheet Pile
-        # Flow travels down one side and up the other.
-        # Simplified: loss depends on depth and side of pile.
-        # This is a very rough approximation for the calculator.
-        if px < 0: # Upstream side
-            fraction_lost = 0.2 # Slight loss entering soil
-        elif px > 0: # Downstream side
-            fraction_lost = 0.8 # Major loss after passing pile
-        else:
-            fraction_lost = 0.5
+    L_horizontal = 0.0
+    L_vertical = 0.0
+    
+    if has_dam:
+        dam_left = -dam_width / 2.0
+        dam_right = dam_width / 2.0
+        L_horizontal = dam_width
+    else:
+        # If no dam, treating effective horizontal width as small for the pile calc
+        dam_left = -0.1
+        dam_right = 0.1
+        L_horizontal = 0.2
 
+    if has_pile:
+        # Pile adds 2 * Depth to the path (down and up)
+        L_vertical = 2 * pile_depth
+        
+    total_creep_length = L_horizontal + L_vertical
+    if total_creep_length <= 0: total_creep_length = 1.0 # Avoid div/0
+
+    # --- CALCULATE LOSS RATIO AT POINT X ---
+    # We estimate how far 'px' is along the flow path.
+    
+    current_creep = 0.0
+    
+    # 1. Before Structure
+    if px <= dam_left:
+        # Linear loss in the soil before the structure (approx)
+        dist = abs(px - dam_left)
+        # Decay factor upstream
+        fraction_lost = 0.0
+        
+    # 2. After Structure
+    elif px >= dam_right:
+        fraction_lost = 1.0
+        
+    # 3. Under/Inside Structure Zone
+    else:
+        # We are between dam_left and dam_right
+        
+        # Distance from left edge
+        x_dist = px - dam_left
+        current_creep += x_dist # Horizontal creep
+        
+        # Did we pass the pile?
+        if has_pile:
+            # Check if current X is past the pile X
+            if px > pile_x:
+                current_creep += 2 * pile_depth # Add the vertical loop
+            elif px == pile_x:
+                # Exactly on the pile line. 
+                # Loss depends on how deep we are (py).
+                # This is a simplification.
+                depth_ratio = abs(py) / pile_depth if pile_depth > 0 else 0
+                if depth_ratio > 1: depth_ratio = 1
+                # We went down 'py' and assume linear drop
+                current_creep += x_dist + (abs(py)) 
+        
+        fraction_lost = current_creep / total_creep_length
+
+    # Clamp fraction
+    fraction_lost = max(0.0, min(1.0, fraction_lost))
+    
+    # Calculate Head
     h = h_upstream - (delta_H * fraction_lost)
 
     # 3. Pressure Head (hp) = Total Head - Elevation Head
@@ -366,27 +398,42 @@ def app():
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5); ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
 
             st.pyplot(fig2)
-            
     # =================================================================
-    # TAB 3: 2D FLOW NET (UPDATED WITH POINT CALC)
+    # TAB 3: 2D FLOW NET (DAM + PILE COMBINATION)
     # =================================================================
     with tab3:
         st.markdown("### Combined Flow Net Analysis")
-        st.caption("Calculate seepage and pressures for Dams or Sheet Piles.")
+        st.caption("Design a hydraulic structure using a Concrete Dam, a Sheet Pile, or both.")
         
         col_input, col_plot = st.columns([1, 1.5])
 
         with col_input:
-            # 1. Structure Selection
             st.markdown("#### 1. Structure Configuration")
-            struct_type = st.radio("Select Structure:", ["Sheet Pile", "Concrete Dam"], horizontal=True)
             
-            if struct_type == "Concrete Dam":
-                dim_val = st.number_input("Dam Base Width (B) [m]", value=10.0, step=1.0)
-            else:
-                dim_val = st.number_input("Pile Embedment Depth (D) [m]", value=5.0, step=0.5)
+            # CHECKBOXES for "Both"
+            has_dam = st.checkbox("Include Concrete Dam", value=True)
+            has_pile = st.checkbox("Include Sheet Pile (Cutoff)", value=False)
+            
+            dam_width = 0.0
+            pile_depth = 0.0
+            pile_x = 0.0
+
+            # CONDITIONAL INPUTS
+            if has_dam:
+                dam_width = st.number_input("Dam Base Width (B) [m]", value=10.0, step=1.0)
+            
+            if has_pile:
+                c_p1, c_p2 = st.columns(2)
+                pile_depth = c_p1.number_input("Pile Depth (D) [m]", value=5.0, step=0.5)
+                
+                # Limit pile position to be under the dam if dam exists
+                min_x = -dam_width/2.0 if has_dam else -10.0
+                max_x = dam_width/2.0 if has_dam else 10.0
+                pile_x = c_p2.number_input("Pile Location (X) [m]", value=min_x, step=0.5, min_value=min_x, max_value=max_x)
 
             # 2. Water Levels
+            st.markdown("---")
+            st.markdown("#### 2. Hydraulic Conditions")
             c_h1, c_h2 = st.columns(2)
             h_up = c_h1.number_input("Upstream Level [m]", value=10.0)
             h_down = c_h2.number_input("Downstream Level [m]", value=2.0)
@@ -394,80 +441,87 @@ def app():
 
             # 3. Point Calculator
             st.markdown("---")
-            st.markdown("#### 2. Student Point Calculator")
-            st.caption("Enter coordinates to find pressure at a specific point.")
+            st.markdown("#### 3. Point Pressure Calculator")
             
             cp1, cp2 = st.columns(2)
-            p_x = cp1.number_input("Point X [m]", value=2.0, step=0.5)
+            p_x = cp1.number_input("Point X [m]", value=0.0, step=0.5)
             p_y = cp2.number_input("Point Y [m]", value=-4.0, step=0.5, max_value=0.0)
             
-            # Real-time calculation for the point
+            # CALCULATE
             if p_y > 0:
                 st.error("Point Y must be negative (in the soil).")
-                res_h, res_z, res_hp, res_u = 0,0,0,0
+                res_h, res_u = 0, 0
+                res_z, res_hp = 0, 0
             else:
-                # THIS WAS THE MISSING FUNCTION CALL
-                res_h, res_z, res_hp, res_u = solve_flow_net_at_point(p_x, p_y, struct_type, dim_val, h_up, h_down)
+                # Check for structural conflict (Point inside dam/pile)
+                conflict = False
+                if has_pile:
+                    # Simple check: if point is exactly on pile line within depth
+                    if abs(p_x - pile_x) < 0.1 and abs(p_y) < pile_depth:
+                        conflict = True
+                
+                if conflict:
+                    st.warning("Point is inside the structure material.")
+                    res_h = None
+                else:
+                    res_h, res_z, res_hp, res_u = solve_flow_net_at_point(
+                        p_x, p_y, has_dam, dam_width, has_pile, pile_depth, pile_x, h_up, h_down
+                    )
 
             if res_h is not None:
                 st.markdown(f"""
                 <div style="background-color: #f8f9fa; border-left: 4px solid #0d6efd; padding: 10px; border-radius: 4px;">
                     <strong>Results at Point ({p_x}, {p_y}):</strong><br>
                     • Total Head (h): <b>{res_h:.2f} m</b><br>
-                    • Elevation Head (z): <b>{res_z:.2f} m</b><br>
-                    • Pressure Head (hp): <b>{res_hp:.2f} m</b><br>
                     • Pore Pressure (u): <span style="color: #d63384; font-weight:bold;">{res_u:.2f} kPa</span>
                 </div>
                 """, unsafe_allow_html=True)
-            else:
-                st.warning("Point is inside the structure boundary.")
-
-            # 4. Total Flow
-            st.markdown("---")
-            st.markdown("#### 3. Total Seepage (q)")
-            k_val = st.number_input("Permeability (k) [m/day]", value=0.0864)
-            Nf = st.number_input("Flow Channels (Nf)", value=4)
-            Nd = st.number_input("Potential Drops (Nd)", value=12)
-            
-            if st.button("Calculate Total Flow (q)"):
-                q = k_val * H_net * (Nf/Nd)
-                st.success(f"q = {q:.4f} m³/day/m")
 
         with col_plot:
             fig, ax = plt.subplots(figsize=(8, 6))
             
-            # Grid for Contours
+            # Grid for Contours (Visual Approximation)
             gx = np.linspace(-15, 15, 200)
             gy = np.linspace(-15, 0, 150)
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
             
-            # --- Draw Based on Selection ---
-            if struct_type == "Concrete Dam":
-                # Dam Drawing
-                C = dim_val / 2.0
-                ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+2, facecolor='gray', edgecolor='black', zorder=3))
-                ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold')
+            # --- VISUALIZATION LOGIC ---
+            # We select the dominant structure for the flow lines visualization
+            # (Calculating exact streamlines for arbitrary combined structures 
+            # requires a complex FEA solver, so we use the Dam approximation for visuals)
+            
+            if has_dam:
+                C = dam_width / 2.0
+                # Draw Dam Body
+                ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', edgecolor='black', zorder=5))
+                ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=6)
                 
-                # Math Map
+                # Visual Map (Flat base approximation)
                 with np.errstate(invalid='ignore', divide='ignore'):
                     W = np.arccosh(Z / C)
                 Phi, Psi = np.real(W), np.imag(W)
                 
-            else: # Sheet Pile
-                # Pile Drawing
-                D = dim_val
-                ax.add_patch(patches.Rectangle((-0.2, -D), 0.4, D + h_up, facecolor='gray', edgecolor='black', zorder=3))
-                
-                # Math Map (Approximation for visuals)
-                Z_shift = Z + 1j*D
+            elif has_pile:
+                # Pile only map
+                D = pile_depth
+                Z_shift = Z + 1j*D # Shift for visual centering roughly
                 with np.errstate(invalid='ignore'):
-                    W = -1j * np.sqrt(Z_shift) # Rotated parabola map
+                    W = -1j * np.sqrt(Z_shift)
                 Phi, Psi = np.real(W), np.imag(W)
+                
+            else:
+                Phi, Psi = np.zeros_like(X), np.zeros_like(Y) # Empty
 
-            # Plot Flow Net
-            ax.contour(X, Y, Psi, levels=10, colors='blue', linewidths=1, linestyles='solid', alpha=0.5)
-            ax.contour(X, Y, Phi, levels=15, colors='red', linewidths=1, linestyles='dashed', alpha=0.5)
+            # Draw Pile if enabled (Overlay)
+            if has_pile:
+                ax.add_patch(patches.Rectangle((pile_x - 0.15, -pile_depth), 0.3, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=6))
+                ax.text(pile_x, -pile_depth/2, "PILE", rotation=90, color='white', ha='center', va='center', fontsize=8, zorder=7)
+
+            # Plot Flow Net (Contours)
+            if has_dam or has_pile:
+                ax.contour(X, Y, Psi, levels=12, colors='blue', linewidths=1, linestyles='solid', alpha=0.4)
+                ax.contour(X, Y, Phi, levels=18, colors='red', linewidths=1, linestyles='dashed', alpha=0.4)
 
             # Water
             ax.add_patch(patches.Rectangle((-15, 0), 15, h_up, facecolor='#D6EAF8', alpha=0.5))
@@ -479,20 +533,18 @@ def app():
             # PLOT STUDENT POINT
             if res_h is not None:
                 ax.scatter(p_x, p_y, c='red', s=100, marker='x', zorder=10, linewidths=3)
-                ax.text(p_x + 0.5, p_y, f"Point\nu={res_u:.1f}", color='red', fontweight='bold', fontsize=10, zorder=10)
+                ax.text(p_x + 0.5, p_y, f"u={res_u:.1f}", color='red', fontweight='bold', fontsize=10, zorder=10)
 
             ax.set_ylim(-12, max(h_up, h_down)+2)
             ax.set_xlim(-12, 12)
             ax.set_aspect('equal'); ax.axis('off')
             
             # Legend
-            ax.plot([], [], 'b-', label='Flow Line')
-            ax.plot([], [], 'r--', label='Equipotential')
-            ax.scatter([], [], c='red', marker='x', label='Calculated Point')
+            ax.plot([], [], 'b-', label='Flow Line', alpha=0.5)
+            ax.plot([], [], 'r--', label='Equipotential', alpha=0.5)
             ax.legend(loc='lower center', ncol=3, fontsize=8)
 
             st.pyplot(fig)
-
     
 if __name__ == "__main__":
     app()
