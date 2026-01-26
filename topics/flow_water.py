@@ -11,7 +11,7 @@ def app():
     tab1, tab2, tab3 = st.tabs(["1D Seepage (Effective Stress)", "Permeability Tests", "Flow Nets & Piping"])
 
     # =================================================================
-    # TAB 1: 1D SEEPAGE (Effective Stress)
+    # TAB 1: 1D SEEPAGE (Effective Stress) - FULLY RESTORED
     # =================================================================
     with tab1:
         st.caption("Determine Effective Stress at Point A. (Datum is at the Bottom of Soil)")
@@ -50,6 +50,7 @@ def app():
                 u_val = h_p_A * gamma_w
                 sigma_prime = sigma_total - u_val
                 
+                # Result Display
                 st.success(f"**Flow Condition:** {flow_type}\n\n*{effect_msg}*")
                 st.metric("Total Stress (σ)", f"{sigma_total:.2f} kPa")
                 st.metric("Pore Pressure (u)", f"{u_val:.2f} kPa")
@@ -61,42 +62,141 @@ def app():
                     st.latex(rf"u = {u_val:.2f} kPa")
 
         with col_plot:
-            # Reusing the previous 1D Seepage Logic (Hidden for brevity, same as before)
+            # --- FULL DIAGRAM LOGIC RESTORED ---
             fig, ax = plt.subplots(figsize=(7, 8))
-            datum_y, soil_w, soil_x = 0.0, 2.5, 3.5
+            
+            # COORDINATES
+            datum_y = 0.0
+            soil_w = 2.5
+            soil_x = 3.5  
+            
+            # Water Levels relative to Datum
             wl_top = val_z + val_y  
             wl_bot = val_x          
             
-            # Draw Soil
-            ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, val_z, facecolor='#E3C195', hatch='...', edgecolor='none'))
-            ax.text(soil_x + soil_w/2, datum_y + val_z/2, "SOIL", ha='center', fontweight='bold')
+            # Flow Arrow Logic
+            if wl_top > wl_bot: flow_arrow = "⬇️"
+            elif wl_bot > wl_top: flow_arrow = "⬆️"
+            else: flow_arrow = "No Flow"
+
+            # --- DRAWING LAYERS ---
             
-            # Draw Water
+            # 1. SOIL FILL
+            ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, val_z, 
+                                           facecolor='#E3C195', hatch='...', edgecolor='none', zorder=1))
+            ax.text(soil_x + soil_w/2, datum_y + val_z/2, "SOIL", ha='center', fontweight='bold', fontsize=12, zorder=3)
+            
+            # 2. WATER FILLS & TANKS
             tank_w = 2.0
-            tank_base_y = max(datum_y + val_z, wl_top - 0.5)
-            # Top Tank
-            ax.add_patch(patches.Rectangle((soil_x + (soil_w-tank_w)/2, tank_base_y), tank_w, wl_top - tank_base_y, facecolor='#D6EAF8', edgecolor='blue'))
-            # Draw Walls
-            ax.plot([soil_x, soil_x], [datum_y, datum_y+val_z], 'k-', lw=2)
-            ax.plot([soil_x+soil_w, soil_x+soil_w], [datum_y, datum_y+val_z], 'k-', lw=2)
+            tank_x = soil_x + (soil_w - tank_w)/2
+            neck_w = 0.8
+            neck_x = soil_x + (soil_w - neck_w)/2
+            tank_base_y = wl_top - 0.5
+            if tank_base_y < datum_y + val_z: tank_base_y = datum_y + val_z 
             
-            # Dimensions
-            ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.') # Datum
-            ax.annotate('', xy=(soil_x-0.4, datum_y), xytext=(soil_x-0.4, datum_y+val_z), arrowprops=dict(arrowstyle='<->'))
-            ax.text(soil_x-0.5, val_z/2, f"z={val_z}m", ha='right')
+            # Top Tank Fill
+            ax.add_patch(patches.Rectangle((tank_x, tank_base_y), tank_w, wl_top - tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            ax.add_patch(patches.Rectangle((neck_x, datum_y + val_z), neck_w, tank_base_y - (datum_y + val_z) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            
+            # Left Tank & Tube Fill
+            tube_w = 0.6
+            left_tank_x = 0.5
+            l_tank_base_y = wl_bot - 0.5
+            if l_tank_base_y < datum_y - 1.0: l_tank_base_y = datum_y - 1.0 
+            
+            tube_start_x = soil_x + (soil_w - tube_w)/2
+            
+            # U-Tube Fill 
+            ax.add_patch(patches.Rectangle((tube_start_x, datum_y - 1.0), tube_w, 1.0, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            tube_left_end = left_tank_x + (tank_w - tube_w)/2
+            ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_start_x - tube_left_end + tube_w, tube_w, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_w, l_tank_base_y - (datum_y - 1.0) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+            ax.add_patch(patches.Rectangle((left_tank_x, l_tank_base_y), tank_w, wl_bot - l_tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
+
+            # --- 3. STRUCTURAL WALLS ---
+            wall_thick = 2.5
+            wall_color = 'black'
+            
+            # Top Tank Walls
+            ax.plot([tank_x, tank_x, neck_x, neck_x], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([tank_x + tank_w, tank_x + tank_w, neck_x + neck_w, neck_x + neck_w], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
+            
+            # Soil Box Walls
+            ax.plot([soil_x, soil_x], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) 
+            ax.plot([soil_x + soil_w, soil_x + soil_w], [datum_y + val_z, datum_y], color=wall_color, lw=wall_thick, zorder=2) 
+            
+            # Bottom of Soil
+            ax.plot([soil_x, tube_start_x], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([tube_start_x + tube_w, soil_x + soil_w], [datum_y, datum_y], color=wall_color, lw=wall_thick, zorder=2)
+           
+            # Top of Soil
+            ax.plot([soil_x, neck_x], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
+            ax.plot([neck_x + neck_w, soil_x + soil_w], [datum_y + val_z , datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2) 
+            
+            # Bottom Tube & Left Tank Walls
+            path_outer_x = [tube_start_x , tube_start_x , tube_left_end + tube_w, tube_left_end + tube_w, left_tank_x + tank_w, left_tank_x + tank_w]
+            path_outer_y = [datum_y, datum_y - 1.0 + tube_w, datum_y - 1.0 + tube_w, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
+            ax.plot(path_outer_x, path_outer_y, color=wall_color, lw=wall_thick, zorder=2)
+            
+            path_inner_x = [tube_start_x + tube_w, tube_start_x + tube_w, tube_left_end, tube_left_end, left_tank_x, left_tank_x]
+            path_inner_y = [datum_y, datum_y - 1.0, datum_y - 1.0, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
+            ax.plot(path_inner_x, path_inner_y, color=wall_color, lw=wall_thick, zorder=2)
+
+            # Water Surfaces
+            ax.plot([tank_x, tank_x + tank_w], [wl_top, wl_top], color='blue', lw=2, zorder=2)
+            ax.plot([left_tank_x, left_tank_x + tank_w], [wl_bot, wl_bot], color='blue', lw=2, zorder=2)
+            
+            # Triangles
+            ax.plot(tank_x + tank_w/2, wl_top, marker='v', color='blue', markersize=8, zorder=2)
+            ax.plot(left_tank_x + tank_w/2, wl_bot, marker='v', color='blue', markersize=8, zorder=2)
+
+            # --- 4. DIMENSIONS ---
+            
+            # Datum Line
+            ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
+            ax.text(soil_x + 0.5 + soil_w, datum_y - 0.25, "Datum (z=0)", va='center', fontsize=10, style='italic')
+
+            # Dimension z
+            dim_z_x = soil_x - 0.4
+            ax.annotate('', xy=(dim_z_x, datum_y), xytext=(dim_z_x, datum_y + val_z), 
+                        arrowprops=dict(arrowstyle='<->', color='black'))
+            ax.text(dim_z_x - 0.1, val_z/2, f"z = {val_z:.2f}m", fontsize=10, ha='right')
+
+            # Dimension y
+            dim_y_x = soil_x + soil_w + 0.8
+            ax.annotate('', xy=(dim_y_x, val_z), xytext=(dim_y_x, wl_top), 
+                        arrowprops=dict(arrowstyle='<->', color='black'))
+            ax.text(dim_y_x + 0.1, (val_z + wl_top)/2, f"y = {val_y:.2f}m", fontsize=11, fontweight='bold', color='black', ha='left')
+            ax.plot([soil_x + soil_w, dim_y_x + 0.2], [val_z, val_z], 'k--', lw=0.5)
+            ax.plot([tank_x + tank_w, dim_y_x + 0.2], [wl_top, wl_top], 'k--', lw=0.5)
+
+            # Dimension x
+            dim_x_loc = left_tank_x - 0.4
+            ax.annotate('', xy=(dim_x_loc, datum_y), xytext=(dim_x_loc, wl_bot), 
+                        arrowprops=dict(arrowstyle='<->'))
+            ax.text(dim_x_loc - 0.1, wl_bot/2, f"x = {val_x:.2f}m", fontsize=11, fontweight='bold', ha='right')
 
             # Point A
-            ax.scatter(soil_x + soil_w/2, val_A, c='black', zorder=5)
-            ax.text(soil_x + soil_w/2 + 0.2, val_A, "A", fontweight='bold')
+            ax.scatter(soil_x + soil_w/2 + 2.0, datum_y + val_A, color='Black', zorder=5, s=80, edgecolor='black')
+            ax.text(soil_x + soil_w/2 + 2.2, datum_y + val_A + 0.1, f"Point A", color='Black', fontweight='bold', zorder=5)
             
-            ax.set_xlim(0, 8)
-            ax.set_ylim(-1, wl_top+1)
+            # Dimension A
+            dim_A_x = soil_x + soil_w/2 + 2.0
+            ax.annotate('', xy=(dim_A_x, datum_y), xytext=(dim_A_x, datum_y + val_A), 
+                        arrowprops=dict(arrowstyle='<->', color='black'))
+            ax.text(dim_A_x + 0.1, val_A/2, f"A = {val_A:.2f}m", color='black', fontweight='bold', zorder=5)
+            ax.plot([soil_x + soil_w/2, dim_A_x], [datum_y + val_A, datum_y + val_A], 'k:', lw=1)
+
+            ax.text(soil_x + soil_w/2, wl_top + 0.5, f"FLOW {flow_arrow}", ha='center', fontsize=12, fontweight='bold')
+
+            ax.set_xlim(-1.5, 9)
+            ax.set_ylim(datum_y - 1.5, max(wl_bot, wl_top) + 1)
             ax.axis('off')
             st.pyplot(fig)
 
 
     # =================================================================
-    # TAB 2: PERMEABILITY (Lab Tests) - UPDATED DIAGRAMS
+    # TAB 2: PERMEABILITY (Lab Tests)
     # =================================================================
     with tab2:
         st.caption("Calculate Coefficient of Permeability (k). Input variables are marked on the diagram.")
@@ -121,8 +221,13 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A*h*t > 0: 
                         k_val = (Q*L)/(A*h*t)
-                        st.success("Calculation Successful")
-                        st.metric("Permeability Coefficient (k)", f"{k_val:.4e} cm/sec")
+                        # --- PROFESSIONAL RESULT CARD ---
+                        st.markdown(f"""
+                        <div style="background-color: #d1e7dd; padding: 20px; border-radius: 10px; border: 1px solid #0f5132; text-align: center; margin-top: 20px;">
+                            <p style="color: #0f5132; margin-bottom: 5px; font-size: 16px; font-weight: 600;">Permeability Coefficient (k)</p>
+                            <h2 style="color: #0f5132; margin: 0; font-size: 32px; font-weight: 800;">{k_val:.4e} cm/sec</h2>
+                        </div>
+                        """, unsafe_allow_html=True)
                     else:
                         st.error("Inputs must be positive.")
 
@@ -141,8 +246,13 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A_soil*t_fall > 0 and h2 > 0: 
                         k_val = (2.303*a*L_fall/(A_soil*t_fall))*np.log10(h1/h2)
-                        st.success("Calculation Successful")
-                        st.metric("Permeability Coefficient (k)", f"{k_val:.4e} cm/sec")
+                        # --- PROFESSIONAL RESULT CARD ---
+                        st.markdown(f"""
+                        <div style="background-color: #d1e7dd; padding: 20px; border-radius: 10px; border: 1px solid #0f5132; text-align: center; margin-top: 20px;">
+                            <p style="color: #0f5132; margin-bottom: 5px; font-size: 16px; font-weight: 600;">Permeability Coefficient (k)</p>
+                            <h2 style="color: #0f5132; margin: 0; font-size: 32px; font-weight: 800;">{k_val:.4e} cm/sec</h2>
+                        </div>
+                        """, unsafe_allow_html=True)
                     else:
                         st.error("Inputs invalid. h2 must be > 0.")
 
@@ -152,107 +262,74 @@ def app():
             ax2.set_ylim(0, 10)
             ax2.axis('off')
             
-            # Common Style
             soil_color = '#E3C195'
             water_color = '#D6EAF8'
             wall_color = 'black'
 
             if "Constant" in test_type:
                 # --- CONSTANT HEAD (Vertical Stack) ---
-                
-                # 1. Top Supply Tank (y=8 to 9.5)
                 ax2.add_patch(patches.Rectangle((2, 8), 4, 1.5, facecolor=water_color, edgecolor=wall_color))
                 ax2.text(2.2, 8.2, "Supply\nTank", fontsize=8)
-                # Top Water Level
                 ax2.plot([2, 6], [9, 9], 'b-', lw=2)
                 ax2.plot(4, 9, marker='v', color='blue')
                 
-                # 2. Connection Pipe
                 ax2.add_patch(patches.Rectangle((3.8, 6), 0.4, 2, facecolor=water_color, edgecolor='none'))
                 ax2.plot([3.8, 3.8], [6, 8], 'k-')
                 ax2.plot([4.2, 4.2], [6, 8], 'k-')
 
-                # 3. Soil Chamber (y=4 to 6)
                 ax2.add_patch(patches.Rectangle((3, 4), 2, 2, facecolor=soil_color, hatch='X', edgecolor=wall_color, lw=2))
                 ax2.text(4, 5, "SOIL\nArea A", ha='center', va='center', fontweight='bold')
                 
-                # 4. Bottom Outlet Tank (y=1 to 2.5)
-                # Connection Pipe
                 ax2.add_patch(patches.Rectangle((3.8, 2.5), 0.4, 1.5, facecolor=water_color, edgecolor='none'))
                 ax2.plot([3.8, 3.8], [2.5, 4], 'k-')
                 ax2.plot([4.2, 4.2], [2.5, 4], 'k-')
-                
-                # The Tank
                 ax2.add_patch(patches.Rectangle((3.5, 1), 3, 1.5, facecolor=water_color, edgecolor=wall_color))
                 ax2.text(6, 0.5, "Collection\nTank", ha='center')
-                # Outlet Water Level (Constant)
-                ax2.plot([3.5, 6.5], [2.2, 2.2], 'b-', lw=2) # Outlet level
+                ax2.plot([3.5, 6.5], [2.2, 2.2], 'b-', lw=2)
                 ax2.plot(6, 2.2, marker='v', color='blue')
 
-                # --- DIMENSIONS (THE IMPORTANT PART) ---
-                
-                # Dimension h (Total Head Difference)
-                # From Top Level (9) to Bottom Level (2.2)
                 ax2.annotate('', xy=(8, 2.2), xytext=(8, 9), arrowprops=dict(arrowstyle='<->', lw=1.5))
                 ax2.text(8.2, 5.5, "h (Head Diff)", ha='left', fontweight='bold', fontsize=12, color='blue')
-                # Extension lines
                 ax2.plot([6, 8.2], [9, 9], 'k--', lw=0.5)
                 ax2.plot([6.5, 8.2], [2.2, 2.2], 'k--', lw=0.5)
 
-                # Dimension L (Soil Length)
                 ax2.annotate('', xy=(1.5, 4), xytext=(1.5, 6), arrowprops=dict(arrowstyle='<->', lw=1.5))
                 ax2.text(1.2, 5, "L", ha='right', fontweight='bold', fontsize=12)
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5)
                 ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
                 
-                # Q (Volume)
                 ax2.text(6.8, 1.5, "-> Q (Vol)", ha='left', fontstyle='italic')
 
             else:
                 # --- FALLING HEAD (Standpipe on Top) ---
-                
-                # 1. Standpipe (Narrow) y=6 to 9.5
                 ax2.add_patch(patches.Rectangle((3.8, 6), 0.4, 3.5, facecolor=water_color, edgecolor=wall_color))
                 ax2.text(3.5, 8, "Standpipe\n(Area a)", ha='right', fontsize=9)
                 
-                # 2. Soil Chamber y=4 to 6
                 ax2.add_patch(patches.Rectangle((3, 4), 2, 2, facecolor=soil_color, hatch='X', edgecolor=wall_color, lw=2))
                 ax2.text(4, 5, "SOIL\nArea A", ha='center', va='center', fontweight='bold')
                 
-                # 3. Bottom Tank y=1 to 2
-                # Connection
                 ax2.add_patch(patches.Rectangle((3.8, 2), 0.4, 2, facecolor=water_color, edgecolor='none'))
                 ax2.plot([3.8, 3.8], [2, 4], 'k-')
                 ax2.plot([4.2, 4.2], [2, 4], 'k-')
-                # Tank
                 ax2.add_patch(patches.Rectangle((3.5, 1), 3, 1.5, facecolor=water_color, edgecolor=wall_color))
-                ax2.plot([3.5, 6.5], [2, 2], 'b-', lw=2) # Bottom Constant Level
+                ax2.plot([3.5, 6.5], [2, 2], 'b-', lw=2)
                 ax2.plot(6, 2, marker='v', color='blue')
 
-                # --- DIMENSIONS ---
-                
-                # Water Levels in Standpipe
-                # h1 (Start)
                 ax2.plot([3.8, 4.2], [9, 9], 'r-', lw=2)
                 ax2.text(4.4, 9, "Start", fontsize=8, color='red')
-                # h2 (End)
                 ax2.plot([3.8, 4.2], [7, 7], 'r-', lw=2)
                 ax2.text(4.4, 7, "End", fontsize=8, color='red')
 
-                # Dimension h1 (From Bottom Level to Start)
                 ax2.annotate('', xy=(8, 2), xytext=(8, 9), arrowprops=dict(arrowstyle='<->', color='red'))
                 ax2.text(8.2, 9, "h1", ha='left', fontweight='bold', color='red')
                 ax2.plot([4.2, 8.2], [9, 9], 'r--', lw=0.5)
                 
-                # Dimension h2 (From Bottom Level to End)
                 ax2.annotate('', xy=(7, 2), xytext=(7, 7), arrowprops=dict(arrowstyle='<->', color='red'))
                 ax2.text(7.2, 7, "h2", ha='left', fontweight='bold', color='red')
                 ax2.plot([4.2, 7.2], [7, 7], 'r--', lw=0.5)
                 
-                # Extension for bottom level
                 ax2.plot([6.5, 8.2], [2, 2], 'b--', lw=0.5)
 
-                # Dimension L (Soil Length)
                 ax2.annotate('', xy=(1.5, 4), xytext=(1.5, 6), arrowprops=dict(arrowstyle='<->', lw=1.5))
                 ax2.text(1.2, 5, "L", ha='right', fontweight='bold', fontsize=12)
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5)
