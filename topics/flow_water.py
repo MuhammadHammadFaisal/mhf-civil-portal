@@ -103,6 +103,7 @@ def solve_flow_net_at_point(px, py, has_dam, dam_width, has_pile, pile_depth, pi
         "dH": delta_H,
         "head_loss": head_loss
     }
+
 # --- MAIN APP ---
 
 def app():
@@ -389,7 +390,8 @@ def app():
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5); ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
 
             st.pyplot(fig2)
-   # =================================================================
+
+    # =================================================================
     # TAB 3: 2D FLOW NET (DAM + PILE COMBINATION)
     # =================================================================
     with tab3:
@@ -449,9 +451,8 @@ def app():
                         p_x, p_y, has_dam, dam_width, has_pile, pile_depth, pile_x, h_up, h_down
                     )
 
-           if results:
+            if results:
                 # --- PROFESSIONAL RESULT CARD (FIXED COLORS) ---
-                # Added 'color: #333333' to force dark text on the light background
                 st.markdown(f"""
                 <div style="background-color: #e3f2fd; color: #333333; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-top: 10px;">
                     <h4 style="color: #1565c0; margin-top: 0;">Results at Point ({p_x}, {p_y})</h4>
@@ -545,5 +546,6 @@ def app():
             ax.legend(loc='lower center', ncol=2, fontsize=8, frameon=True)
 
             st.pyplot(fig)
+
 if __name__ == "__main__":
     app()
