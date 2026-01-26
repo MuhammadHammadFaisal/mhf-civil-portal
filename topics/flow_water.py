@@ -355,42 +355,52 @@ def app():
             st.pyplot(fig2)
 
  # =================================================================
-    # TAB 3: FLOW NETS & PIPING (TEXTBOOK SOLVER)
+    # TAB 3: FLOW NETS (TEXTBOOK SOLVER + VISUALS)
     # =================================================================
     with tab3:
         st.markdown("### Flow Net Analysis")
-        st.caption("Solve Flow Net problems by counting Drops ($N_d$) and Channels ($N_f$).")
+        st.caption("Solve Flow Net problems for Dams or Sheet Piles using the counting method.")
         
-        col_input, col_plot = st.columns([1, 1])
+        col_input, col_plot = st.columns([1, 1.1])
 
         with col_input:
-            st.markdown("#### 1. Hydraulic Conditions")
+            # --- 1. VISUAL SETUP ---
+            st.markdown("#### 1. Structure Visual")
+            struct_type = st.radio("Select Diagram Type:", ["Sheet Pile", "Concrete Dam"], horizontal=True)
+            
+            # --- 2. HYDRAULIC CONDITIONS ---
+            st.markdown("---")
+            st.markdown("#### 2. Hydraulic Conditions")
             c_h1, c_h2 = st.columns(2)
             h_up = c_h1.number_input("Upstream Total Head ($H_{up}$) [m]", value=4.5, step=0.1)
             h_down = c_h2.number_input("Downstream Total Head ($H_{down}$) [m]", value=0.5, step=0.1)
             
+            # --- 3. FLOW NET PROPERTIES ---
             st.markdown("---")
-            st.markdown("#### 2. Flow Net Properties")
+            st.markdown("#### 3. Flow Net Counting")
             c_net1, c_net2 = st.columns(2)
             Nd = c_net1.number_input("Total Potential Drops ($N_d$)", value=7, step=1, min_value=1)
             Nf = c_net2.number_input("Total Flow Channels ($N_f$)", value=3, step=1, min_value=1)
             
+            # --- 4. POINT CALCULATOR ---
             st.markdown("---")
-            st.markdown("#### 3. Point Calculator")
+            st.markdown("#### 4. Point Calculator")
             
-            # DATUM INPUT
-            datum = st.number_input("Datum Elevation [m] (Reference Level)", value=-6.0, step=1.0, help="The level where Elevation Head z = 0")
+            datum = st.number_input("Datum Elevation ($z=0$)", value=-6.0, step=1.0)
 
-            # POINT INPUTS
             c_p1, c_p2, c_p3 = st.columns(3)
-            x_point = c_p1.number_input("Point X [m]", value=2.5, step=0.5)
-            y_point = c_p2.number_input("Point Y [m]", value=-4.0, step=0.5)
-            nd_point = c_p3.number_input("Drops Passed ($n_d$)", value=2.0, step=0.1)
+            # Default values adjust based on structure for better UX
+            def_x = 2.5 if struct_type == "Sheet Pile" else 0.0
+            def_y = -4.0
+            
+            x_point = c_p1.number_input("Point X [m]", value=def_x, step=0.5)
+            y_point = c_p2.number_input("Point Y [m]", value=def_y, step=0.5)
+            nd_point = c_p3.number_input("Drops Passed ($n_d$)", value=2.0, step=0.1, help="Count how many equipotential lines crossed to reach this point.")
             
             # Calculate Logic
             results = solve_flow_net_at_point(h_up, h_down, Nd, nd_point, y_point, datum)
             
-            # --- RESULTS DISPLAY ---
+            # Result Card
             st.markdown(f"""
             <div style="background-color: #e3f2fd; color: #333333; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-top: 10px;">
                 <h4 style="color: #1565c0; margin-top: 0;">Results at Point ({x_point}, {y_point})</h4>
@@ -411,82 +421,76 @@ def app():
             </div>
             """, unsafe_allow_html=True)
             
-            # --- SEEPAGE RATE ---
             k_val = st.number_input("Permeability ($k$) [m/sec]", value=1e-6, format="%.1e")
             q = k_val * results['H_diff'] * (Nf / Nd)
             st.info(f"**Seepage Rate (q):** {format_scientific(q)} m³/sec/m")
 
             with st.expander("See Calculation Steps"):
-                st.markdown("**Step 1: Calculate Head Loss per Drop**")
+                st.markdown("**Step 1: Head Loss per Drop**")
                 st.latex(rf"\Delta H = {h_up} - {h_down} = {results['H_diff']:.2f} \text{{ m}}")
                 st.latex(rf"\Delta h = \frac{{\Delta H}}{{N_d}} = \frac{{{results['H_diff']:.2f}}}{{{Nd}}} = {results['delta_h']:.3f} \text{{ m}}")
-                
-                st.markdown("**Step 2: Elevation Head ($z$)**")
-                st.latex(rf"z = Y_{{point}} - Y_{{datum}} = {y_point} - ({datum}) = \mathbf{{{results['z']:.2f} \text{{ m}}}}")
-                
-                st.markdown("**Step 3: Total Head at Point**")
+                st.markdown("**Step 2: Total Head at Point**")
                 st.latex(rf"H_{{point}} = H_{{up}} - (n_d \times \Delta h) = {h_up} - ({nd_point} \times {results['delta_h']:.3f}) = \mathbf{{{results['h_point']:.2f} \text{{ m}}}}")
-                
-                st.markdown("**Step 4: Pore Pressure**")
+                st.markdown("**Step 3: Pore Pressure**")
+                st.latex(rf"z = Y_{{pt}} - Y_{{datum}} = {y_point} - ({datum}) = {results['z']:.2f} \text{{ m}}")
                 st.latex(rf"\frac{{u}}{{\gamma_w}} = H_{{point}} - z = {results['h_point']:.2f} - ({results['z']:.2f}) = {results['hp']:.2f} \text{{ m}}")
                 st.latex(rf"u = {results['hp']:.2f} \times 9.81 = \mathbf{{{results['u']:.2f} \text{{ kPa}}}}")
 
         with col_plot:
             fig, ax = plt.subplots(figsize=(6, 6))
-            
-            # --- 1. SETUP GRID & AXIS ---
             ax.set_xlim(-8, 8)
             ax.set_ylim(-10, 6)
             ax.set_aspect('equal')
             
-            # Add Coordinate Grid
+            # Grid & Datum
             ax.grid(True, which='both', linestyle='--', linewidth=0.5, color='gray', alpha=0.5, zorder=0)
-            ax.axhline(0, color='black', linewidth=1) # Ground line
-            ax.axvline(0, color='black', linewidth=0.5, linestyle=':') # Center line
-            
-            # --- 2. DRAW DATUM LINE ---
+            ax.axhline(0, color='black', linewidth=1) 
             ax.axhline(datum, color='green', linewidth=2, linestyle='-.', zorder=1)
-            ax.text(-7.5, datum + 0.2, f"DATUM (z=0) @ {datum}m", color='green', fontweight='bold', fontsize=9, zorder=2)
+            ax.text(-7.5, datum + 0.2, f"DATUM (z=0) @ {datum}m", color='green', fontweight='bold', fontsize=9)
 
-            # --- 3. DRAW STRUCTURE (Sheet Pile) ---
-            pile_depth = 6.0
-            ax.add_patch(patches.Rectangle((-0.1, -pile_depth), 0.2, pile_depth + 4, facecolor='#444', edgecolor='black', zorder=5))
-            
-            # Water
-            ax.add_patch(patches.Rectangle((-8, 0), 8, 4, facecolor='#D6EAF8', alpha=0.5, zorder=1))
-            ax.add_patch(patches.Rectangle((0, 0), 8, 1, facecolor='#D6EAF8', alpha=0.5, zorder=1))
-            ax.text(-7, 4.2, f"Upstream: {h_up}m", color='blue', fontsize=8)
-            
-            # --- 4. FLOW NET VISUALS ---
+            # --- DYNAMIC STRUCTURE DRAWING ---
             gx = np.linspace(-8, 8, 100)
             gy = np.linspace(-10, 0, 100)
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
-            Z_shift = Z + 1j*pile_depth
-            with np.errstate(invalid='ignore'): W = -1j * np.sqrt(Z_shift)
-            Phi, Psi = np.real(W), np.imag(W)
             
+            if struct_type == "Sheet Pile":
+                # PILE DRAWING
+                pile_depth = 6.0
+                ax.add_patch(patches.Rectangle((-0.1, -pile_depth), 0.2, pile_depth + 4, facecolor='#444', edgecolor='black', zorder=5))
+                # Pile Flow Net Math
+                Z_shift = Z + 1j*pile_depth
+                with np.errstate(invalid='ignore'): W = -1j * np.sqrt(Z_shift)
+                
+            else:
+                # DAM DRAWING
+                dam_width = 4.0
+                C = dam_width / 2.0
+                ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', edgecolor='black', zorder=5))
+                ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=6)
+                # Dam Flow Net Math
+                with np.errstate(invalid='ignore', divide='ignore'): W = np.arccosh(Z / C)
+
+            # --- COMMON VISUALS ---
+            Phi, Psi = np.real(W), np.imag(W)
             ax.contour(X, Y, Phi, levels=Nd+1, colors='red', linewidths=1, linestyles='dashed', alpha=0.5)
             ax.contour(X, Y, Psi, levels=Nf+1, colors='blue', linewidths=1, linestyles='solid', alpha=0.5)
 
-            # --- 5. PLOT THE STUDENT POINT ---
-            # High visibility marker
-            ax.scatter(x_point, y_point, color='red', s=150, marker='X', edgecolors='black', linewidth=1.5, zorder=10, label='Point')
-            
-            # Add coordinates text next to point
-            ax.text(x_point + 0.3, y_point, f"({x_point}, {y_point})\nu={results['u']:.1f}", 
-                    color='red', fontweight='bold', fontsize=10, zorder=10,
-                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+            # Water
+            ax.add_patch(patches.Rectangle((-8, 0), 8, 4, facecolor='#D6EAF8', alpha=0.5, zorder=1))
+            ax.add_patch(patches.Rectangle((0, 0), 8, 1, facecolor='#D6EAF8', alpha=0.5, zorder=1))
+            ax.text(-7, 4.2, f"Upstream: {h_up}m", color='blue', fontsize=8)
 
-            # Visual arrow for z
-            ax.annotate('', xy=(x_point, y_point), xytext=(x_point, datum), 
-                        arrowprops=dict(arrowstyle='<->', color='green', lw=1.5), zorder=9)
+            # Point Marker
+            ax.scatter(x_point, y_point, color='red', s=150, marker='X', edgecolors='black', zorder=10)
+            ax.text(x_point + 0.3, y_point, f"n_d={nd_point}", color='red', fontweight='bold', fontsize=10, zorder=10, bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+            
+            # Z arrow
+            ax.annotate('', xy=(x_point, y_point), xytext=(x_point, datum), arrowprops=dict(arrowstyle='<->', color='green', lw=1.5), zorder=9)
             ax.text(x_point + 0.1, (y_point + datum)/2, f"z={results['z']:.1f}", color='green', fontsize=9, fontweight='bold')
 
-            # Legend
-            ax.plot([], [], 'g-.', label='Datum')
-            ax.scatter([], [], c='red', marker='X', label='Point')
-            ax.legend(loc='upper right', fontsize=8, framealpha=1)
+            ax.legend([patches.Patch(color='red', alpha=0.5), patches.Patch(color='blue', alpha=0.5)], 
+                      [f'{Nd} Drops (Equipotential)', f'{Nf} Channels (Flow)'], loc='upper right', fontsize=8)
             
             st.pyplot(fig)
 if __name__ == "__main__":
