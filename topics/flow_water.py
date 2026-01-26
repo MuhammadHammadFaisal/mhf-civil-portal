@@ -22,88 +22,43 @@ def format_scientific(val):
     else:
         return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
 
-def solve_flow_net_at_point(px, py, has_dam, dam_width, has_pile, pile_depth, pile_x, h_upstream, h_downstream):
+def solve_flow_net_at_point(h_upstream, h_downstream, total_Nd, drops_passed, z_point):
     """
-    Calculates head and pressure using Bligh's Creep Theory (Linear Loss).
-    Returns detailed steps for display.
+    Calculates head and pressure using Flow Net Counting Method (Standard Textbook Approach).
     """
-    # 1. Elevation Head (z)
-    z = py 
+    # 1. Total Head Loss (H_diff)
+    H_diff = h_upstream - h_downstream
     
-    # 2. Total Head (h)
-    delta_H = h_upstream - h_downstream
-    
-    # --- GEOMETRY SETUP ---
-    # Define the "Creep Path" (The path water follows along the contact)
-    
-    L_horizontal = 0.0
-    L_vertical = 0.0
-    
-    if has_dam:
-        dam_left = -dam_width / 2.0
-        dam_right = dam_width / 2.0
-        L_horizontal = dam_width
+    # 2. Head Loss per Drop (delta_h)
+    if total_Nd > 0:
+        delta_h = H_diff / total_Nd
     else:
-        # Minimal width if no dam
-        dam_left = -0.1
-        dam_right = 0.1
-        L_horizontal = 0.2
-
-    if has_pile:
-        # Pile adds 2 * Depth to the path (down and up)
-        L_vertical = 2 * pile_depth
+        delta_h = 0
         
-    total_creep_length = L_horizontal + L_vertical
-    if total_creep_length <= 0: total_creep_length = 1.0 
-
-    # --- CALCULATE LOSS RATIO AT POINT X ---
-    current_creep = 0.0
+    # 3. Total Head at Point (H_point)
+    # H_point = H_start - (drops_passed * loss_per_drop)
+    # Note: H_start is usually equal to h_upstream (assuming datum is at 0 or consistent)
+    h_point = h_upstream - (drops_passed * delta_h)
     
-    # 1. Before Structure
-    if px <= dam_left:
-        fraction_lost = 0.0
-    # 2. After Structure
-    elif px >= dam_right:
-        fraction_lost = 1.0
-    # 3. Under/Inside Structure Zone
-    else:
-        x_dist = px - dam_left
-        current_creep += x_dist 
-        
-        if has_pile:
-            if px > pile_x:
-                current_creep += 2 * pile_depth 
-            elif abs(px - pile_x) < 0.01: # On the pile line
-                depth_ratio = abs(py) / pile_depth if pile_depth > 0 else 0
-                if depth_ratio > 1: depth_ratio = 1
-                current_creep += (abs(py)) # Just going down
-        
-        fraction_lost = current_creep / total_creep_length
-
-    # Clamp fraction
-    fraction_lost = max(0.0, min(1.0, fraction_lost))
+    # 4. Pressure Head (hp)
+    # Bernoulli: Total Head = Elevation Head + Pressure Head
+    # h = z + hp  ->  hp = h - z
+    hp = h_point - z_point
     
-    # Calculate Head
-    head_loss = delta_H * fraction_lost
-    h = h_upstream - head_loss
-
-    # 3. Pressure Head (hp) = Total Head - Elevation Head
-    hp = h - z
-
-    # 4. Pore Pressure (u) = hp * gamma_w
+    # 5. Pore Pressure (u)
     gamma_w = 9.81
     u = hp * gamma_w
     
-    # Return everything needed for the "Show Calculation" step
     return {
-        "h": h, "z": z, "hp": hp, "u": u,
-        "L_total": total_creep_length,
-        "L_current": current_creep if px > dam_left and px < dam_right else (0 if px <= dam_left else total_creep_length),
-        "fraction": fraction_lost,
-        "dH": delta_H,
-        "head_loss": head_loss
+        "H_diff": H_diff,
+        "delta_h": delta_h,
+        "h_point": h_point,
+        "hp": hp,
+        "u": u,
+        "z": z_point,
+        "nd_passed": drops_passed,
+        "Nd_total": total_Nd
     }
-
 # --- MAIN APP ---
 
 def app():
@@ -391,161 +346,137 @@ def app():
 
             st.pyplot(fig2)
 
-    # =================================================================
-    # TAB 3: 2D FLOW NET (DAM + PILE COMBINATION)
+  # =================================================================
+    # TAB 3: FLOW NETS & PIPING (TEXTBOOK SOLVER)
     # =================================================================
     with tab3:
-        st.markdown("### Combined Flow Net Analysis")
-        st.caption("Design a hydraulic structure using a Concrete Dam, a Sheet Pile, or both.")
+        st.markdown("### Flow Net Analysis")
+        st.caption("Solve Flow Net problems by counting Drops ($N_d$) and Channels ($N_f$).")
         
-        # CHANGED: Adjusted column ratio to make the plot smaller/more balanced
         col_input, col_plot = st.columns([1, 1])
 
         with col_input:
-            st.markdown("#### 1. Structure Configuration")
-            
-            has_dam = st.checkbox("Include Concrete Dam", value=True)
-            has_pile = st.checkbox("Include Sheet Pile (Cutoff)", value=False)
-            
-            dam_width = 0.0
-            pile_depth = 0.0
-            pile_x = 0.0
-
-            if has_dam:
-                dam_width = st.number_input("Dam Base Width (B) [m]", value=10.0, step=1.0)
-            
-            if has_pile:
-                c_p1, c_p2 = st.columns(2)
-                pile_depth = c_p1.number_input("Pile Depth (D) [m]", value=5.0, step=0.5)
-                
-                min_x = -dam_width/2.0 if has_dam else -10.0
-                max_x = dam_width/2.0 if has_dam else 10.0
-                pile_x = c_p2.number_input("Pile Location (X) [m]", value=min_x, step=0.5, min_value=min_x, max_value=max_x)
-
-            st.markdown("---")
-            st.markdown("#### 2. Hydraulic Conditions")
+            st.markdown("#### 1. Hydraulic Conditions")
             c_h1, c_h2 = st.columns(2)
-            h_up = c_h1.number_input("Upstream Level [m]", value=10.0)
-            h_down = c_h2.number_input("Downstream Level [m]", value=2.0)
+            h_up = c_h1.number_input("Upstream Head ($H_{up}$) [m]", value=4.5, step=0.1)
+            h_down = c_h2.number_input("Downstream Head ($H_{down}$) [m]", value=0.5, step=0.1)
             
             st.markdown("---")
-            st.markdown("#### 3. Point Pressure Calculator")
+            st.markdown("#### 2. Flow Net Properties")
+            c_net1, c_net2 = st.columns(2)
+            Nd = c_net1.number_input("Total Potential Drops ($N_d$)", value=7, step=1, min_value=1)
+            Nf = c_net2.number_input("Total Flow Channels ($N_f$)", value=3, step=1, min_value=1)
             
-            cp1, cp2 = st.columns(2)
-            p_x = cp1.number_input("Point X [m]", value=0.0, step=0.5)
-            p_y = cp2.number_input("Point Y [m]", value=-4.0, step=0.5, max_value=0.0)
+            st.markdown("---")
+            st.markdown("#### 3. Point Calculator")
+            st.caption("Look at your diagram. Where is the point located?")
             
-            results = None
-            if p_y > 0:
-                st.error("Point Y must be negative (in the soil).")
-            else:
-                conflict = False
-                if has_pile:
-                    if abs(p_x - pile_x) < 0.1 and abs(p_y) < pile_depth:
-                        conflict = True
-                
-                if conflict:
-                    st.warning("Point is inside the structure material.")
-                else:
-                    results = solve_flow_net_at_point(
-                        p_x, p_y, has_dam, dam_width, has_pile, pile_depth, pile_x, h_up, h_down
-                    )
+            # Point Inputs
+            z_point = st.number_input("Elevation of Point ($z$) [m]", value=-4.0, step=0.5, help="Vertical distance from datum")
+            nd_point = st.number_input("Drops Passed to reach Point ($n_d$)", value=2.0, step=0.1, help="How many equipotential lines has the water crossed to get here?")
+            
+            # Calculate Logic
+            results = solve_flow_net_at_point(h_up, h_down, Nd, nd_point, z_point)
+            
+            # --- RESULTS DISPLAY ---
+            st.markdown(f"""
+            <div style="background-color: #e3f2fd; color: #333333; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-top: 10px;">
+                <h4 style="color: #1565c0; margin-top: 0;">Results at Point</h4>
+                <table style="width: 100%; border-collapse: collapse; color: #333333;">
+                    <tr>
+                        <td style="padding: 5px;"><strong>Total Head ($h$)</strong></td>
+                        <td style="text-align: right; font-family: monospace; font-size: 1.1em; color: #333333;">{results['h_point']:.2f} m</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px;"><strong>Elevation Head ($z$)</strong></td>
+                        <td style="text-align: right; font-family: monospace; font-size: 1.1em; color: #333333;">{results['z']:.2f} m</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px; border-top: 1px solid #bdc3c7;"><strong>Pore Pressure ($u$)</strong></td>
+                        <td style="text-align: right; font-family: monospace; font-size: 1.2em; color: #d63384; font-weight: bold; border-top: 1px solid #bdc3c7;">{results['u']:.2f} kPa</td>
+                    </tr>
+                </table>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # --- SEEPAGE RATE CALCULATION (Part a of image) ---
+            k_val = st.number_input("Permeability ($k$) [m/sec] (for q calc)", value=1e-6, format="%.1e")
+            q = k_val * results['H_diff'] * (Nf / Nd)
+            
+            st.info(f"**Seepage Rate (q):** {format_scientific(q)} m³/sec/m")
 
-            if results:
-                # --- PROFESSIONAL RESULT CARD (FIXED COLORS) ---
-                st.markdown(f"""
-                <div style="background-color: #e3f2fd; color: #333333; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-top: 10px;">
-                    <h4 style="color: #1565c0; margin-top: 0;">Results at Point ({p_x}, {p_y})</h4>
-                    <table style="width: 100%; border-collapse: collapse; color: #333333;">
-                        <tr>
-                            <td style="padding: 5px;"><strong>Total Head ($h$)</strong></td>
-                            <td style="text-align: right; font-family: monospace; font-size: 1.1em; color: #333333;">{results['h']:.2f} m</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 5px;"><strong>Elevation Head ($z$)</strong></td>
-                            <td style="text-align: right; font-family: monospace; font-size: 1.1em; color: #333333;">{results['z']:.2f} m</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 5px; border-top: 1px solid #bdc3c7;"><strong>Pore Pressure ($u$)</strong></td>
-                            <td style="text-align: right; font-family: monospace; font-size: 1.2em; color: #d63384; font-weight: bold; border-top: 1px solid #bdc3c7;">{results['u']:.2f} kPa</td>
-                        </tr>
-                    </table>
-                </div>
-                """, unsafe_allow_html=True)
+            # --- DETAILED STEPS (Matches Handwritten Note) ---
+            with st.expander("See Calculation Steps (Textbook Style)"):
+                st.markdown("**Step 1: Calculate Head Loss per Drop**")
+                st.latex(rf"\Delta H = H_{{up}} - H_{{down}} = {h_up} - {h_down} = {results['H_diff']:.2f} \text{{ m}}")
+                st.latex(rf"\Delta h = \frac{{\Delta H}}{{N_d}} = \frac{{{results['H_diff']:.2f}}}{{{Nd}}} = {results['delta_h']:.3f} \text{{ m}}")
                 
-                # --- DETAILED CALCULATION EXPANDER ---
-                with st.expander("See Detailed Calculation Steps"):
-                    st.markdown("**Step 1: Geometry & Creep Length**")
-                    st.latex(rf"L_{{total}} = \text{{Horizontal}} + \text{{Vertical}} = {results['L_total']:.2f} \text{{ m}}")
-                    st.latex(rf"L_{{point}} = \text{{Creep path to Point A}} = {results['L_current']:.2f} \text{{ m}}")
-                    
-                    st.markdown("**Step 2: Head Loss Calculation**")
-                    st.latex(rf"\Delta H = H_{{up}} - H_{{down}} = {h_up} - {h_down} = {results['dH']:.2f} \text{{ m}}")
-                    st.latex(rf"\text{{Loss Ratio}} = \frac{{L_{{point}}}}{{L_{{total}}}} = \frac{{{results['L_current']:.2f}}}{{{results['L_total']:.2f}}} = {results['fraction']:.3f}")
-                    st.latex(rf"h_{{loss}} = \Delta H \times \text{{Ratio}} = {results['head_loss']:.2f} \text{{ m}}")
-                    
-                    st.markdown("**Step 3: Total Head ($h$)**")
-                    st.latex(rf"h = H_{{up}} - h_{{loss}} = {h_up} - {results['head_loss']:.2f} = \mathbf{{{results['h']:.2f} \text{{ m}}}}")
-                    
-                    st.markdown("**Step 4: Pore Pressure ($u$)**")
-                    st.write("Bernoulli Equation: $h = z + h_p$")
-                    st.latex(rf"h_p = h - z = {results['h']:.2f} - ({results['z']}) = {results['hp']:.2f} \text{{ m}}")
-                    st.latex(rf"u = h_p \times \gamma_w = {results['hp']:.2f} \times 9.81 = \mathbf{{{results['u']:.2f} \text{{ kPa}}}}")
+                st.markdown("**Step 2: Calculate Total Head at Point**")
+                st.write("Using the formula: $H_{point} = H_{start} - (n \times \Delta h)$")
+                st.latex(rf"H_{{point}} = {h_up} - ({nd_point} \times {results['delta_h']:.3f}) = \mathbf{{{results['h_point']:.2f} \text{{ m}}}}")
+                
+                st.markdown("**Step 3: Calculate Pore Pressure**")
+                st.write("Using Bernoulli: $H = z + \frac{u}{\gamma_w}$")
+                st.latex(rf"\frac{{u}}{{\gamma_w}} = H_{{point}} - z = {results['h_point']:.2f} - ({results['z']}) = {results['hp']:.2f} \text{{ m}}")
+                st.latex(rf"u = {results['hp']:.2f} \times 9.81 = \mathbf{{{results['u']:.2f} \text{{ kPa}}}}")
 
         with col_plot:
-            # CHANGED: Reduced figure size from (8,6) to (6, 5) for a compact look
+            # Dynamic Plot Visualization
             fig, ax = plt.subplots(figsize=(6, 5))
             
-            gx = np.linspace(-15, 15, 200)
-            gy = np.linspace(-15, 0, 150)
+            # Setup Limits
+            ax.set_xlim(-10, 10)
+            ax.set_ylim(-12, 6)
+            ax.set_aspect('equal')
+            ax.axis('off')
+            
+            # 1. Draw Structure (Generic Sheet Pile)
+            pile_depth = 6.0
+            ax.add_patch(patches.Rectangle((-0.2, -pile_depth), 0.4, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=5))
+            
+            # 2. Draw Water Levels
+            ax.plot([-10, 0], [h_up, h_up], 'b-', lw=2)
+            ax.add_patch(patches.Rectangle((-10, 0), 10, h_up, facecolor='#D6EAF8', alpha=0.5))
+            ax.text(-8, h_up + 0.5, f"Upstream: {h_up}m", fontsize=8, color='blue')
+
+            ax.plot([0, 10], [h_down, h_down], 'b-', lw=2)
+            ax.add_patch(patches.Rectangle((0, 0), 10, h_down, facecolor='#D6EAF8', alpha=0.5))
+            ax.text(2, h_down + 0.5, f"Downstream: {h_down}m", fontsize=8, color='blue')
+            
+            # 3. Draw Ground Line
+            ax.plot([-10, 10], [0, 0], 'k-', lw=2)
+
+            # 4. Generate Flow Net Lines (Approximation for visuals)
+            # We use complex potentials for a theoretical sheet pile to draw curves
+            # But we limit the number of lines to exactly what the user typed (Nf, Nd)
+            
+            gx = np.linspace(-10, 10, 100)
+            gy = np.linspace(-12, 0, 100)
             X, Y = np.meshgrid(gx, gy)
             Z = X + 1j * Y
+            Z_shift = Z + 1j*pile_depth
             
-            if has_dam:
-                C = dam_width / 2.0
-                ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, facecolor='gray', edgecolor='black', zorder=5))
-                ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold', zorder=6)
-                with np.errstate(invalid='ignore', divide='ignore'):
-                    W = np.arccosh(Z / C)
-                Phi, Psi = np.real(W), np.imag(W)
-            elif has_pile:
-                D = pile_depth
-                Z_shift = Z + 1j*D 
-                with np.errstate(invalid='ignore'):
-                    W = -1j * np.sqrt(Z_shift)
-                Phi, Psi = np.real(W), np.imag(W)
-            else:
-                Phi, Psi = np.zeros_like(X), np.zeros_like(Y)
-
-            if has_pile:
-                ax.add_patch(patches.Rectangle((pile_x - 0.15, -pile_depth), 0.3, pile_depth + h_up, facecolor='#444', edgecolor='black', zorder=6))
-                ax.text(pile_x, -pile_depth/2, "PILE", rotation=90, color='white', ha='center', va='center', fontsize=8, zorder=7)
-
-            if has_dam or has_pile:
-                ax.contour(X, Y, Psi, levels=12, colors='blue', linewidths=1, linestyles='solid', alpha=0.4)
-                ax.contour(X, Y, Phi, levels=18, colors='red', linewidths=1, linestyles='dashed', alpha=0.4)
-
-            ax.add_patch(patches.Rectangle((-15, 0), 15, h_up, facecolor='#D6EAF8', alpha=0.5))
-            ax.plot([-15, 0], [h_up, h_up], 'b-', lw=2)
-            ax.add_patch(patches.Rectangle((0, 0), 15, h_down, facecolor='#D6EAF8', alpha=0.5))
-            ax.plot([0, 15], [h_down, h_down], 'b-', lw=2)
-            ax.plot([-15, 15], [0, 0], 'k-', lw=2) 
-
-            if results:
-                ax.scatter(p_x, p_y, c='red', s=80, marker='x', zorder=10, linewidths=2)
-                # Shorter label on plot to reduce clutter
-                ax.text(p_x + 0.5, p_y, f"u={results['u']:.1f}", color='red', fontweight='bold', fontsize=9, zorder=10)
-
-            ax.set_ylim(-12, max(h_up, h_down)+2)
-            ax.set_xlim(-12, 12)
-            ax.set_aspect('equal'); ax.axis('off')
+            with np.errstate(invalid='ignore'):
+                W = -1j * np.sqrt(Z_shift)
+            Phi = np.real(W) # Potentials
+            Psi = np.imag(W) # Flow lines
             
-            # Simplified Legend
-            ax.plot([], [], 'b-', label='Flow', alpha=0.5)
-            ax.plot([], [], 'r--', label='Equipotential', alpha=0.5)
-            ax.legend(loc='lower center', ncol=2, fontsize=8, frameon=True)
+            # Draw Equipotential Lines (Nd)
+            # We want Nd drops, so we need Nd+1 lines roughly
+            ax.contour(X, Y, Phi, levels=Nd+1, colors='red', linewidths=1, linestyles='dashed', alpha=0.6)
+            
+            # Draw Flow Lines (Nf)
+            ax.contour(X, Y, Psi, levels=Nf+1, colors='blue', linewidths=1, linestyles='solid', alpha=0.6)
 
+            # 5. Highlight the "Elevation" line
+            ax.plot([-10, 10], [z_point, z_point], 'k:', lw=1, alpha=0.5)
+            ax.text(-9, z_point + 0.2, f"Elevation z={z_point}", fontsize=8)
+
+            # Legend
+            ax.plot([], [], 'b-', label=f'{Nf} Flow Channels')
+            ax.plot([], [], 'r--', label=f'{Nd} Potential Drops')
+            ax.legend(loc='lower center', ncol=2, fontsize=8)
+            
             st.pyplot(fig)
-
 if __name__ == "__main__":
     app()
