@@ -264,7 +264,9 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A*h*t > 0: 
                         k_val = (Q*L)/(A*h*t)
-                        st.success(f"**k = {k_val:.4e} cm/sec**")
+                        # UPGRADE: Use st.metric for consistent look
+                        st.success("Calculation Successful")
+                        st.metric("Permeability Coefficient (k)", f"{k_val:.4e} cm/sec")
                     else:
                         st.error("Inputs must be positive.")
 
@@ -283,7 +285,9 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A_soil*t_fall > 0 and h2 > 0: 
                         k_val = (2.303*a*L_fall/(A_soil*t_fall))*np.log10(h1/h2)
-                        st.success(f"**k = {k_val:.4e} cm/sec**")
+                        # UPGRADE: Use st.metric for consistent look
+                        st.success("Calculation Successful")
+                        st.metric("Permeability Coefficient (k)", f"{k_val:.4e} cm/sec")
                     else:
                         st.error("Inputs invalid. h2 must be > 0.")
 
@@ -368,7 +372,9 @@ def app():
             st.markdown("---")
             if st.button("Calculate Critical Gradient", type="primary"):
                 icr = (Gs - 1) / (1 + e)
-                st.success(f"**Critical Gradient (i_cr) = {icr:.3f}**")
+                # UPGRADE: Use st.metric for consistent look
+                st.success("Calculation Successful")
+                st.metric("Critical Gradient (i_cr)", f"{icr:.3f}")
                 
                 st.info("""
                 **What does this mean?**
