@@ -1,74 +1,51 @@
 import streamlit as st
-# IMPORT MODULES
-from topics import soil_phase
-from topics import effective_stress
-from topics import flow_water
-from config import APP_VERSION
 
-# 1. PAGE CONFIG
+# --- 1. CRITICAL: CONFIG MUST BE BEFORE CUSTOM IMPORTS ---
 st.set_page_config(
-    page_title="Soil Mechanics",
-    page_icon="assets/logo.png",
+    page_title="Soil Mechanics", 
+    page_icon="assets/logo.png", 
     layout="wide"
 )
 
+# --- 2. NOW IMPORT TOPICS ---
+# (If these imports happened before config, it causes the "Cache/Config" error)
+from topics import soil_phase
+from topics import effective_stress
+from topics import flow_water
+
 def app():
-
-    # --- PROFESSIONAL HEADER ---
+    # Header
     try:
-        col_logo, col_text = st.columns([1, 5], vertical_alignment="center")
-    except TypeError:
-        col_logo, col_text = st.columns([1, 5])
+        c1, c2 = st.columns([1, 5], vertical_alignment="center")
+    except:
+        c1, c2 = st.columns([1, 5])
 
-    with col_logo:
-        st.markdown(
-            """
-            <style>
-            img[data-testid="stImage"] {
-                border-radius: 12px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-        st.image("assets/logo.png", width=150)
-
-    with col_text:
-        st.markdown(
-            """
-            <div style="padding-left: 0px;">
-                <h1 style='font-size: 48px; margin-bottom: 0px; line-height: 1.0;'>Soil Mechanics</h1>
-                <p style='color: #888; font-size: 18px; font-weight: 300; margin-top: 5px;'>
-                    Phase Relationships, Effective Stress & Flow Analysis
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    with c1:
+        # Optional: Add logo here if desired, or keep it clean
+        pass 
+    with c2:
+        st.title("Soil Mechanics Portal")
+        st.caption("Phase Relationships • Effective Stress • Flow Nets")
 
     st.markdown("---")
 
-    # --- TOPIC SELECTION MENU ---
-    with st.container(border=True):
-        topic = st.selectbox(
-            "Select Calculation Module:",
-            [
-                "Phase Relationships",
-                "Effective Stress",
-                "Flow of Water in Soils"
-            ]
-        )
+    # Topic Router
+    topic = st.sidebar.radio(
+        "Select Module:", 
+        ["1D Seepage & Stress", "Permeability Tests", "2D Flow Net Analysis", "Phase Relationships"]
+    )
 
-    # --- ROUTER LOGIC ---
-    if topic == "Phase Relationships":
-        soil_phase.app(APP_VERSION)
-
-    elif topic == "Effective Stress":
-        effective_stress.app(APP_VERSION)
-
-    elif topic == "Flow of Water in Soils":
-        flow_water.app(APP_VERSION)
-
+    if topic == "1D Seepage & Stress":
+        flow_water.render_tab1_seepage()
+        
+    elif topic == "Permeability Tests":
+        flow_water.render_tab2_permeability()
+        
+    elif topic == "2D Flow Net Analysis":
+        flow_water.render_tab3_flownet()
+        
+    elif topic == "Phase Relationships":
+        soil_phase.app()
 
 if __name__ == "__main__":
     app()
