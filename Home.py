@@ -1,23 +1,31 @@
 import streamlit as st
 import os
 
-# 1. PAGE CONFIG
+# ==================================================
+# GLOBAL APP VERSION (CACHE BUSTING SOURCE OF TRUTH)
+# ==================================================
+APP_VERSION = "1.2.0"
+
+# ==================================================
+# PAGE CONFIG
+# ==================================================
 st.set_page_config(
-    page_title="MHF CIVIL CALC", 
-    page_icon="assets/logo.png", 
+    page_title="MHF CIVIL CALC",
+    page_icon="assets/logo.png",
     layout="wide"
 )
 
-# --- CUSTOM CSS: PRO GREEN BUTTONS ---
+# ==================================================
+# CUSTOM CSS: PRO GREEN BUTTONS
+# ==================================================
 st.markdown("""
 <style>
-/* 1. The Button Container (Green Box) */
 [data-testid="stPageLink-NavLink"] {
-    background-color: #198754 !important;   /* Solid Green */
+    background-color: #198754 !important;
     border: 2px solid #198754 !important;
     border-radius: 12px !important;
     padding: 16px !important;
-    text-align: center !important;          /* FORCE CENTER ALIGNMENT */
+    text-align: center !important;
     box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
     transition: transform 0.2s ease, box-shadow 0.2s ease !important;
     display: flex !important;
@@ -25,58 +33,62 @@ st.markdown("""
     align-items: center !important;
 }
 
-/* 2. Hover Effect */
 [data-testid="stPageLink-NavLink"]:hover {
-    background-color: #146c43 !important;   /* Darker Green */
+    background-color: #146c43 !important;
     transform: translateY(-3px) !important;
     box-shadow: 0 8px 12px rgba(20, 108, 67, 0.4) !important;
     border-color: #146c43 !important;
 }
 
-/* 3. Text Styling - Base Settings (Normal Weight) */
 [data-testid="stPageLink-NavLink"] p {
     color: white !important;
     font-size: 16px !important;
-    font-weight: 400 !important;      /* UNBOLD EVERYTHING by default */
+    font-weight: 400 !important;
     line-height: 1.5 !important;
     margin: 0 !important;
-    white-space: pre-wrap !important; /* Respect new lines */
+    white-space: pre-wrap !important;
 }
 
-/* 4. TITLE STYLING (First Line Only) */
-/* This makes "Soil Mechanics" Bold and Big, while "Online" stays normal */
 [data-testid="stPageLink-NavLink"] p::first-line {
-    font-weight: 800 !important;      /* BOLD Title */
-    font-size: 20px !important;       /* LARGER Title */
-    line-height: 1.8 !important;      /* More space below title */
+    font-weight: 800 !important;
+    font-size: 20px !important;
+    line-height: 1.8 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
+# ==================================================
+# MODULE DISCOVERY
+# ==================================================
 def get_active_modules():
-    """
-    Scans 'pages/' directory for active modules.
-    Returns a list of tuples: (filename, display_name)
-    """
     active_modules = []
+
     if os.path.exists("pages"):
-        files = os.listdir("pages")
-        for f in files:
+        for f in os.listdir("pages"):
             if f.endswith(".py") and f != "__init__.py":
                 try:
-                    with open(os.path.join("pages", f), "r", encoding="utf-8") as file_content:
-                        content = file_content.read()
+                    with open(os.path.join("pages", f), "r", encoding="utf-8") as file:
+                        content = file.read()
                         if "Module Under Construction" not in content:
-                            clean_name = f.replace(".py", "").replace("_", " ").replace("-", " ")
+                            clean_name = (
+                                f.replace(".py", "")
+                                 .replace("_", " ")
+                                 .replace("-", " ")
+                            )
                             parts = clean_name.split(" ", 1)
                             if parts[0].isdigit():
                                 clean_name = parts[1]
                             active_modules.append((f, clean_name.title()))
                 except Exception:
-                    pass 
+                    pass
+
     return sorted(active_modules, key=lambda x: x[1])
 
+# ==================================================
+# MAIN APP
+# ==================================================
 def main():
+
     # --- HERO SECTION ---
     try:
         col_logo, col_text = st.columns([1, 2], vertical_alignment="center")
@@ -84,7 +96,7 @@ def main():
         col_logo, col_text = st.columns([1, 2])
 
     with col_logo:
-        st.image("assets/logo.png", use_container_width=True) 
+        st.image("assets/logo.png", use_container_width=True)
 
     with col_text:
         st.markdown(
@@ -95,67 +107,68 @@ def main():
                     Deterministic Civil Engineering Computation Platform
                 </p>
             </div>
-            """, 
+            """,
             unsafe_allow_html=True
         )
 
     st.markdown("---")
-    
-    # --- AUTOMATIC DASHBOARD ---
+
+    # --- DASHBOARD ---
     modules_list = get_active_modules()
 
     if modules_list:
         st.subheader("Active Course Calculators")
-        
+
         cols = st.columns(4)
-        
-        for index, (file_name, module_title) in enumerate(modules_list):
-            with cols[index % 2]:
-                # The \n creates the line break.
-                # CSS ::first-line handles the bolding of the top part.
+        for idx, (file_name, module_title) in enumerate(modules_list):
+            with cols[idx % 2]:
                 st.page_link(
-                    f"pages/{file_name}", 
-                    label=f"{module_title}\n Online & Verified", 
+                    f"pages/{file_name}",
+                    label=f"{module_title}\nOnline & Verified",
                     use_container_width=True
                 )
-    
-    # --- MISSION STATEMENT ---
+
+    # --- MISSION ---
     st.markdown("---")
     st.markdown("""
     ### Precision. Logic. Deterministic.
-    
+
     MHF Civil is a focused engineering workspace built for **civil engineers who care about correctness**.
     No black-box guesses. No approximations without context.
     Just transparent, deterministic engineering calculations.
     """)
-    st.markdown("")
 
-   # --- ABOUT THE DEVELOPER ---
+    # --- ABOUT ---
     st.markdown("---")
     st.subheader("About MHF Civil")
-    
+
     st.markdown("""
-    ### Muhammad Hammad Faisal
-    **Final Year Civil Engineering Student (METU)** Founder — MHF Civil
-    
-    MHF Civil is built on a simple principle:  
-    **Engineering results should be reproducible, transparent, and mathematically defensible.**
+    ### Muhammad Hammad Faisal  
+    **Final Year Civil Engineering Student (METU)**  
+    Founder — MHF Civil
+
+    Engineering results should be **reproducible, transparent, and mathematically defensible**.
     """)
 
-    st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229")
-    
+    st.link_button(
+        "Connect on LinkedIn",
+        "https://www.linkedin.com/in/muhammad-hammad-20059a229"
+    )
+
     # --- FOOTER ---
     st.markdown("---")
     st.markdown(
-        """
+        f"""
         <div style='text-align: center; color: #666; font-size: 12px;'>
         © 2026 MHF Civil. All rights reserved.<br>
-        Version 1.2.0 · Ankara, Turkey
+        Version {APP_VERSION} · Ankara, Turkey
         </div>
-        """, 
+        """,
         unsafe_allow_html=True
-        )
+    )
 
+# ==================================================
+# ENTRY POINT
+# ==================================================
 if __name__ == "__main__":
     main()
-
