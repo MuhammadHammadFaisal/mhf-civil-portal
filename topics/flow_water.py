@@ -304,7 +304,130 @@ def app():
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5); ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
 
             st.pyplot(fig2)
+                # =================================================================
+    # TAB 3: 2D FLOW NET (UPDATED WITH POINT CALC)
+    # =================================================================
+    with tab3:
+        st.markdown("### Combined Flow Net Analysis")
+        st.caption("Calculate seepage and pressures for Dams or Sheet Piles.")
+        
+        col_input, col_plot = st.columns([1, 1.5])
+
+        with col_input:
+            # 1. Structure Selection
+            st.markdown("#### 1. Structure Configuration")
+            struct_type = st.radio("Select Structure:", ["Sheet Pile", "Concrete Dam"], horizontal=True)
             
+            if struct_type == "Concrete Dam":
+                dim_val = st.number_input("Dam Base Width (B) [m]", value=10.0, step=1.0)
+            else:
+                dim_val = st.number_input("Pile Embedment Depth (D) [m]", value=5.0, step=0.5)
+
+            # 2. Water Levels
+            c_h1, c_h2 = st.columns(2)
+            h_up = c_h1.number_input("Upstream Level [m]", value=10.0)
+            h_down = c_h2.number_input("Downstream Level [m]", value=2.0)
+            H_net = h_up - h_down
+
+            # 3. Point Calculator
+            st.markdown("---")
+            st.markdown("#### 2. Student Point Calculator")
+            st.caption("Enter coordinates to find pressure at a specific point.")
+            
+            cp1, cp2 = st.columns(2)
+            p_x = cp1.number_input("Point X [m]", value=2.0, step=0.5)
+            p_y = cp2.number_input("Point Y [m]", value=-4.0, step=0.5, max_value=0.0)
+            
+            # Real-time calculation for the point
+            if p_y > 0:
+                st.error("Point Y must be negative (in the soil).")
+                res_h, res_z, res_hp, res_u = 0,0,0,0
+            else:
+                res_h, res_z, res_hp, res_u = solve_flow_net_at_point(p_x, p_y, struct_type, dim_val, h_up, h_down)
+
+            if res_h is not None:
+                st.markdown(f"""
+                <div style="background-color: #f8f9fa; border-left: 4px solid #0d6efd; padding: 10px; border-radius: 4px;">
+                    <strong>Results at Point ({p_x}, {p_y}):</strong><br>
+                    • Total Head (h): <b>{res_h:.2f} m</b><br>
+                    • Elevation Head (z): <b>{res_z:.2f} m</b><br>
+                    • Pressure Head (hp): <b>{res_hp:.2f} m</b><br>
+                    • Pore Pressure (u): <span style="color: #d63384; font-weight:bold;">{res_u:.2f} kPa</span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.warning("Point is inside the structure boundary.")
+
+            # 4. Total Flow
+            st.markdown("---")
+            st.markdown("#### 3. Total Seepage (q)")
+            k_val = st.number_input("Permeability (k) [m/day]", value=0.0864)
+            Nf = st.number_input("Flow Channels (Nf)", value=4)
+            Nd = st.number_input("Potential Drops (Nd)", value=12)
+            
+            if st.button("Calculate Total Flow (q)"):
+                q = k_val * H_net * (Nf/Nd)
+                st.success(f"q = {q:.4f} m³/day/m")
+
+        with col_plot:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            
+            # Grid for Contours
+            gx = np.linspace(-15, 15, 200)
+            gy = np.linspace(-15, 0, 150)
+            X, Y = np.meshgrid(gx, gy)
+            Z = X + 1j * Y
+            
+            # --- Draw Based on Selection ---
+            if struct_type == "Concrete Dam":
+                # Dam Drawing
+                C = dim_val / 2.0
+                ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+2, facecolor='gray', edgecolor='black', zorder=3))
+                ax.text(0, 1, "DAM", ha='center', color='white', fontweight='bold')
+                
+                # Math Map
+                with np.errstate(invalid='ignore', divide='ignore'):
+                    W = np.arccosh(Z / C)
+                Phi, Psi = np.real(W), np.imag(W)
+                
+            else: # Sheet Pile
+                # Pile Drawing
+                D = dim_val
+                ax.add_patch(patches.Rectangle((-0.2, -D), 0.4, D + h_up, facecolor='gray', edgecolor='black', zorder=3))
+                
+                # Math Map (Approximation for visuals)
+                Z_shift = Z + 1j*D
+                with np.errstate(invalid='ignore'):
+                    W = -1j * np.sqrt(Z_shift) # Rotated parabola map
+                Phi, Psi = np.real(W), np.imag(W)
+
+            # Plot Flow Net
+            ax.contour(X, Y, Psi, levels=10, colors='blue', linewidths=1, linestyles='solid', alpha=0.5)
+            ax.contour(X, Y, Phi, levels=15, colors='red', linewidths=1, linestyles='dashed', alpha=0.5)
+
+            # Water
+            ax.add_patch(patches.Rectangle((-15, 0), 15, h_up, facecolor='#D6EAF8', alpha=0.5))
+            ax.plot([-15, 0], [h_up, h_up], 'b-', lw=2)
+            ax.add_patch(patches.Rectangle((0, 0), 15, h_down, facecolor='#D6EAF8', alpha=0.5))
+            ax.plot([0, 15], [h_down, h_down], 'b-', lw=2)
+            ax.plot([-15, 15], [0, 0], 'k-', lw=2) # Ground
+
+            # PLOT STUDENT POINT
+            if res_h is not None:
+                ax.scatter(p_x, p_y, c='red', s=100, marker='x', zorder=10, linewidths=3)
+                ax.text(p_x + 0.5, p_y, f"Point\nu={res_u:.1f}", color='red', fontweight='bold', fontsize=10, zorder=10)
+
+            ax.set_ylim(-12, max(h_up, h_down)+2)
+            ax.set_xlim(-12, 12)
+            ax.set_aspect('equal'); ax.axis('off')
+            
+            # Legend
+            ax.plot([], [], 'b-', label='Flow Line')
+            ax.plot([], [], 'r--', label='Equipotential')
+            ax.scatter([], [], c='red', marker='x', label='Calculated Point')
+            ax.legend(loc='lower center', ncol=3, fontsize=8)
+
+            st.pyplot(fig)
 
     
 if __name__ == "__main__":
