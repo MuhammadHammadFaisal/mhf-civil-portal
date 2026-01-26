@@ -203,7 +203,13 @@ def app():
                         
                         # --- PROFESSIONAL FORMATTING (LaTeX Scientific) ---
                         k_formatted = format_scientific(k_val)
+                        st.success(f"""
+                        **Permeability Coefficient (k)**
                         
+                        $$
+                        {k_formatted} \\text{{ cm/sec}}
+                        $$
+                        """)
                         st.markdown(f"""
                         <div style="background-color: #d1e7dd; padding: 20px; border-radius: 10px; border: 1px solid #0f5132; text-align: center; margin-top: 20px;">
                             <p style="color: #0f5132; margin-bottom: 8px; font-size: 16px; font-weight: 600;">Permeability Coefficient (k)</p>
@@ -231,15 +237,13 @@ def app():
                         
                         # --- PROFESSIONAL FORMATTING (LaTeX Scientific) ---
                         k_formatted = format_scientific(k_val)
-
-                        st.markdown(f"""
-                        <div style="background-color: #d1e7dd; padding: 20px; border-radius: 10px; border: 1px solid #0f5132; text-align: center; margin-top: 20px;">
-                            <p style="color: #0f5132; margin-bottom: 8px; font-size: 16px; font-weight: 600;">Permeability Coefficient (k)</p>
-                            <h2 style="color: #0f5132; margin: 0; font-size: 28px; font-weight: 800;">
-                                $${k_formatted} \\text{{ cm/sec}}$$
-                            </h2>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.success(f"""
+                        **Permeability Coefficient (k)**
+                        
+                        $$
+                        {k_formatted} \\text{{ cm/sec}}
+                        $$
+                        """)
                     else:
                         st.error("Inputs invalid. h2 must be > 0.")
 
