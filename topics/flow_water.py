@@ -14,36 +14,49 @@ def format_scientific(val):
 
 def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width):
     """
-    Returns Complex Potential W based on the selected MODE.
+    Returns the Complex Potential W.
+    
+    THEORY CORRECTION:
+    For flow around a barrier (Dam or Pile), we use Confocal Conic coordinates.
+    - Streamlines (Psi) are the ELLIPSES (wrapping the obstacle).
+    - Equipotentials (Phi) are the HYPERBOLAS (radiating outward).
+    
+    Mathematically:
+    - z = c * cosh(W)  maps streamlines to Im(W). (Standard for horizontal slit)
+    - z = c * sinh(W)  maps streamlines to Re(W). (Standard for vertical needle)
     """
     z = x + 1j * y
     
-    # 1. SINGULARITY CHECK (Skip for arrays)
+    # Singularity Check (Scalar only)
     if np.isscalar(z):
         target_x = pile_x if "Pile" in mode else 0
         if abs(z - (target_x + 0j)) < 0.01: z = target_x + 0.01j
 
-    # 2. MATH SELECTION
+    # 1. SHEET PILE ONLY (Vertical Cut)
     if mode == "Sheet Pile Only":
-        # Vertical Cut Math
+        # Map: z = d * sinh(w)  ->  w = arcsinh(z/d)
+        # In this map: Re(w) = Ellipses (Flow), Im(w) = Hyperbolas (Potential)
         z_shifted = (z - pile_x)
         d = pile_depth if pile_depth > 0 else 0.1
         with np.errstate(all='ignore'):
              W = np.arcsinh(z_shifted / d)
-        return W
+        
+        # We need positive flow values for plotting contours easily
+        return np.real(W) + 1j * np.imag(W)
 
+    # 2. CONCRETE DAM ONLY (Horizontal Cut)
     elif mode == "Concrete Dam Only":
-        # Horizontal Cut Math
+        # Map: z = c * cosh(w) -> w = arccosh(z/c)
+        # In this map: Re(w) = Ellipses (Flow), Im(w) = Hyperbolas (Potential)
         c = dam_width / 2.0 if dam_width > 0 else 0.1
         with np.errstate(all='ignore'):
             W = np.arccosh(z / c)
         return W
 
+    # 3. COMBINED (Hybrid)
     elif mode == "Combined (Dam + Pile)":
-        # HYBRID MATH:
-        # A dam with a sheet pile is hydraulically governed by the pile tip depth.
-        # We use the 'Vertical Cut' math centered on the pile, because flow MUST go under the tip.
-        # The dam width is handled visually by masking.
+        # Physics: The Sheet Pile is the deeper cutoff, controlling the flow loops.
+        # The Dam just caps the top. We use Pile math + Dam Masking.
         z_shifted = (z - pile_x)
         d = pile_depth if pile_depth > 0 else 0.1
         with np.errstate(all='ignore'):
@@ -53,24 +66,47 @@ def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width):
     return z
 
 def solve_smart_point(x, y, h_up, h_down, datum, mode, pile_depth, pile_x, dam_width):
-    # 1. Get Potential at Point
+    # Get W
     W_point = get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width)
-    phi_point = np.real(W_point)
     
-    # 2. Get Boundaries (Far Field)
-    W_L = get_complex_potential(-30, -0.1, mode, pile_depth, pile_x, dam_width)
-    W_R = get_complex_potential(30, -0.1, mode, pile_depth, pile_x, dam_width)
+    # Extract Potential (Phi)
+    # Note: Based on our mapping above, Equipotentials are the IMAGINARY part for Dam, 
+    # but strictly speaking, standard form maps Phi to Real. 
+    # Let's align with the visual grid: 
+    # The radiating lines (Hyperbolas) are the head drops.
+    # In arccosh(z/c), Imag(w) = Hyperbolas. 
+    # In arcsinh(z/d), Imag(w) = Hyperbolas.
+    # So Phi (Potential) is driven by Imag(W).
     
-    phi_L, phi_R = np.real(W_L), np.real(W_R)
+    phi_point = np.abs(np.imag(W_point))
     
-    # 3. Ratio
-    if abs(phi_R - phi_L) > 1e-6:
-        ratio = (phi_R - phi_point) / (phi_R - phi_L)
-    else:
-        ratio = 0.5
+    # Establish Boundary Ranges (0 to PI usually for these maps)
+    # Upstream Ground (y=0, x<-c) -> Phi = PI
+    # Downstream Ground (y=0, x>c) -> Phi = 0
+    phi_max = np.pi 
+    phi_min = 0.0
+    
+    # Calculate Drop Ratio (1.0 at Upstream, 0.0 at Downstream)
+    # We use linear interpolation of the Hyperbolic angle
+    ratio = (phi_point - phi_min) / (phi_max - phi_min)
+    
+    # Correction for "Left vs Right" side of the structure
+    # The math returns symmetric positive values. We need to know which side we are on.
+    # Upstream (Left) should have High Head.
+    center_x = pile_x if "Pile" in mode else 0
+    if x < center_x:
+        # Left side: ratio should be close to 1. 
+        # arccosh returns 0..pi. 
+        # We need to map: Left(Pi) -> 1.0, Right(0) -> 0.0
+        # If x < center, we are on the high side.
+        pass # Ratio is already correct if phi_point is near PI? 
+             # Wait, arccosh(neg) -> Pi. arccosh(pos) -> 0.
+             # So Left(-x) -> Pi -> Ratio=(Pi-0)/Pi = 1.0. (Correct)
+             # Right(+x) -> 0 -> Ratio=(0-0)/Pi = 0.0. (Correct)
+    
     ratio = max(0.0, min(1.0, ratio))
     
-    # 4. Physics
+    # Physics
     h_point = h_down + (h_up - h_down) * ratio
     z = y - datum
     hp = h_point - z
@@ -398,8 +434,8 @@ def app():
             h_down = st.number_input("Downstream Head", 2.0)
             
             c_n1, c_n2 = st.columns(2)
-            Nd = c_n1.number_input("Drops (Nd)", 12)
-            Nf = c_n2.number_input("Channels (Nf)", 4)
+            Nd = c_n1.number_input("Drops (Nd)", value=12)
+            Nf = c_n2.number_input("Channels (Nf)", value=4)
 
             st.markdown("#### 3. Smart Point")
             datum = st.number_input("Datum Elevation", value=-soil_d)
@@ -441,41 +477,59 @@ def app():
             X, Y = np.meshgrid(gx, gy)
             
             W = get_complex_potential(X, Y, mode, pile_d, pile_loc, dam_w)
-            Phi, Psi = np.real(W), np.abs(np.imag(W))
             
-            # Clamp Psi to Bedrock
+            # THE SWAP FIX:
+            # Re(W) = Flow Lines (Ellipses). Im(W) = Potentials (Hyperbolas).
+            # This is true for both arccosh and arcsinh maps used here.
+            Psi = np.real(W) # Flow
+            Phi = np.imag(W) # Potential
+            
+            # --- CLAMPING ---
+            # Flow: 0 (Structure) -> Max (Bedrock)
+            # Potential: 0 (Downstream) -> Pi (Upstream)
+            
+            # Get max Psi at Bedrock Depth
             check_x = pile_loc if "Pile" in mode else 0
             w_bed = get_complex_potential(check_x + 0.01, -soil_d, mode, pile_d, pile_loc, dam_w)
-            psi_max = np.abs(np.imag(w_bed))
-            if np.isnan(psi_max) or psi_max < 0.1: psi_max = 3.14
+            psi_max = np.real(w_bed) # Matches the swap above
+            if np.isnan(psi_max) or psi_max < 0.1: psi_max = 3.0
 
             # Draw Lines
+            # Flow (Blue) - Fixed range 0 to psi_max
             ax.contour(X, Y, Psi, levels=np.linspace(0, psi_max, Nf+1), colors='blue', lw=1, alpha=0.6)
-            ax.contour(X, Y, Phi, levels=Nd+2, colors='red', lw=1, linestyles='--', alpha=0.6)
+            
+            # Potential (Red) - Fixed range 0 to PI (approx boundary of conformal map)
+            # We use absolute value to capture both sides symmetric
+            ax.contour(X, Y, np.abs(Phi), levels=np.linspace(0, np.pi, Nd+1), colors='red', lw=1, linestyles='--', alpha=0.6)
 
             # --- VISUALS BY MODE ---
             if mode == "Sheet Pile Only":
                 pw = 0.3
                 ax.add_patch(patches.Rectangle((pile_loc-pw/2, -pile_d), pw, pile_d+h_up+1, fc='#333', zorder=10))
-                # Mask inside
+                # Mask lines inside
                 ax.add_patch(patches.Rectangle((pile_loc-0.1, -pile_d), 0.2, pile_d, fc='white', zorder=9))
                 
             elif mode == "Concrete Dam Only":
                 C = dam_w / 2.0
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, fc='gray', ec='k', zorder=10))
-                ax.plot([-C, C], [0, 0], 'b-', lw=3, zorder=11) # Impervious Base
+                # Impervious Base Line (Blue Flow Line)
+                ax.plot([-C, C], [0, 0], 'b-', lw=3, zorder=11)
 
             elif mode == "Combined (Dam + Pile)":
                 C = dam_w / 2.0
                 pw = 0.3
-                # 1. Draw Pile (Back)
-                ax.add_patch(patches.Rectangle((pile_loc-pw/2, -pile_d), pw, pile_d, fc='#333', zorder=10))
-                # 2. Draw Dam (Front)
+                # 1. Draw Dam (Front)
                 ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, fc='gray', ec='k', zorder=11))
-                # 3. Impervious Base Line (Dam + Pile Side)
+                # 2. Draw Pile (Back)
+                ax.add_patch(patches.Rectangle((pile_loc-pw/2, -pile_d), pw, pile_d, fc='#333', zorder=12))
+                # 3. MASK DAM BASE (Crucial)
+                # We cover any blue lines that might have drawn "through" the dam
+                ax.add_patch(patches.Rectangle((-C, 0), 2*C, 2, fc='white', zorder=8)) # Mask above ground
+                # Re-draw Dam over mask
+                ax.add_patch(patches.Rectangle((-C, 0), 2*C, h_up+1, fc='gray', ec='k', zorder=11))
+                
+                # 4. Impervious Base Line (Dam + Pile Side)
                 ax.plot([-C, C], [0, 0], 'b-', lw=3, zorder=12)
-                # 4. Mask inside Pile
-                ax.add_patch(patches.Rectangle((pile_loc-0.1, -pile_d), 0.2, pile_d, fc='white', zorder=9))
 
             # Water
             ax.add_patch(patches.Rectangle((-12, 0), 12, h_up, fc='#D6EAF8', alpha=0.5))
