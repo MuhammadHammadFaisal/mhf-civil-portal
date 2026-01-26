@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 
 # --- 1. PAGE CONFIGURATION (MUST BE FIRST) ---
 st.set_page_config(
@@ -8,22 +9,25 @@ st.set_page_config(
 )
 
 # --- 2. IMPORT TOPIC MODULES ---
-# These imports link to the files in your 'topics' folder
 from topics import flow_water
 from topics import soil_phase
 from topics import effective_stress
 
 def app():
     # --- HEADER SECTION ---
+    # Creates a 2-column layout: Small Logo (1) | Big Text (5)
     try:
         col_logo, col_text = st.columns([1, 5], vertical_alignment="center")
     except TypeError:
         col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
-        # If you have a logo, uncomment the line below
-        # st.image("assets/logo.png", width=120) 
-        pass
+        # CHECK: Ensure 'assets/logo.png' exists in your folder
+        if os.path.exists("assets/logo.png"):
+            st.image("assets/logo.png", width=120)
+        else:
+            # Fallback if image is missing
+            st.info("Logo missing")
 
     with col_text:
         st.markdown("""
@@ -37,30 +41,30 @@ def app():
 
     st.markdown("---")
 
-    # --- SIDEBAR NAVIGATION ---
-    st.sidebar.header("Select Module")
-    
-    # This radio button determines which file gets loaded
-    topic = st.sidebar.radio(
-        "Available Topics:",
-        [
-            "Phase Relationships", 
-            "Flow of Water (Seepage)",
-            "Effective Stress"
-        ]
-    )
+    # --- MAIN SELECTION MENU (NOT SIDEBAR) ---
+    # We use a container to make it look distinct
+    with st.container():
+        # Using a pill-like selection or radio for easy toggling
+        topic = st.radio(
+            "Select Calculation Module:",
+            [
+                "Phase Relationships", 
+                "Effective Stress",
+                "Flow of Water (Seepage)"
+            ],
+            horizontal=True # Makes it a nice top bar instead of a vertical list
+        )
+
+    st.markdown("---")
 
     # --- ROUTER LOGIC ---
     if topic == "Phase Relationships":
-        # Loads the code from topics/soil_phase.py
         soil_phase.app()
 
     elif topic == "Flow of Water (Seepage)":
-        # Loads the code from topics/flow_water.py
         flow_water.app()
 
     elif topic == "Effective Stress":
-        # Loads the code from topics/effective_stress.py
         effective_stress.app()
 
 if __name__ == "__main__":
