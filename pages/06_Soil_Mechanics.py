@@ -12,8 +12,7 @@ st.set_page_config(
 )
 
 def app():
-    # --- SIDEBAR LOGO ---
-    st.logo(image="assets/logo.png", icon_image="assets/logo.png")
+
 
     # --- PROFESSIONAL HEADER ---
     # Column Ratio [1, 5] keeps logo compact
