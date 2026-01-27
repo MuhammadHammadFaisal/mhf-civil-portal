@@ -115,7 +115,7 @@ def main():
                 # CSS ::first-line handles the bolding of the top part.
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n Beta Release (Validation Pending)", 
+                    label=f"{module_title}\n Beta Release \n (Validation Pending)", 
                     use_container_width=True
                 )
     
@@ -158,5 +158,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
