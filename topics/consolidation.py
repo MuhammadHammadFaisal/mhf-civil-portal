@@ -13,7 +13,7 @@ def app():
     # =================================================================
     calc_mode = st.radio(
         "**What do you want to calculate?**",
-        ["1. Final Ultimate Settlement (S_final)", "2. Average Degree of Consolidation (U_av) & Time Rate"],
+        ["1. Final Ultimate Settlement ($S_{final}$)", "2. Average Degree of Consolidation ($U_{av}$) & Time Rate"],
         horizontal=True
     )
     st.markdown("---")
@@ -23,9 +23,9 @@ def app():
     # =================================================================
     col_g1, col_g2 = st.columns(2)
     with col_g1:
-        water_depth = st.number_input("Water Table Depth (m)", value=2.0, step=0.5)
+        water_depth = st.number_input("Water Table Depth [m]", value=2.0, step=0.5)
     with col_g2:
-        surcharge_q = st.number_input("Surface Surcharge Δσ (kPa)", value=50.0, step=10.0)
+        surcharge_q = st.number_input("Surface Surcharge $\Delta\sigma$ [kPa]", value=50.0, step=10.0)
 
     # =================================================================
     # 3. SPLIT LAYOUT: INPUTS (Left) vs VISUALIZATION (Right)
@@ -43,8 +43,8 @@ def app():
         for i in range(int(num_layers)):
             with st.expander(f"Layer {i+1} (Top: {current_depth:.1f}m)", expanded=True):
                 c1, c2, c3 = st.columns(3)
-                thickness = c1.number_input(f"Thickness (m)", value=4.0, key=f"h_{i}")
-                gamma = c2.number_input(f"γ_sat (kN/m³)", value=19.0, key=f"g_{i}")
+                thickness = c1.number_input(f"Thickness [m]", value=4.0, key=f"h_{i}")
+                gamma = c2.number_input(f"$\gamma_{{sat}}$ [kN/m³]", value=19.0, key=f"g_{i}")
                 soil_type = c3.selectbox("Type", ["Clay", "Sand"], key=f"type_{i}")
                 
                 mid_depth = current_depth + (thickness / 2)
@@ -61,18 +61,18 @@ def app():
                     
                     if "Method A" in method:
                         rc1, rc2, rc3 = st.columns(3)
-                        e0 = rc1.number_input("e₀", 0.85, key=f"e0_{i}")
-                        Cc = rc2.number_input("Cc", 0.32, key=f"cc_{i}")
-                        Cr = rc3.number_input("Cr", 0.05, key=f"cr_{i}")
-                        sig_p = st.number_input("σ'p (kPa)", 100.0, key=f"sp_{i}")
+                        e0 = rc1.number_input("Initial $e_0$", 0.85, key=f"e0_{i}")
+                        Cc = rc2.number_input("Index $C_c$", 0.32, key=f"cc_{i}")
+                        Cr = rc3.number_input("Index $C_r$", 0.05, key=f"cr_{i}")
+                        sig_p = st.number_input("Precons. $\sigma'_p$ [kPa]", 100.0, key=f"sp_{i}")
                         params = {"e0": e0, "Cc": Cc, "Cr": Cr, "sigma_p": sig_p}
                     elif "Method B" in method:
-                        mv = st.number_input("m_v (1/kPa)", 0.0005, format="%.5f", key=f"mv_{i}")
+                        mv = st.number_input("Coeff. $m_v$ [1/kPa]", 0.0005, format="%.5f", key=f"mv_{i}")
                         params = {"mv": mv}
                     elif "Method C" in method:
                         rc1, rc2 = st.columns(2)
-                        e0 = rc1.number_input("e₀", 0.9, key=f"e0c_{i}")
-                        ef = rc2.number_input("e_final", 0.82, key=f"efc_{i}")
+                        e0 = rc1.number_input("Initial $e_0$", 0.9, key=f"e0c_{i}")
+                        ef = rc2.number_input("Final $e_{final}$", 0.82, key=f"efc_{i}")
                         params = {"e0": e0, "e_final": ef}
                 
                 layers_data.append({
@@ -121,7 +121,7 @@ def app():
     # -------------------------------------------------------------
     if "1. Final" in calc_mode:
         st.markdown("---")
-        if st.button("Calculate S_final", type="primary"):
+        if st.button("Calculate $S_{final}$", type="primary"):
             st.markdown("### 📊 Results: Final Settlement")
             
             total_settlement = 0.0
@@ -177,7 +177,8 @@ def app():
                     
                     total_settlement += settlement
                 
-                st.metric("TOTAL S_final", f"{total_settlement*1000:.2f} mm")
+                st.markdown("---")
+                st.metric("Total Final Settlement ($S_{final}$)", f"{total_settlement*1000:.2f} mm", help=f"{total_settlement:.4f} m")
 
             with c_path:
                 clay_layers = [l for l in calculated_layers if l['type'] == "Clay" and "Method A" in l['method']]
@@ -224,8 +225,8 @@ def app():
 
                     ax.plot(path_x, path_y, 'bo-', label="Path")
                     ax.set_xscale('log')
-                    ax.set_xlabel("Effective Stress (kPa)")
-                    ax.set_ylabel("Void Ratio")
+                    ax.set_xlabel("Effective Stress $\sigma'$ (kPa)")
+                    ax.set_ylabel("Void Ratio $e$")
                     ax.grid(True, which="both", alpha=0.2)
                     st.pyplot(fig)
 
@@ -249,7 +250,7 @@ def app():
             cv = c_t1.number_input("Coeff. of Consolidation ($c_v$) [m²/year]", value=2.0)
             dr_path = c_t2.number_input("Drainage Path ($d$ or $H_{dr}$) [m]", value=crit_layer['thickness']/2)
             
-            time_goal = st.radio("Goal:", ["Find Time (t) for specific U%", "Find Settlement (S_t) at specific Time (t)"])
+            time_goal = st.radio("Goal:", ["Find Time ($t$) for specific $U_{av}$", "Find Settlement ($S_t$) at specific Time ($t$)"])
             
             if st.button("Calculate Time Rate", type="primary"):
                 # Hidden S_final calc
@@ -274,25 +275,46 @@ def app():
 
                 st.info(f"**Step 1:** Calculated Total $S_{{final}} = {total_s_final*1000:.2f}$ mm")
                 
-                if time_goal == "Find Time (t) for specific U%":
-                    U_target = st.slider("Target U%", 0, 100, 90)
+                if "Find Time" in time_goal:
+                    U_target = st.slider("Target $U_{av}$ (%)", 0, 100, 90)
                     U_dec = U_target / 100.0
-                    if U_dec <= 0.6: Tv = (np.pi/4) * (U_dec**2)
-                    else: Tv = -0.933 * np.log10(1 - U_dec) - 0.085
+                    
+                    if U_dec <= 0.6:
+                        Tv = (np.pi/4) * (U_dec**2)
+                    else:
+                        Tv = -0.933 * np.log10(1 - U_dec) - 0.085
                         
                     if cv > 0:
                         t_req = (Tv * dr_path**2) / cv
                         st.success(f"**Time required: {t_req:.2f} years**")
+                        st.latex(rf"T_v = {Tv:.4f} \quad (\text{{from }} U_{{av}}={U_target}\%)")
+                        st.latex(rf"t = \frac{{T_v d^2}}{{c_v}} = \frac{{{Tv:.4f} \cdot ({dr_path})^2}}{{{cv}}} = {t_req:.2f} \text{{ years}}")
+
                 else:
                     t_val = st.number_input("Time (years)", 1.0)
+                    
                     if cv > 0:
                         Tv = (cv * t_val) / (dr_path**2)
-                        if Tv <= 0.28: U_calc = 2 * np.sqrt(Tv / np.pi)
-                        else: U_calc = 1 - (10 ** (-(Tv + 0.085) / 0.933))
+                        
+                        if Tv <= 0.28:
+                            U_calc = 2 * np.sqrt(Tv / np.pi)
+                            eq_label = r"U_{av} = 2\sqrt{T_v / \pi}"
+                            condition = r"T_v \le 0.28"
+                        else:
+                            exponent = -(Tv + 0.085) / 0.933
+                            U_calc = 1 - (10 ** exponent)
+                            eq_label = r"U_{av} = 1 - 10^{-\frac{T_v + 0.085}{0.933}}"
+                            condition = r"T_v > 0.28"
+                        
                         if U_calc > 1.0: U_calc = 1.0
+                        
                         s_t = total_s_final * U_calc
+                        
                         st.success(f"**Settlement at {t_val} years: {s_t*1000:.2f} mm**")
-                        st.metric("U_av", f"{U_calc*100:.1f} %")
+                        st.latex(rf"T_v = \frac{{c_v t}}{{d^2}} = {Tv:.4f}")
+                        st.write(f"Using equation for ${condition}$:")
+                        st.latex(eq_label)
+                        st.metric("Average Degree of Consolidation ($U_{av}$)", f"{U_calc*100:.1f} %")
 
 if __name__ == "__main__":
     app()
