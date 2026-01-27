@@ -177,9 +177,7 @@ def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, s
 def app():
     st.set_page_config(page_title="Soil Mechanics Analysis", layout="wide")
     
-    # SHOW MAINTENANCE BANNER
-    show_maintenance_banner()
-    
+
     st.subheader("Flow of Water & Seepage Analysis")
     
     tab1, tab2, tab3 = st.tabs(["1D Seepage", "Permeability", "Flow Nets"])
