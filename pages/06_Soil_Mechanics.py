@@ -43,7 +43,7 @@ def app():
         )
         # Ensure this image exists, otherwise comment it out to avoid errors
         # st.image("assets/logo.png", width=150) 
-        st.image("assets/logo.png", width=150) 
+        st.image("assets/logo.png", width=200) 
     with col_text:
         st.markdown(
             """
