@@ -36,7 +36,7 @@ def app():
             <div style="padding-top: 15px; padding-left: 10px;">
                 <h1 style='font-size: 45px; margin-bottom: 5px; line-height: 1.0;'>Soil Mechanics</h1>
                 <p style='color: #888; font-size: 18px; font-weight: 300; margin: 0;'>
-                    Comprehensive Geotechnical Engineering Suite
+                    Phase Relationships, Effective Stress & Flow Analysis
                 </p>
             </div>
             """, 
@@ -50,40 +50,36 @@ def app():
         topic = st.selectbox(
             "Select Calculation Module:", 
             [
-                "1. Introduction",
-                "2. Phase Relationships",
-                "3. Effective Stress",
-                "4. Flow of Water in Soils (Seepage)",
-                "5. Consolidation Theory",
-                "6. Shear Strength",
-                "7. Lateral Earth Pressure",
-                "8. Stability of Slopes"
-            ],
-            index=1 # Defaults to Phase Relationships
+                "Basic Properties & Phase Relationships",
+                "Effective Stress",
+                "Flow of Water (Seepage)",
+                "Consolidation Theory",
+                "Shear Strength",
+                "Lateral Earth Pressure",
+                "Stability of Slopes"
+            ]
         )
 
     # --- ROUTER LOGIC ---
     
     # Active Modules
-    if topic == "2. Phase Relationships":
+    if topic == "Basic Properties & Phase Relationships":
         soil_phase.app()
 
-    elif topic == "3. Effective Stress":
+    elif topic == "Effective Stress":
         effective_stress.app()
 
-    elif topic == "4. Flow of Water in Soils (Seepage)":
+    elif topic == "Flow of Water (Seepage)":
         flow_water.app()
 
-    # Maintenance Modules
+    # Maintenance Modules (Consolidation, Shear Strength, Earth Pressure, Slopes)
     else:
-        st.warning(f"### 🚧 Under Maintenance")
-        st.info(f"The module for **{topic}** is currently being developed. Please check back later!")
+        st.markdown("---")
+        st.warning(f"### 🚧 Module Under Maintenance")
+        st.info(f"The module for **{topic}** is currently being developed. Please select an active module from the list.")
         
-        # Optional: Show what is coming soon based on the syllabus image
-        if "Consolidation" in topic:
-            st.write("Upcoming features: Oedometer test analysis, Terzaghi's theory, and Compression indices.")
-        elif "Shear Strength" in topic:
-            st.write("Upcoming features: Mohr-Coulomb failure criterion and Triaxial test simulations.")
+        # Displaying a syllabus reminder of what's coming
+        st.write("Current development focus: Implementation of theoretical models and calculation tools for this chapter.")
 
 if __name__ == "__main__":
     app()
