@@ -1,207 +1,182 @@
 import streamlit as st
 import numpy as np
+import matplotlib.pyplot as plt
 
-# RENAME THIS FUNCTION TO 'app' TO MATCH YOUR OTHER FILES
 def app():
-    st.header("Consolidation & Settlement Analysis")
+    st.header("🏗️ Consolidation: Field Settlement")
     st.markdown("""
-    This module is divided into two parts:
-    1.  **Lab Analysis:** Determine the Coefficient of Consolidation ($c_v$) using lab data.
-    2.  **Field Settlement:** Calculate ultimate settlement and time-rate settlement using field parameters.
+    Calculate the ultimate primary consolidation settlement and time-rate settlement for clay layers.
+    The interactive graph below visualizes the soil state relative to the preconsolidation pressure.
     """)
     
     st.divider()
 
     # =================================================================
-    # PART 1: DETERMINATION OF Cv (Lab Data)
+    # INPUT SECTION
     # =================================================================
-    st.subheader("1. Laboratory Determination of $c_v$")
-    st.info("Select the graphical method used in your laboratory test to determine the Coefficient of Consolidation.")
+    col1, col2, col3 = st.columns(3)
 
-    # User Selection: Method
-    cv_method = st.radio(
-        "Which method are you using?",
-        ["Casagrande Method (Log-Time)", "Taylor Method (Square-Root-Time)"],
-        horizontal=True
-    )
-
-    col_lab1, col_lab2 = st.columns(2)
-    
-    with col_lab1:
-        # Lab Sample Inputs
-        d_lab_mm = st.number_input("Sample Thickness at 50% consolidation (H_lab) [mm]", value=20.0, step=0.1)
-        drainage_lab = st.selectbox("Lab Drainage Condition", ["Double Drainage (Top & Bottom)", "Single Drainage"])
+    with col1:
+        st.markdown("##### 1. Soil Properties")
+        H_field = st.number_input("Layer Thickness (H) [m]", value=5.0)
+        e0 = st.number_input("Initial Void Ratio ($e_0$)", value=0.85, format="%.3f")
+        Cc = st.number_input("Compression Index ($C_c$)", value=0.32, format="%.3f")
+        Cr = st.number_input("Recompression Index ($C_r$)", value=0.05, format="%.3f")
         
-        # Calculate drainage path 'd' or 'Hdr' for lab
-        if drainage_lab == "Double Drainage (Top & Bottom)":
-            Hdr_lab = (d_lab_mm / 2) / 1000 # convert to meters
-            st.caption(f"Drainage path $d = H/2 = {Hdr_lab*1000:.2f}$ mm")
+    with col2:
+        st.markdown("##### 2. Stress State")
+        sigma_v0 = st.number_input("Initial Effective Stress ($\sigma'_0$) [kPa]", value=100.0)
+        sigma_p = st.number_input("Preconsolidation Pressure ($\sigma'_p$) [kPa]", value=120.0)
+        delta_sigma = st.number_input("Stress Increase ($\Delta\sigma$) [kPa]", value=50.0)
+
+    with col3:
+        st.markdown("##### 3. Drainage & Time")
+        cv_field = st.number_input("Coeff. of Consolidation ($c_v$) [$m^2/year$]", value=2.0)
+        drainage_type = st.selectbox("Drainage Condition", ["Double (Top & Bottom)", "Single (Top or Bottom)"])
+        
+        # Calculate Drainage Path
+        if "Double" in drainage_type:
+            Hdr = H_field / 2
+            st.caption(f"Drainage path $d = H/2 = {Hdr:.2f}$ m")
         else:
-            Hdr_lab = d_lab_mm / 1000 # convert to meters
-            st.caption(f"Drainage path $d = H = {Hdr_lab*1000:.2f}$ mm")
+            Hdr = H_field
+            st.caption(f"Drainage path $d = H = {Hdr:.2f}$ m")
 
-    with col_lab2:
-        # Method Specific Inputs
-        if "Casagrande" in cv_method:
-            st.markdown("**Casagrande Method Inputs**")
-            t_50 = st.number_input("Time for 50% consolidation ($t_{50}$) [min]", value=10.0, step=0.1)
-            # Formula: Tv=0.196, Cv = (0.196 * d^2) / t50
-            if t_50 > 0:
-                cv_val = (0.196 * (Hdr_lab**2)) / t_50 # m2/min
-                method_cite = "Tv = 0.196 for 50% Consolidation"
-            else:
-                cv_val = 0
-                
-        else: # Taylor Method
-            st.markdown("**Taylor Method Inputs**")
-            t_90 = st.number_input("Time for 90% consolidation ($t_{90}$) [min]", value=25.0, step=0.1)
-            # Formula: Tv=0.848, Cv = (0.848 * d^2) / t90
-            if t_90 > 0:
-                cv_val = (0.848 * (Hdr_lab**2)) / t_90 # m2/min
-                method_cite = "Tv = 0.848 for 90% Consolidation"
-            else:
-                cv_val = 0
-
-    # Display Cv Results
-    if cv_val > 0:
-        cv_year = cv_val * 60 * 24 * 365 # Convert m2/min to m2/year
-        st.success(f"**Calculated Coefficient of Consolidation ($c_v$):**")
-        st.latex(f"c_v = {cv_val:.6f} \, m^2/min = {cv_year:.4f} \, m^2/year")
-        st.caption(f"Based on {method_cite}")
-    
     st.divider()
 
     # =================================================================
-    # PART 2: FIELD SETTLEMENT (Smart Logic)
+    # CALCULATION LOGIC
     # =================================================================
-    st.subheader("2. Field Settlement Analysis")
-    st.write("Enter the soil profile parameters. The system will automatically identify the soil state (NC vs OC) and apply the correct settlement formula.")
-
-    col_field1, col_field2, col_field3 = st.columns(3)
-
-    with col_field1:
-        st.markdown("##### Soil Properties")
-        H_field = st.number_input("Field Layer Thickness (H) [m]", value=5.0)
-        e0 = st.number_input("Initial Void Ratio ($e_0$)", value=0.85)
-        Cc = st.number_input("Compression Index ($C_c$)", value=0.32)
-        Cr = st.number_input("Recompression Index ($C_r$)", value=0.05)
-        
-    with col_field2:
-        st.markdown("##### Stress State")
-        sigma_v0 = st.number_input("Initial Effective Stress ($\sigma'_0$) [kPa]", value=118.0)
-        sigma_p = st.number_input("Preconsolidation Pressure ($\sigma'_p$) [kPa]", value=118.0)
-        delta_sigma = st.number_input("Stress Increase ($\Delta\sigma$) [kPa]", value=60.0)
-
-    with col_field3:
-        st.markdown("##### Time Rate Params")
-        # Allow user to use calculated Cv or override
-        use_calc_cv = st.checkbox("Use calculated $c_v$ from Part 1?", value=True)
-        if use_calc_cv:
-            # Check if cv_year is defined (from part 1)
-            if 'cv_year' in locals():
-                cv_field = cv_year
-                st.write(f"$c_v = {cv_field:.4f} \, m^2/year$")
-            else:
-                st.warning("Calculate Cv in Part 1 first, or uncheck this box.")
-                cv_field = 0
-        else:
-            cv_field = st.number_input("Enter Field $c_v$ [$m^2/year$]", value=2.0)
-            
-        drainage_field = st.selectbox("Field Drainage", ["Double (Top & Bottom)", "Single (Top or Bottom)"])
-        Hdr_field = H_field / 2 if "Double" in drainage_field else H_field
-
-    # --- CRITICAL THINKING / LOGIC ---
     sigma_final = sigma_v0 + delta_sigma
     settlement = 0.0
-    status_msg = ""
-    formula_latex = ""
     case_type = ""
-
-    # Logic Tree for Settlement Calculation
+    status_msg = ""
+    
+    # Logic Tree based on Lecture Notes [cite: 230-237]
     if sigma_v0 >= sigma_p:
         # Case: Normally Consolidated (NC)
+        # Note: Ideally sigma_v0 can't be > sigma_p, but we treat it as NC if they are close or user input varies.
         case_type = "Normally Consolidated (NC)"
+        status_msg = "Current stress is on the Virgin Compression Line."
+        
         settlement = (Cc * H_field / (1 + e0)) * np.log10(sigma_final / sigma_v0)
-        status_msg = f"Since $\sigma'_0 ({sigma_v0}) \approx \sigma'_p ({sigma_p})$, the soil is **Normally Consolidated**."
-        formula_latex = r"S_c = \frac{C_c H}{1+e_0} \log \left( \frac{\sigma'_0 + \Delta\sigma}{\sigma'_0} \right)"
+        
+        # For plotting: path is just straight down Cc line
+        path_sigma = [sigma_v0, sigma_final]
+        path_e = [e0, e0 - Cc * np.log10(sigma_final/sigma_v0)]
         
     else:
         # Case: Over Consolidated (OC)
         if sigma_final <= sigma_p:
             # Case 1: Recompression Only
-            case_type = "Over-Consolidated (Case 1: Recompression)"
+            case_type = "OC Case 1: Recompression Only"
+            status_msg = "Final stress is still below Preconsolidation Pressure."
+            
             settlement = (Cr * H_field / (1 + e0)) * np.log10(sigma_final / sigma_v0)
-            status_msg = f"Since $\sigma'_0 < \sigma'_p$ AND $\sigma'_{{final}} ({sigma_final}) < \sigma'_p ({sigma_p})$, the soil remains in the **recompression range**."
-            formula_latex = r"S_c = \frac{C_r H}{1+e_0} \log \left( \frac{\sigma'_0 + \Delta\sigma}{\sigma'_0} \right)"
+            
+            # For plotting: path is straight down Cr line
+            path_sigma = [sigma_v0, sigma_final]
+            path_e = [e0, e0 - Cr * np.log10(sigma_final/sigma_v0)]
             
         else:
             # Case 2: Recompression + Compression
-            case_type = "Over-Consolidated (Case 2: Preconsolidation Exceeded)"
+            case_type = "OC Case 2: Recompression + Virgin Compression"
+            status_msg = "Stress exceeds Preconsolidation Pressure; moving to Virgin Compression Line."
+            
             term1 = (Cr * H_field / (1 + e0)) * np.log10(sigma_p / sigma_v0)
             term2 = (Cc * H_field / (1 + e0)) * np.log10(sigma_final / sigma_p)
             settlement = term1 + term2
-            status_msg = f"Since $\sigma'_0 < \sigma'_p$ BUT $\sigma'_{{final}} ({sigma_final}) > \sigma'_p ({sigma_p})$, the soil undergoes **both recompression and virgin compression**."
-            formula_latex = r"S_c = \frac{C_r H}{1+e_0} \log \left( \frac{\sigma'_p}{\sigma'_0} \right) + \frac{C_c H}{1+e_0} \log \left( \frac{\sigma'_0 + \Delta\sigma}{\sigma'_p} \right)"
-
-    # --- RESULTS DISPLAY ---
-    st.markdown("#### 📊 Analysis Results")
-    
-    # 1. Classification Result
-    st.info(f"**Identified State:** {case_type}")
-    st.write(status_msg)
-    
-    # 2. Ultimate Settlement Result
-    col_res1, col_res2 = st.columns(2)
-    with col_res1:
-        st.metric("Total Ultimate Settlement ($S_c$)", f"{settlement*1000:.2f} mm", help=f"{settlement:.4f} m")
-    with col_res2:
-        st.latex(formula_latex)
-
-    # 3. Time Rate Calculation
-    st.markdown("#### ⏳ Time-Rate Predictions")
-    
-    time_calc_mode = st.radio("Calculate:", ["Time required for X% Settlement", "Settlement amount after Y years"], horizontal=True)
-    
-    if time_calc_mode == "Time required for X% Settlement":
-        U_target = st.slider("Target Consolidation Ratio (U%)", 10, 99, 90)
-        U_decimal = U_target / 100.0
-        
-        # Calculate Tv based on U
-        if U_decimal <= 0.60:
-            Tv = (np.pi / 4) * (U_decimal ** 2)
-        else:
-            Tv = -0.933 * np.log10(1 - U_decimal) - 0.085
             
-        # Calculate time: t = (Tv * d^2) / Cv
+            # For plotting: Two segments
+            # Segment 1: sigma_v0 to sigma_p (slope Cr)
+            e_p = e0 - Cr * np.log10(sigma_p/sigma_v0)
+            # Segment 2: sigma_p to sigma_final (slope Cc)
+            e_final = e_p - Cc * np.log10(sigma_final/sigma_p)
+            
+            path_sigma = [sigma_v0, sigma_p, sigma_final]
+            path_e = [e0, e_p, e_final]
+
+    # =================================================================
+    # OUTPUT & VISUALIZATION
+    # =================================================================
+    col_res, col_plot = st.columns([1, 1.5])
+
+    with col_res:
+        st.subheader("Results")
+        st.info(f"**State:** {case_type}")
+        st.write(f"_{status_msg}_")
+        
+        st.metric(
+            label="Total Primary Settlement ($S_c$)", 
+            value=f"{settlement*1000:.2f} mm",
+            help=f"Calculated value: {settlement:.4f} m"
+        )
+        
+        # Time Rate Quick Calc
+        st.markdown("#### ⏳ Time Rate")
+        t_years = st.number_input("Years elapsed:", value=1.0, step=0.5)
+        
         if cv_field > 0:
-            t_years = (Tv * (Hdr_field**2)) / cv_field
-            st.metric(f"Time required for {U_target}% Consolidation", f"{t_years:.2f} years")
-        else:
-            st.warning("Please ensure Cv > 0 to calculate time.")
+            Tv = (cv_field * t_years) / (Hdr**2)
             
-    else:
-        t_user = st.number_input("Time duration [years]", value=1.0)
-        
-        # Calculate Tv: Tv = Cv * t / d^2
-        if Hdr_field > 0 and cv_field > 0:
-            Tv_calc = (cv_field * t_user) / (Hdr_field**2)
-            
-            # Inverse Tv to get U
-            if Tv_calc < 0.283: 
-                U_calc = np.sqrt((4 * Tv_calc) / np.pi)
+            # Inverse Tv approximation
+            if Tv < 0.283:
+                U = np.sqrt((4 * Tv) / np.pi)
             else:
-                exponent = (Tv_calc + 0.085) / -0.933
-                U_calc = 1 - (10**exponent)
+                U = 1 - (10 ** ((Tv + 0.085) / -0.933))
             
-            # Cap U at 100%
-            if U_calc > 1.0: U_calc = 1.0
+            if U > 1.0: U = 1.0
             
-            settlement_at_t = settlement * U_calc
-            
-            st.metric(f"Degree of Consolidation at {t_user} years", f"{U_calc*100:.1f} %")
-            st.metric(f"Settlement at {t_user} years", f"{settlement_at_t*1000:.2f} mm")
+            st.metric(f"Settlement at {t_years} years", f"{(settlement * U)*1000:.2f} mm")
+            st.caption(f"Degree of Consolidation $U = {U*100:.1f}\%$")
         else:
-            st.warning("Please ensure Cv > 0 to calculate settlement.")
+            st.warning("Enter $c_v > 0$ for time calculations.")
+
+    with col_plot:
+        st.subheader("Dynamic $e-\log \sigma'$ Curve")
+        
+        fig, ax = plt.subplots(figsize=(6, 4))
+        
+        # 1. Plot the "Background" Lines (Theoretical)
+        # Create a range of stress for visualization
+        x_range = np.logspace(np.log10(min(10, sigma_v0/2)), np.log10(max(1000, sigma_final*2)), 100)
+        
+        # Plot Virgin Compression Line (extending from sigma_p)
+        # We need a reference point. If NC, ref is (sigma_v0, e0). If OC, ref is (sigma_p, e_p calculated).
+        if sigma_v0 >= sigma_p:
+            ref_sig, ref_e = sigma_v0, e0
+        else:
+            # Calculate e_p first
+            ref_sig = sigma_p
+            ref_e = e0 - Cr * np.log10(sigma_p/sigma_v0)
+            
+            # Plot Recompression Line (backward from sigma_p)
+            # e = e_p + Cr * log(sigma_p / sigma) -> slope is negative in plot
+            y_recomp = ref_e + Cr * np.log10(ref_sig / x_range)
+            ax.plot(x_range, y_recomp, '--', color='green', alpha=0.3, label="Recompression Slope ($C_r$)")
+
+        # Virgin Line equation: e = ref_e - Cc * log(sigma / ref_sig)
+        y_virgin = ref_e - Cc * np.log10(x_range / ref_sig)
+        ax.plot(x_range, y_virgin, '--', color='red', alpha=0.3, label="Virgin Slope ($C_c$)")
+        
+        # 2. Plot the Actual Stress Path (The "Dynamic" part)
+        ax.plot(path_sigma, path_e, 'o-', color='blue', linewidth=2, markersize=8, label="Stress Path")
+        
+        # Annotate points
+        ax.annotate('Start ($\sigma\'_0$)', xy=(path_sigma[0], path_e[0]), xytext=(5, 5), textcoords='offset points')
+        ax.annotate('Final ($\sigma\'_f$)', xy=(path_sigma[-1], path_e[-1]), xytext=(5, -15), textcoords='offset points')
+        
+        if len(path_sigma) == 3: # If we have the break point at sigma_p
+             ax.annotate('$\sigma\'_p$', xy=(path_sigma[1], path_e[1]), xytext=(5, 5), textcoords='offset points')
+
+        # Formatting
+        ax.set_xscale('log')
+        ax.set_xlabel("Effective Stress $\sigma'$ (kPa) [Log Scale]")
+        ax.set_ylabel("Void Ratio ($e$)")
+        ax.grid(True, which="both", ls="-", alpha=0.2)
+        ax.legend(loc='upper right', fontsize='small')
+        
+        st.pyplot(fig)
 
 if __name__ == "__main__":
     app()
