@@ -139,7 +139,7 @@ def main():
         
         # Replace the link below with your actual Google Form link
         st.link_button(
-            "📝 Open Feedback Form", 
+            "Open Feedback Form", 
             "https://forms.google.com/your-form-link-here", 
             use_container_width=True
         )
@@ -171,6 +171,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
