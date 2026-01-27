@@ -3,7 +3,7 @@ import streamlit as st
 from topics import soil_phase
 from topics import effective_stress
 from topics import flow_water
-
+from topics import consolidation
 # 1. PAGE CONFIG
 st.set_page_config(
     page_title="Soil Mechanics", 
@@ -71,7 +71,9 @@ def app():
 
     elif topic == "Flow of Water (Seepage)":
         flow_water.app()
-
+        
+    elif topic == "Consolidation Theory":
+        consolidation.app()
     # Maintenance Modules (Consolidation, Shear Strength, Earth Pressure, Slopes)
     else:
         st.markdown("---")
