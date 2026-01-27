@@ -4,6 +4,7 @@ from topics import soil_phase
 from topics import effective_stress
 from topics import flow_water
 from topics import consolidation
+
 # 1. PAGE CONFIG
 st.set_page_config(
     page_title="Soil Mechanics", 
@@ -12,6 +13,17 @@ st.set_page_config(
 )
 
 def app():
+    # =========================================================
+    # 🚨 BETA DISCLAIMER (Added Here)
+    # =========================================================
+    # Placing this here ensures it shows up on EVERY page selection
+    st.warning(
+        "⚠️ **BETA VERSION:** This application is currently in testing. "
+        "While most calculations are precise, please verify results manually. "
+        "If you encounter any issues, please contact the developer.", 
+        icon="🚧"
+    )
+
     # --- PROFESSIONAL HEADER ---
     col_logo, col_text = st.columns([1, 5])
 
@@ -28,7 +40,8 @@ def app():
             """, 
             unsafe_allow_html=True
         )
-        st.image("assets/logo.png", width=150) 
+        # Ensure this image exists, otherwise comment it out to avoid errors
+        # st.image("assets/logo.png", width=150) 
 
     with col_text:
         st.markdown(
@@ -74,13 +87,13 @@ def app():
         
     elif topic == "Consolidation Theory":
         consolidation.app()
-    # Maintenance Modules (Consolidation, Shear Strength, Earth Pressure, Slopes)
+        
+    # Maintenance Modules
     else:
         st.markdown("---")
         st.warning(f"### 🚧 Module Under Maintenance")
         st.info(f"The module for **{topic}** is currently being developed. Please select an active module from the list.")
         
-        # Displaying a syllabus reminder of what's coming
         st.write("Current development focus: Implementation of theoretical models and calculation tools for this chapter.")
 
 if __name__ == "__main__":
