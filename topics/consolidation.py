@@ -213,4 +213,4 @@ def consolidation_page():
             st.metric(f"Settlement at {t_user} years", f"{settlement_at_t*1000:.2f} mm")
 
 if __name__ == "__main__":
-    consolidation_page()
+    app()
