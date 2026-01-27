@@ -4,15 +4,14 @@ import matplotlib.patches as patches
 import numpy as np
 
 def app():
+    # =================================================================
+    # 1. HEADER & MODE
+    # =================================================================
     st.header("🏗️ Consolidation Analysis")
-    st.markdown("Select your calculation goal below. The input fields will adjust based on your choice.")
     st.markdown("---")
 
-    # =================================================================
-    # 1. MODE SELECTION
-    # =================================================================
     calc_mode = st.radio(
-        "**What do you want to calculate?**",
+        "**Calculation Goal:**",
         ["1. Final Ultimate Settlement ($S_{final}$)", "2. Average Degree of Consolidation ($U_{av}$) & Time Rate"],
         horizontal=True
     )
@@ -28,9 +27,10 @@ def app():
         surcharge_q = st.number_input("Surface Surcharge $\Delta\sigma$ [kPa]", value=50.0, step=10.0)
 
     # =================================================================
-    # 3. SPLIT LAYOUT: INPUTS (Left) vs VISUALIZATION (Right)
+    # 3. LAYOUT: INPUTS (Left) - VISUALIZATION (Right)
     # =================================================================
-    col_input, col_viz = st.columns([1.2, 1])
+    # Adjusted ratio to [1.5, 1] to give inputs more room
+    col_input, col_viz = st.columns([1.5, 1])
 
     layers_data = []
     
@@ -52,9 +52,9 @@ def app():
                 params = {}
                 
                 if soil_type == "Clay":
-                    st.caption("Settlement Parameters")
+                    st.markdown("**Settlement Parameters**")
                     method = st.radio(
-                        f"Method for Layer {i+1}:",
+                        f"Method (Layer {i+1}):",
                         ["Method A: Cc/Cr", "Method B: mv", "Method C: Δe"],
                         key=f"m_{i}", horizontal=True
                     )
@@ -82,9 +82,7 @@ def app():
                 })
                 current_depth += thickness
 
-    # =================================================================
-    # 4. VISUALIZATION (ALWAYS VISIBLE)
-    # =================================================================
+    # --- VISUALIZER ---
     with col_viz:
         st.subheader("Soil Profile")
         fig, ax = plt.subplots(figsize=(6, 8))
@@ -105,19 +103,95 @@ def app():
                 ax.arrow(x, -0.6, 0, 0.5, head_width=0.15, head_length=0.1, fc='red', ec='red')
             ax.text(2.5, -0.8, f"q = {surcharge_q} kPa", color='red', ha='center')
 
-        # Fix Y-axis to show depth nicely
-        max_depth = max(current_depth * 1.1, 5.0) # Ensure minimal plot size
+        max_depth = max(current_depth * 1.1, 5.0) 
         ax.set_ylim(max_depth, -1.5)
         ax.set_xlim(0, 5)
         ax.axis('off')
         st.pyplot(fig)
 
     # =================================================================
-    # 5. MODE SPECIFIC LOGIC
+    # HELPER: CALCULATION ENGINE
+    # =================================================================
+    def calculate_layer(l, all_layers, w_depth, q_surf):
+        # 1. Stress Calculation
+        sigma_str = []
+        sigma_val = 0.0
+        
+        for above in all_layers:
+            if above['id'] < l['id']:
+                sigma_str.append(f"({above['thickness']}m × {above['gamma']})")
+                sigma_val += above['thickness'] * above['gamma']
+        
+        sigma_str.append(f"({l['thickness']/2}m × {l['gamma']})")
+        sigma_val += (l['thickness']/2) * l['gamma']
+        
+        u_val = (l['mid'] - w_depth) * 9.81 if l['mid'] > w_depth else 0.0
+        u_str = f"({l['mid']} - {w_depth}) × 9.81 = {u_val:.2f}" if l['mid'] > w_depth else "0"
+            
+        sig_0 = sigma_val - u_val
+        sig_f = sig_0 + q_surf
+        
+        math_log = [
+            "**1. Effective Stress:**",
+            f"$\sigma_{{total}} = {sigma_val:.2f}$ kPa",
+            f"$u = {u_str}$ kPa",
+            f"$\sigma'_0 = {sigma_val:.2f} - {u_val:.2f} = \\mathbf{{{sig_0:.2f} \\text{{ kPa}}}}$",
+            f"$\sigma'_f = {sig_0:.2f} + {q_surf} = \\mathbf{{{sig_f:.2f} \\text{{ kPa}}}}$"
+        ]
+
+        # 2. Settlement Calculation
+        settlement = 0.0
+        status = "Skipped"
+        
+        if l['type'] == "Clay":
+            H = l['thickness']
+            math_log.append("**2. Settlement Formula:**")
+            
+            if "Method A" in l['method']:
+                p = l['params']
+                math_log.append(f"Params: $C_c={p['Cc']}, C_r={p['Cr']}, e_0={p['e0']}, \sigma'_p={p['sigma_p']}$")
+                
+                if sig_0 >= p['sigma_p']: 
+                    status = "NC"
+                    settlement = (p['Cc']*H/(1+p['e0'])) * np.log10(sig_f/sig_0)
+                    math_log.append(f"Case: NC ($\sigma'_0 \ge \sigma'_p$)")
+                    math_log.append(f"$S = \\frac{{{p['Cc']} \cdot {H}}}{{1+{p['e0']}}} \log\\left(\\frac{{{sig_f:.1f}}}{{{sig_0:.1f}}}\\right)$")
+                
+                elif sig_f <= p['sigma_p']:
+                    status = "OC (Recomp)"
+                    settlement = (p['Cr']*H/(1+p['e0'])) * np.log10(sig_f/sig_0)
+                    math_log.append(f"Case: OC Recomp ($\sigma'_f \le \sigma'_p$)")
+                    math_log.append(f"$S = \\frac{{{p['Cr']} \cdot {H}}}{{1+{p['e0']}}} \log\\left(\\frac{{{sig_f:.1f}}}{{{sig_0:.1f}}}\\right)$")
+                
+                else:
+                    status = "OC (Mixed)"
+                    s1 = (p['Cr']*H/(1+p['e0'])) * np.log10(p['sigma_p']/sig_0)
+                    s2 = (p['Cc']*H/(1+p['e0'])) * np.log10(sig_f/p['sigma_p'])
+                    settlement = s1 + s2
+                    math_log.append(f"Case: OC Mixed ($\sigma'_0 < \sigma'_p < \sigma'_f$)")
+                    math_log.append(f"$S = S_{{recomp}} + S_{{virgin}}$")
+            
+            elif "Method B" in l['method']:
+                status = "mv"
+                settlement = l['params']['mv'] * q_surf * H
+                math_log.append(f"$S = m_v \cdot \Delta\sigma \cdot H$")
+            
+            elif "Method C" in l['method']:
+                status = "Δe"
+                de = l['params']['e0'] - l['params']['e_final']
+                settlement = (de/(1+l['params']['e0'])) * H
+                math_log.append(f"$S = \\frac{{\Delta e}}{{1+e_0}} \cdot H$")
+        
+        math_log.append(f"**Result: $S = {settlement:.4f}$ m**")
+        
+        return {"settlement": settlement, "status": status, "sig_0": sig_0, "sig_f": sig_f, "log": math_log, "params": params if l['type']=="Clay" else {}}
+
+    # =================================================================
+    # 4. RESULTS SECTION
     # =================================================================
     
     # -------------------------------------------------------------
-    # MODE 1: FINAL SETTLEMENT + STRESS PATH PLOT
+    # MODE 1: FINAL SETTLEMENT
     # -------------------------------------------------------------
     if "1. Final" in calc_mode:
         st.markdown("---")
@@ -127,63 +201,27 @@ def app():
             total_settlement = 0.0
             calculated_layers = []
 
-            # Use columns for Results vs Path Plot
-            c_res, c_path = st.columns([1, 1])
+            c_res, c_path = st.columns([1.1, 0.9])
 
             with c_res:
                 for l in layers_data:
-                    # Stress Calc
-                    sigma_tot = sum([lx['thickness']*lx['gamma'] for lx in layers_data if lx['id'] < l['id']])
-                    sigma_tot += (l['thickness']/2) * l['gamma']
-                    u = (l['mid'] - water_depth)*9.81 if l['mid'] > water_depth else 0.0
-                    sig_0 = sigma_tot - u
-                    sig_f = sig_0 + surcharge_q
-                    
-                    settlement = 0.0
-                    status = "Skipped"
-                    
-                    if l['type'] == "Clay":
-                        H = l['thickness']
-                        if "Method A" in l['method']:
-                            p = l['params']
-                            if sig_0 >= p['sigma_p']:
-                                settlement = (p['Cc']*H/(1+p['e0'])) * np.log10(sig_f/sig_0)
-                                status = "NC"
-                            elif sig_f <= p['sigma_p']:
-                                settlement = (p['Cr']*H/(1+p['e0'])) * np.log10(sig_f/sig_0)
-                                status = "OC (Recomp)"
-                            else:
-                                s1 = (p['Cr']*H/(1+p['e0'])) * np.log10(p['sigma_p']/sig_0)
-                                s2 = (p['Cc']*H/(1+p['e0'])) * np.log10(sig_f/p['sigma_p'])
-                                settlement = s1 + s2
-                                status = "OC (Mixed)"
-                        elif "Method B" in l['method']:
-                            settlement = l['params']['mv'] * surcharge_q * H
-                            status = "mv"
-                        elif "Method C" in l['method']:
-                            de = l['params']['e0'] - l['params']['e_final']
-                            settlement = (de/(1+l['params']['e0'])) * H
-                            status = "Δe"
-                    
-                    l['sig_0'] = sig_0
-                    l['sig_f'] = sig_f
+                    res = calculate_layer(l, layers_data, water_depth, surcharge_q)
+                    l.update(res) # Store results in layer dict
                     calculated_layers.append(l)
 
-                    if settlement > 0:
-                        st.success(f"**Layer {l['id']} ({status}):** {settlement*1000:.2f} mm")
-                        with st.expander(f"Details Layer {l['id']}"):
-                            st.write(f"$\sigma'_0 = {sig_0:.1f}$ kPa")
-                            st.write(f"$\sigma'_f = {sig_f:.1f}$ kPa")
+                    if res['settlement'] > 0:
+                        st.success(f"**Layer {l['id']} ({res['status']}):** {res['settlement']*1000:.2f} mm")
+                        with st.expander(f"Show Calculations (Layer {l['id']})"):
+                            for line in res['log']: st.write(line)
                     
-                    total_settlement += settlement
+                    total_settlement += res['settlement']
                 
-                st.markdown("---")
-                st.metric("Total Final Settlement ($S_{final}$)", f"{total_settlement*1000:.2f} mm", help=f"{total_settlement:.4f} m")
+                st.metric("Total Final Settlement ($S_{final}$)", f"{total_settlement*1000:.2f} mm")
 
             with c_path:
                 clay_layers = [l for l in calculated_layers if l['type'] == "Clay" and "Method A" in l['method']]
                 if clay_layers:
-                    st.markdown("#### Stress Path ($e - \log \sigma'$)")
+                    st.markdown("#### Stress Path")
                     layer_opts = [f"Layer {l['id']}" for l in clay_layers]
                     if len(layer_opts) > 1:
                         choice = st.selectbox("Select Layer to Plot:", layer_opts)
@@ -202,12 +240,12 @@ def app():
 
                     x = np.logspace(np.log10(min(10, s0/2)), np.log10(max(sf*2, 1000)), 100)
                     
-                    if s0 >= sp: # NC
+                    if s0 >= sp: 
                         y_virgin = e0 - Cc * np.log10(x / s0)
                         path_x = [s0, sf]
                         path_y = [e0, e0 - Cc * np.log10(sf/s0)]
                         ax.plot(x, y_virgin, 'r--', alpha=0.3, label="Virgin")
-                    else: # OC
+                    else: 
                         y_recomp = e0 - Cr * np.log10(x / s0)
                         ax.plot(x, y_recomp, 'g--', alpha=0.3, label="Recomp")
                         ep = e0 - Cr * np.log10(sp / s0)
@@ -225,13 +263,13 @@ def app():
 
                     ax.plot(path_x, path_y, 'bo-', label="Path")
                     ax.set_xscale('log')
-                    ax.set_xlabel("Effective Stress $\sigma'$ (kPa)")
-                    ax.set_ylabel("Void Ratio $e$")
+                    ax.set_xlabel("Effective Stress (kPa)")
+                    ax.set_ylabel("Void Ratio")
                     ax.grid(True, which="both", alpha=0.2)
                     st.pyplot(fig)
 
     # -------------------------------------------------------------
-    # MODE 2: AVERAGE DEGREE (U_av) & TIME
+    # MODE 2: TIME RATE
     # -------------------------------------------------------------
     else:
         st.markdown("---")
@@ -253,36 +291,24 @@ def app():
             time_goal = st.radio("Goal:", ["Find Time ($t$) for specific $U_{av}$", "Find Settlement ($S_t$) at specific Time ($t$)"])
             
             if st.button("Calculate Time Rate", type="primary"):
-                # Hidden S_final calc
                 total_s_final = 0.0
+                st.markdown("#### 1. Total Settlement Calculation")
                 for l in layers_data:
-                    sigma_tot = sum([lx['thickness']*lx['gamma'] for lx in layers_data if lx['id'] < l['id']])
-                    sigma_tot += (l['thickness']/2) * l['gamma']
-                    u = (l['mid'] - water_depth)*9.81 if l['mid'] > water_depth else 0.0
-                    sig_0 = sigma_tot - u
-                    sig_f = sig_0 + surcharge_q
-                    s_l = 0.0
-                    if l['type'] == "Clay":
-                        H = l['thickness']
-                        if "Method A" in l['method']:
-                            p = l['params']
-                            if sig_0 >= p['sigma_p']: s_l = (p['Cc']*H/(1+p['e0'])) * np.log10(sig_f/sig_0)
-                            elif sig_f <= p['sigma_p']: s_l = (p['Cr']*H/(1+p['e0'])) * np.log10(sig_f/sig_0)
-                            else: s_l = (p['Cr']*H/(1+p['e0']))*np.log10(p['sigma_p']/sig_0) + (p['Cc']*H/(1+p['e0']))*np.log10(sig_f/p['sigma_p'])
-                        elif "Method B" in l['method']: s_l = l['params']['mv'] * surcharge_q * H
-                        elif "Method C" in l['method']: s_l = ((l['params']['e0']-l['params']['e_final'])/(1+l['params']['e0'])) * H
-                    total_s_final += s_l
+                    res = calculate_layer(l, layers_data, water_depth, surcharge_q)
+                    total_s_final += res['settlement']
+                    if res['settlement'] > 0:
+                         with st.expander(f"Layer {l['id']} Calc (S = {res['settlement']*1000:.1f} mm)"):
+                             for line in res['log']: st.write(line)
 
-                st.info(f"**Step 1:** Calculated Total $S_{{final}} = {total_s_final*1000:.2f}$ mm")
+                st.info(f"**Total Ultimate Settlement ($S_{{final}}$) = {total_s_final*1000:.2f} mm**")
                 
+                st.markdown("#### 2. Time Rate Calculation")
                 if "Find Time" in time_goal:
                     U_target = st.slider("Target $U_{av}$ (%)", 0, 100, 90)
                     U_dec = U_target / 100.0
                     
-                    if U_dec <= 0.6:
-                        Tv = (np.pi/4) * (U_dec**2)
-                    else:
-                        Tv = -0.933 * np.log10(1 - U_dec) - 0.085
+                    if U_dec <= 0.6: Tv = (np.pi/4) * (U_dec**2)
+                    else: Tv = -0.933 * np.log10(1 - U_dec) - 0.085
                         
                     if cv > 0:
                         t_req = (Tv * dr_path**2) / cv
@@ -295,7 +321,6 @@ def app():
                     
                     if cv > 0:
                         Tv = (cv * t_val) / (dr_path**2)
-                        
                         if Tv <= 0.28:
                             U_calc = 2 * np.sqrt(Tv / np.pi)
                             eq_label = r"U_{av} = 2\sqrt{T_v / \pi}"
@@ -307,11 +332,11 @@ def app():
                             condition = r"T_v > 0.28"
                         
                         if U_calc > 1.0: U_calc = 1.0
-                        
                         s_t = total_s_final * U_calc
                         
                         st.success(f"**Settlement at {t_val} years: {s_t*1000:.2f} mm**")
-                        st.latex(rf"T_v = \frac{{c_v t}}{{d^2}} = {Tv:.4f}")
+                        st.write(f"**Calculation Steps:**")
+                        st.latex(rf"T_v = \frac{{c_v t}}{{d^2}} = \frac{{{cv} \cdot {t_val}}}{{{dr_path}^2}} = {Tv:.4f}")
                         st.write(f"Using equation for ${condition}$:")
                         st.latex(eq_label)
                         st.metric("Average Degree of Consolidation ($U_{av}$)", f"{U_calc*100:.1f} %")
