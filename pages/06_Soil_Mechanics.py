@@ -12,16 +12,10 @@ st.set_page_config(
 )
 
 def app():
-
-
     # --- PROFESSIONAL HEADER ---
-    # Column Ratio [1, 5] keeps logo compact
     col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
-        # [STYLE UPGRADE] 
-        # Since the logo has a white background, we frame it like an "App Icon"
-        # with a subtle border and shadow so it looks intentional.
         st.markdown(
             """
             <style>
@@ -37,14 +31,12 @@ def app():
         st.image("assets/logo.png", width=150) 
 
     with col_text:
-        # [ALIGNMENT FIX]
-        # Added 'padding-top: 15px' to push text down so it centers with the logo
         st.markdown(
             """
             <div style="padding-top: 15px; padding-left: 10px;">
                 <h1 style='font-size: 45px; margin-bottom: 5px; line-height: 1.0;'>Soil Mechanics</h1>
                 <p style='color: #888; font-size: 18px; font-weight: 300; margin: 0;'>
-                    Phase Relationships, Effective Stress & Flow Analysis
+                    Comprehensive Geotechnical Engineering Suite
                 </p>
             </div>
             """, 
@@ -54,26 +46,44 @@ def app():
     st.markdown("---")
 
     # --- TOPIC SELECTION MENU ---
-    # Wrapped in a container to separate navigation from the header
     with st.container(border=True):
         topic = st.selectbox(
             "Select Calculation Module:", 
             [
-                "Phase Relationships",
-                "Effective Stress",
-                "Flow of Water in Soils"
-            ]
+                "1. Introduction",
+                "2. Phase Relationships",
+                "3. Effective Stress",
+                "4. Flow of Water in Soils (Seepage)",
+                "5. Consolidation Theory",
+                "6. Shear Strength",
+                "7. Lateral Earth Pressure",
+                "8. Stability of Slopes"
+            ],
+            index=1 # Defaults to Phase Relationships
         )
 
     # --- ROUTER LOGIC ---
-    if topic == "Phase Relationships":
+    
+    # Active Modules
+    if topic == "2. Phase Relationships":
         soil_phase.app()
 
-    elif topic == "Effective Stress":
+    elif topic == "3. Effective Stress":
         effective_stress.app()
 
-    elif topic == "Flow of Water in Soils":
+    elif topic == "4. Flow of Water in Soils (Seepage)":
         flow_water.app()
+
+    # Maintenance Modules
+    else:
+        st.warning(f"### 🚧 Under Maintenance")
+        st.info(f"The module for **{topic}** is currently being developed. Please check back later!")
+        
+        # Optional: Show what is coming soon based on the syllabus image
+        if "Consolidation" in topic:
+            st.write("Upcoming features: Oedometer test analysis, Terzaghi's theory, and Compression indices.")
+        elif "Shear Strength" in topic:
+            st.write("Upcoming features: Mohr-Coulomb failure criterion and Triaxial test simulations.")
 
 if __name__ == "__main__":
     app()
