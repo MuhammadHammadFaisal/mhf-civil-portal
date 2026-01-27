@@ -67,7 +67,7 @@ def app():
             [
                 "Phase Relationships",
                 "Effective Stress",
-                "Flow of Water in Soils"
+                "Flow of Water in Soils",
                 "Consolidation Theory"
             ]
         )
