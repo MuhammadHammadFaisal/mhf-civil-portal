@@ -424,13 +424,7 @@ def app():
         st.markdown("### 2D Flow Net Analysis")
         st.caption("**Flow Net Principles:** Blue lines = flow paths (streamlines). "
                   "Red dashed = head drops (equipotentials). Must intersect at 90°.")
-        
-        col_in, col_gr = st.columns([1, 1.4])
-        # ============================================================
-        # MAINTENANCE BANNER
-        # ============================================================
-        def show_maintenance_banner():
-            st.markdown("""
+        st.markdown("""
             <div style="background: linear-gradient(90deg, #ff6b6b 0%, #ffa500 100%); 
                         padding: 15px; 
                         border-radius: 10px; 
@@ -446,6 +440,8 @@ def app():
                 </p>
             </div>
             """, unsafe_allow_html=True)
+        col_in, col_gr = st.columns([1, 1.4])
+
         with col_in:
             mode = st.radio(
                 "Structure Type",
