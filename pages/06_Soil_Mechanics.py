@@ -25,6 +25,7 @@ def app():
     )
 
     # --- PROFESSIONAL HEADER ---
+    # Column Ratio [1, 5] keeps logo compact
     col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
@@ -42,7 +43,7 @@ def app():
         )
         # Ensure this image exists, otherwise comment it out to avoid errors
         # st.image("assets/logo.png", width=150) 
-
+        st.image("assets/logo.png", width=150) 
     with col_text:
         st.markdown(
             """
