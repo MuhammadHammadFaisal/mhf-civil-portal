@@ -360,12 +360,16 @@ def app():
             if "Dam" in mode:
                 dam_w = st.number_input("Dam Width (B)", 6.0)
 
-            if "Pile" in mode:
-                pile_d = st.number_input("Pile Depth (D)", 5.0)
+           if "Pile" in mode:
+                pile_d = st.number_input("Pile Depth (D)", value=5.0) # Good practice to be explicit here too
                 limit = dam_w / 2 if "Dam" in mode else 10.0
+                
+                # --- CHANGE THIS SECTION ---
                 pile_x = st.number_input(
-                    "Pile X Location", 0.0,
-                    min_value=-limit, max_value=limit
+                    "Pile X Location",
+                    value=0.0,          # Explicitly name this 'value'
+                    min_value=-limit,
+                    max_value=limit
                 )
 
             soil_d = st.number_input("Impervious Layer Depth", 12.0)
