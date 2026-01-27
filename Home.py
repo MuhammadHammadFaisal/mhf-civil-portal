@@ -92,7 +92,7 @@ def main():
             <div style="padding-top: 10px; padding-left: 10px;">
                 <h1 style='font-size: 55px; margin-bottom: 0px; line-height: 1.1;'>MHF Civil Calc</h1>
                 <p style='color: #666; font-size: 20px; font-weight: 300; margin-top: 8px;'>
-                    Deterministic Civil Engineering Computation Platform
+                    Precise, step-by-step Civil Engineering calculations based on standard theory.
                 </p>
             </div>
             """, 
@@ -111,12 +111,16 @@ def main():
         
         for index, (file_name, module_title) in enumerate(modules_list):
             with cols[index % 2]:
-                # The \n creates the line break.
-                # CSS ::first-line handles the bolding of the top part.
+                # 1. The Clean Button
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"{module_title}\n Beta Release \n (Validation Pending)", 
+                    label=f"👉 {module_title}",  # Simple label
                     use_container_width=True
+                )
+                # 2. The "Badge" below it (Smaller, Grey)
+                st.markdown(
+                    f"<div style='text-align: center; color: #888; font-size: 12px; margin-top: -10px; margin-bottom: 20px;'>Beta • v1.2</div>", 
+                    unsafe_allow_html=True
                 )
     
     # --- MISSION STATEMENT ---
@@ -130,7 +134,7 @@ def main():
     """)
     st.markdown("")
 # --- FEEDBACK SECTION ---
-    with st.expander("💬 Feedback & Support"):
+    with st.expander("Report an Issue / Suggest Improvements"):
         st.write("Encountered a calculation error, found a bug, or have a suggestion? Help improve MHF Civil.")
         
         # Single option layout
@@ -149,7 +153,8 @@ def main():
     
     st.markdown("""
     ### Muhammad Hammad Faisal
-    **Final Year Civil Engineering Student (METU)** Founder — MHF Civil
+    Developed by Muhammad Hammad Faisal 
+    Final-Year Civil Engineering Student, METU
     
     MHF Civil is built on a simple principle:  
     **Engineering results should be reproducible, transparent, and mathematically defensible.**
@@ -171,6 +176,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
