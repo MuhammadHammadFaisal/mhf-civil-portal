@@ -1,9 +1,9 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
 
-def consolidation_page():
-    st.header("⏱️ Consolidation & Settlement Analysis")
+# RENAME THIS FUNCTION TO 'app' TO MATCH YOUR OTHER FILES
+def app():
+    st.header("Consolidation & Settlement Analysis")
     st.markdown("""
     This module is divided into two parts:
     1.  **Lab Analysis:** Determine the Coefficient of Consolidation ($c_v$) using lab data.
@@ -46,8 +46,6 @@ def consolidation_page():
             st.markdown("**Casagrande Method Inputs**")
             t_50 = st.number_input("Time for 50% consolidation ($t_{50}$) [min]", value=10.0, step=0.1)
             # Formula: Tv=0.196, Cv = (0.196 * d^2) / t50
-            # Convert t50 to years for consistency with typical geotechnical units (m2/year) 
-            # or keep in m2/min. Let's output both.
             if t_50 > 0:
                 cv_val = (0.196 * (Hdr_lab**2)) / t_50 # m2/min
                 method_cite = "Tv = 0.196 for 50% Consolidation"
@@ -99,8 +97,13 @@ def consolidation_page():
         # Allow user to use calculated Cv or override
         use_calc_cv = st.checkbox("Use calculated $c_v$ from Part 1?", value=True)
         if use_calc_cv:
-            cv_field = cv_year
-            st.write(f"$c_v = {cv_field:.4f} \, m^2/year$")
+            # Check if cv_year is defined (from part 1)
+            if 'cv_year' in locals():
+                cv_field = cv_year
+                st.write(f"$c_v = {cv_field:.4f} \, m^2/year$")
+            else:
+                st.warning("Calculate Cv in Part 1 first, or uncheck this box.")
+                cv_field = 0
         else:
             cv_field = st.number_input("Enter Field $c_v$ [$m^2/year$]", value=2.0)
             
@@ -112,17 +115,13 @@ def consolidation_page():
     settlement = 0.0
     status_msg = ""
     formula_latex = ""
+    case_type = ""
 
     # Logic Tree for Settlement Calculation
     if sigma_v0 >= sigma_p:
         # Case: Normally Consolidated (NC)
-        # Even if sigma_v0 > sigma_p (which is technically impossible in nature without recent unloading, 
-        # we treat it as NC if it's on the virgin curve).
         case_type = "Normally Consolidated (NC)"
-        
-        # Calculate NC Settlement
         settlement = (Cc * H_field / (1 + e0)) * np.log10(sigma_final / sigma_v0)
-        
         status_msg = f"Since $\sigma'_0 ({sigma_v0}) \approx \sigma'_p ({sigma_p})$, the soil is **Normally Consolidated**."
         formula_latex = r"S_c = \frac{C_c H}{1+e_0} \log \left( \frac{\sigma'_0 + \Delta\sigma}{\sigma'_0} \right)"
         
@@ -131,20 +130,16 @@ def consolidation_page():
         if sigma_final <= sigma_p:
             # Case 1: Recompression Only
             case_type = "Over-Consolidated (Case 1: Recompression)"
-            
             settlement = (Cr * H_field / (1 + e0)) * np.log10(sigma_final / sigma_v0)
-            
             status_msg = f"Since $\sigma'_0 < \sigma'_p$ AND $\sigma'_{{final}} ({sigma_final}) < \sigma'_p ({sigma_p})$, the soil remains in the **recompression range**."
             formula_latex = r"S_c = \frac{C_r H}{1+e_0} \log \left( \frac{\sigma'_0 + \Delta\sigma}{\sigma'_0} \right)"
             
         else:
             # Case 2: Recompression + Compression
             case_type = "Over-Consolidated (Case 2: Preconsolidation Exceeded)"
-            
             term1 = (Cr * H_field / (1 + e0)) * np.log10(sigma_p / sigma_v0)
             term2 = (Cc * H_field / (1 + e0)) * np.log10(sigma_final / sigma_p)
             settlement = term1 + term2
-            
             status_msg = f"Since $\sigma'_0 < \sigma'_p$ BUT $\sigma'_{{final}} ({sigma_final}) > \sigma'_p ({sigma_p})$, the soil undergoes **both recompression and virgin compression**."
             formula_latex = r"S_c = \frac{C_r H}{1+e_0} \log \left( \frac{\sigma'_p}{\sigma'_0} \right) + \frac{C_c H}{1+e_0} \log \left( \frac{\sigma'_0 + \Delta\sigma}{\sigma'_p} \right)"
 
@@ -171,7 +166,7 @@ def consolidation_page():
         U_target = st.slider("Target Consolidation Ratio (U%)", 10, 99, 90)
         U_decimal = U_target / 100.0
         
-        # Calculate Tv based on U (Note formulas from slides)
+        # Calculate Tv based on U
         if U_decimal <= 0.60:
             Tv = (np.pi / 4) * (U_decimal ** 2)
         else:
@@ -182,28 +177,22 @@ def consolidation_page():
             t_years = (Tv * (Hdr_field**2)) / cv_field
             st.metric(f"Time required for {U_target}% Consolidation", f"{t_years:.2f} years")
         else:
-            st.error("Cv must be greater than 0")
+            st.warning("Please ensure Cv > 0 to calculate time.")
             
     else:
         t_user = st.number_input("Time duration [years]", value=1.0)
         
         # Calculate Tv: Tv = Cv * t / d^2
-        if Hdr_field > 0:
+        if Hdr_field > 0 and cv_field > 0:
             Tv_calc = (cv_field * t_user) / (Hdr_field**2)
             
             # Inverse Tv to get U
-            # Approximation for U from Tv is complex to inverse exactly for U>60%, 
-            # but we can use the approximation equations:
-            # If Tv < 0.286 (approx U=60%), U = sqrt(4Tv/pi)
-            if Tv_calc < 0.283: # Using 0.283 boundary roughly
+            if Tv_calc < 0.283: 
                 U_calc = np.sqrt((4 * Tv_calc) / np.pi)
             else:
-                # Inverse of: Tv = -0.933 log(1-U) - 0.085
-                # (Tv + 0.085) / -0.933 = log10(1-U)
-                # 10^ANS = 1-U  => U = 1 - 10^ANS
                 exponent = (Tv_calc + 0.085) / -0.933
                 U_calc = 1 - (10**exponent)
-                
+            
             # Cap U at 100%
             if U_calc > 1.0: U_calc = 1.0
             
@@ -211,6 +200,8 @@ def consolidation_page():
             
             st.metric(f"Degree of Consolidation at {t_user} years", f"{U_calc*100:.1f} %")
             st.metric(f"Settlement at {t_user} years", f"{settlement_at_t*1000:.2f} mm")
+        else:
+            st.warning("Please ensure Cv > 0 to calculate settlement.")
 
 if __name__ == "__main__":
     app()
