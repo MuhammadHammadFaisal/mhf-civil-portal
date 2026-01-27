@@ -387,7 +387,7 @@ def app():
 
             st.pyplot(fig2)
 
-    # ============================================================
+  # ============================================================
     # TAB 3 — FLOW NETS
     # ============================================================
     with tab3:
@@ -399,17 +399,19 @@ def app():
                 ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"]
             )
 
-            dam_w = pile_d = pile_x = 0.0
+            # 1. Initialize variables to prevent crash if mode changes
+            dam_w = 0.0
+            pile_d = 0.0
+            pile_x = 0.0
 
+            # 2. Logic Fix: Independent Inputs (Fixed Indentation)
             if "Dam" in mode:
                 dam_w = st.number_input("Dam Width (B)", 6.0)
 
             if "Pile" in mode:
-                pile_d = st.number_input("Pile Depth (D)", value=5.0) 
+                pile_d = st.number_input("Pile Depth (D)", value=5.0)
                 
                 limit = dam_w / 2 if "Dam" in mode else 10.0
-                
-                # Fixed indentation here
                 pile_x = st.number_input(
                     "Pile X Location",
                     value=0.0,
@@ -428,11 +430,32 @@ def app():
             px = st.number_input("Point X", 2.0)
             py = st.number_input("Point Y", -4.0)
 
+            # 3. Logic Fix: Inline Calculation for Pore Pressure
+            # (Replaces the missing 'solve_smart_point' function)
             res = None
             if py <= 0:
-                # The function solve_smart_point was missing in original code. Added to helpers.
-                res = solve_smart_point(px, py, h_up, h_down, datum,
-                                        mode, pile_d, pile_x, dam_w)
+                # A. Get Potential at the specific point
+                w_pt = get_complex_potential(px, py, mode, pile_d, pile_x, dam_w)
+                # For this mapping: Real=Streamline, Imag=Potential
+                phi_pt = np.imag(w_pt) 
+
+                # B. Get Boundary Potentials (Sample just below surface to catch branch cuts)
+                w_up = get_complex_potential(-15.0, -0.01, mode, pile_d, pile_x, dam_w)
+                w_down = get_complex_potential(15.0, -0.01, mode, pile_d, pile_x, dam_w)
+                phi_up = np.imag(w_up)
+                phi_down = np.imag(w_down)
+
+                # C. Interpolate Head
+                if abs(phi_up - phi_down) < 1e-6:
+                    h_total = h_down # No flow/gradient
+                else:
+                    ratio = (phi_pt - phi_down) / (phi_up - phi_down)
+                    h_total = h_down + ratio * (h_up - h_down)
+
+                # D. Calculate Pore Pressure: u = (h_total - elevation) * gamma_w
+                u_val = (h_total - py) * 9.81
+                res = {"u": u_val}
+                
                 st.success(f"Pore Pressure u = {res['u']:.2f} kPa")
             else:
                 st.warning("Point must be below ground surface")
@@ -448,26 +471,31 @@ def app():
             X, Y = np.meshgrid(gx, gy)
 
             W = get_complex_potential(X, Y, mode, pile_d, pile_x, dam_w)
-            # In this code: Psi(Real) = Flow Lines, Phi(Imag) = Equipotential Lines
+            
+            # Logic Check:
+            # Psi (Real Part) = Streamlines (Loops connecting Upstream/Downstream)
+            # Phi (Imag Part) = Equipotentials (Lines dropping from Upstream to Downstream)
             Psi, Phi = np.real(W), np.imag(W)
 
+            # Calculate deep soil stream value for plot limits
             ref_x = pile_x if "Pile" in mode else 0
             psi_max = np.real(get_complex_potential(ref_x + 0.1, -soil_d,
                                                     mode, pile_d, pile_x, dam_w))
-            if not np.isfinite(psi_max) or psi_max < 0.5:
+            
+            # Sanity check to prevent empty plots if calculation fails
+            if not np.isfinite(psi_max) or abs(psi_max) < 0.1:
                 psi_max = 3.0
 
+            # Plot Flow Lines (Psi) - Blue
             ax.contour(X, Y, Psi,
                        levels=np.linspace(0, psi_max, Nf + 1),
-                       colors="blue")
+                       colors="blue", linewidths=1.5, alpha=0.7)
 
-            # Determine min/max Phi for proper contour levels
-            phi_min = np.nanmin(Phi)
-            phi_max = np.nanmax(Phi)
-            
+            # Plot Equipotential Lines (Phi) - Red
+            # Use nanmin/nanmax to handle the branch cuts correctly
             ax.contour(X, Y, Phi,
-                       levels=np.linspace(phi_min, phi_max, Nd + 1),
-                       colors="red", linestyles="--")
+                       levels=np.linspace(np.nanmin(Phi), np.nanmax(Phi), Nd + 1),
+                       colors="red", linestyles="--", linewidths=1.5, alpha=0.7)
 
             # Boundaries
             ax.axhline(0, color="black", lw=2)
@@ -487,9 +515,10 @@ def app():
                 )
 
             if res:
-                ax.scatter(px, py, c="red", s=100)
-                ax.text(px + 0.4, py, f"u={res['u']:.1f} kPa",
-                        color="red", fontweight="bold")
+                ax.scatter(px, py, c="red", s=100, zorder=12, edgecolors='white')
+                ax.text(px + 0.5, py, f"u={res['u']:.1f} kPa",
+                        color="red", fontweight="bold", zorder=12,
+                        bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
 
             ax.axis("off")
             st.pyplot(fig)
