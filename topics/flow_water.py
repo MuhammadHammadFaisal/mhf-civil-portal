@@ -440,15 +440,6 @@ def app():
             ax.axis("off")
             st.pyplot(fig)
 
-    # ============================================================
-    # TAB 1 + TAB 2
-    # (LEFT UNCHANGED — YOUR IMPLEMENTATION IS SOLID)
-    # ============================================================
-    with tab1:
-        st.info("1D seepage logic unchanged (already correct)")
-
-    with tab2:
-        st.info("Permeability calculations unchanged (already correct)")
 
 if __name__ == "__main__":
     app()
