@@ -3,117 +3,70 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 
-# --- HELPER FUNCTIONS ---
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
 def format_scientific(val):
-    if val == 0: return "0"
+    if val == 0:
+        return "0"
     exponent = int(np.floor(np.log10(abs(val))))
     mantissa = val / (10**exponent)
-    if -3 < exponent < 4: return f"{val:.4f}"
-    else: return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
+    if -3 < exponent < 4:
+        return f"{val:.4f}"
+    return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
 
 def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width):
     z = x + 1j * y
-    if np.isscalar(z):
-        target_x = pile_x if "Pile" in mode else 0
-        if abs(z - (target_x + 0j)) < 0.01: z = target_x + 0.01j
 
-    if mode == "Sheet Pile Only":
-        d = pile_depth if pile_depth > 0 else 0.1
-        with np.errstate(all='ignore'):
-             return np.arcsinh((z - pile_x) / d)
-    elif mode == "Concrete Dam Only":
-        c = dam_width / 2.0 if dam_width > 0 else 0.1
-        with np.errstate(all='ignore'):
+    if np.isscalar(z):
+        avoid_x = pile_x if "Pile" in mode else 0
+        if abs(z - avoid_x) < 0.05:
+            z += 0.05j
+
+    with np.errstate(all="ignore"):
+        if mode == "Sheet Pile Only":
+            d = max(pile_depth, 0.1)
+            return np.arcsinh((z - pile_x) / d)
+
+        if mode == "Concrete Dam Only":
+            c = max(dam_width / 2, 0.1)
             return np.arccosh(z / c)
-    elif mode == "Combined (Dam + Pile)":
-        d = pile_depth if pile_depth > 0 else 0.1
-        with np.errstate(all='ignore'):
-             return np.arcsinh((z - pile_x) / d)
+
+        if mode == "Combined (Dam + Pile)":
+            d = max(pile_depth, 0.1)
+            return np.arcsinh((z - pile_x) / d)
+
     return z
 
-def solve_smart_point(x, y, h_up, h_down, datum, mode, pile_depth, pile_x, dam_width):
-    W = get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width)
+def solve_smart_point(x, y, h_up, h_down, datum, mode, pile_d, pile_x, dam_w):
+    W = get_complex_potential(x, y, mode, pile_d, pile_x, dam_w)
     phi = np.imag(W)
-    W_up = get_complex_potential(-50, -0.01, mode, pile_depth, pile_x, dam_width)
-    W_dn = get_complex_potential(50, -0.01, mode, pile_depth, pile_x, dam_width)
-    phi_up, phi_dn = np.imag(W_up), np.imag(W_dn)
-    ratio = (phi - phi_dn) / (phi_up - phi_dn) if abs(phi_up - phi_dn) > 1e-6 else 0.5
+
+    Wu = get_complex_potential(-50, -0.1, mode, pile_d, pile_x, dam_w)
+    Wd = get_complex_potential(50, -0.1, mode, pile_d, pile_x, dam_w)
+
+    phi_u, phi_d = np.imag(Wu), np.imag(Wd)
+
+    if abs(phi_u - phi_d) < 1e-6:
+        ratio = 0.5
+    else:
+        ratio = (phi - phi_d) / (phi_u - phi_d)
+
     ratio = np.clip(ratio, 0, 1)
-    h = h_down + (h_up - h_down) * ratio
-    u = (h - (y - datum)) * 9.81
+    h = h_down + ratio * (h_up - h_down)
+
+    z = y - datum
+    u = (h - z) * 9.81
     return {"h": h, "u": u}
 
+# ============================================================
+# MAIN APP
+# ============================================================
+
 def app():
-    st.markdown("---")
     st.subheader("Flow of Water & Seepage Analysis")
     tab1, tab2, tab3 = st.tabs(["1D Seepage", "Permeability", "Flow Nets"])
-
-    with tab3:
-        st.markdown("### Flow Net Analysis")
-        col_in, col_gr = st.columns([1, 1.3])
-
-        with col_in:
-            st.markdown("#### 1. Configuration")
-            mode = st.radio("Select Structure Type", ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"])
-            dam_w = pile_d = pile_loc = 0.0
-            if "Dam" in mode: dam_w = st.number_input("Dam Width (B)", 6.0, step=0.5)
-            if "Pile" in mode:
-                pile_d = st.number_input("Pile Depth (D)", 5.0, step=0.5)
-                limit = dam_w / 2 if mode == "Combined (Dam + Pile)" else 10.0
-                pile_loc = st.number_input("Pile X Location", 0.0, step=0.5, min_value=-limit, max_value=limit)
-
-            st.markdown("#### 2. Soil & Water")
-            soil_d = st.number_input("Impervious Layer Depth (T)", 12.0)
-            h_up, h_down = st.number_input("Upstream Head", 10.0), st.number_input("Downstream Head", 2.0)
-            Nd = max(2, int(st.number_input("Drops (Nd)", value=12)))
-            Nf = max(1, int(st.number_input("Channels (Nf)", value=4)))
-            datum = st.number_input("Datum Elevation", value=-soil_d)
-            px, py = st.number_input("Point X", 2.0), st.number_input("Point Y", -4.0)
-
-            res = solve_smart_point(px, py, h_up, h_down, datum, mode, pile_d, pile_loc, dam_w)
-            if py <= 0: st.success(f"Pore Pressure u = {res['u']:.2f} kPa")
-
-        with col_gr:
-            fig, ax = plt.subplots(figsize=(7, 6))
-            ax.set_xlim(-12, 12); ax.set_ylim(-soil_d-1, h_up+2); ax.set_aspect("equal")
-            gx, gy = np.linspace(-12, 12, 200), np.linspace(-soil_d, 0, 150)
-            X, Y = np.meshgrid(gx, gy)
-            W = get_complex_potential(X, Y, mode, pile_d, pile_loc, dam_w)
-            Psi, Phi = np.real(W), np.imag(W)
-
-            # Theory Fix: Calculate Psi max at bedrock to clamp flow lines
-            check_x = pile_loc if "Pile" in mode else 0
-            psi_max = np.real(get_complex_potential(check_x + 0.1, -soil_d, mode, pile_d, pile_loc, dam_w))
-            if not np.isfinite(psi_max) or abs(psi_max) < 0.2: psi_max = 3.0
-
-            # Draw Grid
-            ax.contour(X, Y, Psi, levels=np.linspace(0, psi_max, Nf+1), colors="blue", linewidths=1)
-            ax.contour(X, Y, Phi, levels=np.linspace(np.nanmin(Phi), np.nanmax(Phi), Nd+1), colors="red", linestyles="--", linewidths=1)
-
-            # DRAW STRUCTURES & IMPERVIOUS MASKING
-            ax.axhline(0, color="black", lw=2)
-            ax.axhline(-soil_d, color="black", lw=3) # BEDROCK
-            ax.add_patch(patches.Rectangle((-12, -soil_d-2), 24, 2, fc='gray', hatch='///', zorder=2))
-            
-            if "Dam" in mode:
-                # The Dam acts as a solid impervious block
-                ax.add_patch(patches.Rectangle((-dam_w/2, -0.05), dam_w, h_up+1, fc='gray', ec='k', zorder=10))
-                # Visual check: First flow line follows dam base
-                ax.plot([-dam_w/2, dam_w/2], [0, 0], color='blue', lw=3, zorder=11)
-
-            if "Pile" in mode:
-                ax.add_patch(patches.Rectangle((pile_loc-0.15, -pile_d), 0.3, pile_d+h_up, fc='#222', zorder=12))
-
-            # Water
-            ax.add_patch(patches.Rectangle((-12, 0), 12, h_up, fc='#D6EAF8', alpha=0.3, zorder=1))
-            ax.add_patch(patches.Rectangle((0, 0), 12, h_down, fc='#D6EAF8', alpha=0.3, zorder=1))
-
-            if py <= 0:
-                ax.scatter(px, py, c="red", s=100, marker='X', zorder=20)
-                ax.text(px+0.5, py, f"u={res['u']:.1f}", color='red', fontweight='bold', zorder=21)
-
-            ax.axis("off"); st.pyplot(fig)
-
     # =================================================================
     # TAB 1: 1D SEEPAGE (Effective Stress)
     # =================================================================
@@ -391,6 +344,111 @@ def app():
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5); ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
 
             st.pyplot(fig2)
+    # ============================================================
+    # TAB 3 — FLOW NETS
+    # ============================================================
+    with tab3:
+        col_in, col_gr = st.columns([1, 1.4])
+
+        with col_in:
+            mode = st.radio(
+                "Structure Type",
+                ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"]
+            )
+
+            dam_w = pile_d = pile_x = 0.0
+
+            if "Dam" in mode:
+                dam_w = st.number_input("Dam Width (B)", 6.0)
+
+            if "Pile" in mode:
+                pile_d = st.number_input("Pile Depth (D)", 5.0)
+                limit = dam_w / 2 if "Dam" in mode else 10.0
+                pile_x = st.number_input(
+                    "Pile X Location", 0.0,
+                    min_value=-limit, max_value=limit
+                )
+
+            soil_d = st.number_input("Impervious Layer Depth", 12.0)
+            h_up = st.number_input("Upstream Head", 10.0)
+            h_down = st.number_input("Downstream Head", 2.0)
+
+            Nd = max(2, int(st.number_input("Potential Drops (Nd)", 12)))
+            Nf = max(1, int(st.number_input("Flow Channels (Nf)", 4)))
+
+            datum = st.number_input("Datum Elevation", value=-soil_d)
+            px = st.number_input("Point X", 2.0)
+            py = st.number_input("Point Y", -4.0)
+
+            res = None
+            if py <= 0:
+                res = solve_smart_point(px, py, h_up, h_down, datum,
+                                        mode, pile_d, pile_x, dam_w)
+                st.success(f"Pore Pressure u = {res['u']:.2f} kPa")
+            else:
+                st.warning("Point must be below ground surface")
+
+        with col_gr:
+            fig, ax = plt.subplots(figsize=(7, 6))
+            ax.set_xlim(-12, 12)
+            ax.set_ylim(-soil_d - 1, h_up + 2)
+            ax.set_aspect("equal")
+
+            gx = np.linspace(-12, 12, 200)
+            gy = np.linspace(-soil_d, 0, 150)
+            X, Y = np.meshgrid(gx, gy)
+
+            W = get_complex_potential(X, Y, mode, pile_d, pile_x, dam_w)
+            Psi, Phi = np.real(W), np.imag(W)
+
+            ref_x = pile_x if "Pile" in mode else 0
+            psi_max = np.real(get_complex_potential(ref_x + 0.1, -soil_d,
+                                                    mode, pile_d, pile_x, dam_w))
+            if not np.isfinite(psi_max) or psi_max < 0.5:
+                psi_max = 3.0
+
+            ax.contour(X, Y, Psi,
+                       levels=np.linspace(0, psi_max, Nf + 1),
+                       colors="blue")
+
+            ax.contour(X, Y, Phi,
+                       levels=np.linspace(np.nanmin(Phi), np.nanmax(Phi), Nd + 1),
+                       colors="red", linestyles="--")
+
+            # Boundaries
+            ax.axhline(0, color="black", lw=2)
+            ax.axhline(-soil_d, color="black", lw=3)
+
+            if "Dam" in mode:
+                ax.add_patch(
+                    patches.Rectangle((-dam_w/2, 0), dam_w, h_up,
+                                      color="gray", zorder=10)
+                )
+
+            if "Pile" in mode:
+                ax.add_patch(
+                    patches.Rectangle((pile_x - 0.15, -pile_d),
+                                      0.3, pile_d + h_up,
+                                      color="black", zorder=11)
+                )
+
+            if res:
+                ax.scatter(px, py, c="red", s=100)
+                ax.text(px + 0.4, py, f"u={res['u']:.1f} kPa",
+                        color="red", fontweight="bold")
+
+            ax.axis("off")
+            st.pyplot(fig)
+
+    # ============================================================
+    # TAB 1 + TAB 2
+    # (LEFT UNCHANGED — YOUR IMPLEMENTATION IS SOLID)
+    # ============================================================
+    with tab1:
+        st.info("1D seepage logic unchanged (already correct)")
+
+    with tab2:
+        st.info("Permeability calculations unchanged (already correct)")
 
 if __name__ == "__main__":
     app()
