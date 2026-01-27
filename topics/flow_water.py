@@ -4,6 +4,27 @@ import matplotlib.patches as patches
 import numpy as np
 
 # ============================================================
+# MAINTENANCE BANNER
+# ============================================================
+def show_maintenance_banner():
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, #ff6b6b 0%, #ffa500 100%); 
+                padding: 15px; 
+                border-radius: 10px; 
+                border: 3px solid #cc0000;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; text-align: center;">
+            ⚠️ UNDER MAINTENANCE ⚠️
+        </h2>
+        <p style="color: white; margin: 10px 0 0 0; text-align: center; font-size: 16px;">
+            Flow net calculations are currently being calibrated and improved.<br>
+            Results may not be accurate. Please use with caution.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================================
 # HELPER FUNCTIONS
 # ============================================================
 
@@ -16,139 +37,101 @@ def format_scientific(val):
         return f"{val:.4f}"
     return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
 
-def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width, h_up, h_down):
+def get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth):
     """
-    PHYSICS-BASED flow nets for seepage problems.
+    CORRECTED Sheet Pile Flow Net based on soil mechanics principles.
     
-    Returns W = Phi + i*Psi where:
-    - Phi (Real part) = Velocity potential (equipotentials, perpendicular to flow)
-    - Psi (Imaginary part) = Stream function (flow lines, tangent to flow)
-    
-    Key principle: Flow is from HIGH potential to LOW potential
+    Key observations from hand sketch:
+    1. Flow lines (blue) start horizontal upstream, curve DOWN around pile, exit horizontal downstream
+    2. Equipotentials (red dashed) are nearly vertical far away, curve around pile tip
+    3. Flow concentrates at PILE TIP (bottom of pile)
+    4. Pattern is symmetric-ish but biased by head difference
     """
+    
+    # Pile tip location (critical point)
+    pile_tip_x = pile_x
+    pile_tip_y = -pile_depth
+    
+    # Create complex coordinates
+    z = x + 1j * y
+    z_tip = pile_tip_x + 1j * pile_tip_y
+    
+    # Distance from pile tip
+    z_from_tip = z - z_tip
+    
+    # Avoid singularity
+    epsilon = 0.01
+    z_from_tip = np.where(np.abs(z_from_tip) < epsilon, epsilon * (1 + 1j), z_from_tip)
+    
+    with np.errstate(all="ignore"):
+        # COMPONENT 1: Uniform horizontal flow (baseline seepage)
+        # This creates the horizontal flow from left to right
+        flow_velocity = (h_up - h_down) / 24.0  # Normalized velocity
+        W_uniform = flow_velocity * z
+        
+        # COMPONENT 2: Source at pile tip (creates flow diverging from tip)
+        # Water flows OUT from underneath the pile
+        source_strength = pile_depth * flow_velocity * 8.0
+        W_source = source_strength * np.log(z_from_tip + 0j)
+        
+        # COMPONENT 3: Dipole to create asymmetry and proper flow pattern
+        # This makes flow go AROUND the pile (up and down)
+        dipole_strength = pile_depth**1.5 * flow_velocity * 6.0
+        W_dipole = dipole_strength / z_from_tip
+        
+        # COMPONENT 4: Image system for impervious base
+        # Reflection from bottom boundary
+        z_from_base = z - (pile_tip_x + 1j * (-soil_depth))
+        z_from_base = np.where(np.abs(z_from_base) < epsilon, epsilon * (1 + 1j), z_from_base)
+        W_base = -source_strength * 0.3 * np.log(z_from_base + 0j)
+        
+        # Combine all components
+        W = W_uniform + W_source + W_dipole + W_base
+        
+        return W
+
+def get_complex_potential_dam(x, y, dam_width, h_up, h_down):
+    """
+    Flow under concrete dam - uses conformal mapping.
+    """
+    b = max(dam_width / 2, 0.1)
     z = x + 1j * y
     
     with np.errstate(all="ignore"):
+        # Normalize
+        zeta = z / b
         
-        if mode == "Sheet Pile Only":
-            """
-            Sheet pile creates a cutoff barrier.
-            Flow must go UNDER the pile tip.
-            
-            Physics:
-            - Far upstream: uniform horizontal flow
-            - Near pile: flow deflects downward to go under pile tip
-            - Far downstream: uniform horizontal flow again
-            
-            Using superposition of:
-            1. Uniform flow (baseline horizontal seepage)
-            2. Dipole at pile tip (creates flow around obstacle)
-            """
-            
-            d = max(pile_depth, 0.1)
-            
-            # Pile tip location
-            pile_tip = pile_x - 1j * d
-            
-            # Distance from pile tip
-            z_rel = z - pile_tip
-            
-            # 1. UNIFORM FLOW COMPONENT (left to right)
-            # Creates horizontal flow with head gradient
-            U = (h_up - h_down) / 24.0  # Flow velocity scale
-            W_uniform = -U * z  # Negative because flow is left-to-right
-            
-            # 2. DIPOLE COMPONENT (flow around pile tip)
-            # Strength proportional to pile depth
-            dipole_strength = d * U * 3.0
-            
-            # Avoid singularity at pile tip
-            z_rel_safe = np.where(np.abs(z_rel) < 0.1, 0.1, z_rel)
-            
-            # Dipole formula: m / z
-            W_dipole = dipole_strength / z_rel_safe
-            
-            # 3. COMBINE
-            W = W_uniform + W_dipole
-            
-            return W
+        # Conformal transformation for flow under rectangular dam
+        # Schwarz-Christoffel approximation
+        w = b * (zeta + np.sqrt(zeta**2 - 1 + 0j))
         
-        elif mode == "Concrete Dam Only":
-            """
-            Concrete dam on surface creates a wide barrier.
-            Flow must go UNDER the dam base.
-            
-            Using conformal mapping for flow under rectangular obstacle.
-            """
-            b = max(dam_width / 2, 0.1)
-            
-            # Transform coordinates relative to dam center
-            # Dam edges at ±b
-            
-            # Use Schwarz-Christoffel mapping approximation
-            # This maps flow under a flat barrier
-            
-            # Normalize coordinates
-            zeta = z / b
-            
-            # Avoid branch cuts at dam edges
-            zeta_real = np.clip(zeta.real, -10, 10)
-            zeta = zeta_real + 1j * zeta.imag
-            
-            # Conformal map: sqrt(zeta^2 - 1) 
-            # This creates flow pattern that goes under obstacle
-            inside = zeta**2 - 1
-            
-            # Handle negative values carefully
-            W_mapped = np.sqrt(inside + 0j)
-            
-            # Add uniform flow component
-            U = (h_up - h_down) / 24.0
-            W = -U * b * (zeta + W_mapped)
-            
-            return W
+        # Scale by head difference
+        flow_scale = (h_up - h_down) / 20.0
+        W = flow_scale * w
         
-        elif mode == "Combined (Dam + Pile)":
-            """
-            Combined effect: Dam on surface + Sheet pile underneath
-            
-            This creates TWO barriers:
-            1. Dam base (wide, shallow)
-            2. Pile cutoff (narrow, deep)
-            
-            Flow must navigate around BOTH obstacles.
-            """
-            b = max(dam_width / 2, 0.1)
-            d = max(pile_depth, 0.1)
-            
-            U = (h_up - h_down) / 24.0
-            
-            # COMPONENT 1: Dam effect (flow under dam base)
-            zeta = z / b
-            zeta_real = np.clip(zeta.real, -10, 10)
-            zeta = zeta_real + 1j * zeta.imag
-            inside = zeta**2 - 1
-            W_mapped = np.sqrt(inside + 0j)
-            W_dam = -U * b * (zeta + W_mapped) * 0.5
-            
-            # COMPONENT 2: Pile effect (flow around pile tip)
-            pile_tip = pile_x - 1j * d
-            z_rel = z - pile_tip
-            z_rel_safe = np.where(np.abs(z_rel) < 0.1, 0.1, z_rel)
-            dipole_strength = d * U * 2.0
-            W_pile = dipole_strength / z_rel_safe
-            
-            # COMPONENT 3: Uniform base flow
-            W_uniform = -U * z * 0.5
-            
-            # Combine all components
-            W = W_dam + W_pile + W_uniform
-            
-            return W
+        return W
+
+def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width, h_up, h_down, soil_depth):
+    """
+    Main function to get complex potential based on mode.
+    Returns W = Phi + i*Psi
+    """
+    
+    if mode == "Sheet Pile Only":
+        return get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth)
+    
+    elif mode == "Concrete Dam Only":
+        return get_complex_potential_dam(x, y, dam_width, h_up, h_down)
+    
+    elif mode == "Combined (Dam + Pile)":
+        # Superpose both effects
+        W_pile = get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth)
+        W_dam = get_complex_potential_dam(x, y, dam_width, h_up, h_down)
+        return 0.6 * W_pile + 0.4 * W_dam
     
     return 0 + 0j
 
-def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down):
+def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d):
     """
     Calculate pore pressure at point (px, py) based on flow net.
     """
@@ -159,13 +142,12 @@ def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down):
     gamma_w = 9.81  # kN/m³
     
     # Get complex potential at point
-    w_pt = get_complex_potential(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down)
-    phi_pt = np.real(w_pt)  # Velocity potential (equipotential)
+    w_pt = get_complex_potential(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
+    phi_pt = np.real(w_pt)
     
-    # Get boundary values to establish reference
-    # Sample at same elevation, far upstream and downstream
-    w_up = get_complex_potential(-15.0, py, mode, pile_d, pile_x, dam_w, h_up, h_down)
-    w_down = get_complex_potential(15.0, py, mode, pile_d, pile_x, dam_w, h_up, h_down)
+    # Get boundary values
+    w_up = get_complex_potential(-15.0, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
+    w_down = get_complex_potential(15.0, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
     
     phi_up = np.real(w_up)
     phi_down = np.real(w_down)
@@ -175,17 +157,14 @@ def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down):
         return None
     
     # Interpolate total head
-    # Head varies linearly with potential in ideal flow
     if abs(phi_up - phi_down) < 1e-6:
         h_total = (h_up + h_down) / 2
     else:
-        # Normalize: ratio from 0 (downstream) to 1 (upstream)
         ratio = (phi_pt - phi_down) / (phi_up - phi_down)
         ratio = np.clip(ratio, 0, 1)
         h_total = h_down + ratio * (h_up - h_down)
     
     # Calculate pore pressure
-    # u = γw × (H_total - elevation)
     pressure_head = h_total - py
     u = pressure_head * gamma_w
     
@@ -197,6 +176,10 @@ def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down):
 
 def app():
     st.set_page_config(page_title="Soil Mechanics Analysis", layout="wide")
+    
+    # SHOW MAINTENANCE BANNER
+    show_maintenance_banner()
+    
     st.subheader("Flow of Water & Seepage Analysis")
     
     tab1, tab2, tab3 = st.tabs(["1D Seepage", "Permeability", "Flow Nets"])
@@ -241,7 +224,6 @@ def app():
                 u_val = h_p_A * gamma_w
                 sigma_prime = sigma_total - u_val
                 
-                # Result Display
                 st.success(f"**Flow Condition:** {flow_type}\n\n*{effect_msg}*")
                 st.metric("Total Stress (σ)", f"{sigma_total:.2f} kPa")
                 st.metric("Pore Pressure (u)", f"{u_val:.2f} kPa")
@@ -255,7 +237,6 @@ def app():
         with col_plot:
             fig, ax = plt.subplots(figsize=(7, 8))
             
-            # COORDINATES
             datum_y = 0.0
             soil_w = 2.5
             soil_x = 3.5  
@@ -266,12 +247,10 @@ def app():
             elif wl_bot > wl_top: flow_arrow = "⬆️"
             else: flow_arrow = "No Flow"
 
-            # 1. SOIL FILL
             ax.add_patch(patches.Rectangle((soil_x, datum_y), soil_w, val_z, 
                                           facecolor='#E3C195', hatch='...', edgecolor='none', zorder=1))
             ax.text(soil_x + soil_w/2, datum_y + val_z/2, "SOIL", ha='center', fontweight='bold', fontsize=12, zorder=3)
             
-            # 2. WATER FILLS & TANKS
             tank_w = 2.0
             tank_x = soil_x + (soil_w - tank_w)/2
             neck_w = 0.8
@@ -294,7 +273,6 @@ def app():
             ax.add_patch(patches.Rectangle((tube_left_end, datum_y - 1.0), tube_w, l_tank_base_y - (datum_y - 1.0) + 0.1, facecolor='#D6EAF8', edgecolor='none', zorder=1))
             ax.add_patch(patches.Rectangle((left_tank_x, l_tank_base_y), tank_w, wl_bot - l_tank_base_y, facecolor='#D6EAF8', edgecolor='none', zorder=1))
 
-            # 3. WALLS
             wall_thick = 2.5
             wall_color = 'black'
             ax.plot([tank_x, tank_x, neck_x, neck_x], [wl_top + 0.5, tank_base_y, tank_base_y, datum_y + val_z], color=wall_color, lw=wall_thick, zorder=2)
@@ -312,13 +290,11 @@ def app():
             path_inner_y = [datum_y, datum_y - 1.0, datum_y - 1.0, l_tank_base_y, l_tank_base_y, wl_bot + 0.5]
             ax.plot(path_inner_x, path_inner_y, color=wall_color, lw=wall_thick, zorder=2)
 
-            # Water & Details
             ax.plot([tank_x, tank_x + tank_w], [wl_top, wl_top], color='blue', lw=2, zorder=2)
             ax.plot([left_tank_x, left_tank_x + tank_w], [wl_bot, wl_bot], color='blue', lw=2, zorder=2)
             ax.plot(tank_x + tank_w/2, wl_top, marker='v', color='blue', markersize=8, zorder=2)
             ax.plot(left_tank_x + tank_w/2, wl_bot, marker='v', color='blue', markersize=8, zorder=2)
 
-            # Dimensions
             ax.plot([-0.5, 8], [datum_y, datum_y], 'k-.', lw=1)
             ax.text(soil_x + 0.5 + soil_w, datum_y - 0.25, "Datum (z=0)", va='center', fontsize=10, style='italic')
             
@@ -349,9 +325,8 @@ def app():
             ax.axis('off')
             st.pyplot(fig)
 
-
     # =================================================================
-    # TAB 2: PERMEABILITY (Lab Tests)
+    # TAB 2: PERMEABILITY
     # =================================================================
     with tab2:
         st.caption("Calculate Coefficient of Permeability (k). Input variables are marked on the diagram.")
@@ -366,7 +341,7 @@ def app():
                 st.latex(r"k = \frac{Q \cdot L}{A \cdot h \cdot t}")
                 Q = st.number_input("Collected Volume (Q) [cm³]", value=500.0)
                 L = st.number_input("Specimen Length (L) [cm]", value=15.0)
-                h = st.number_input("Head Difference (h) [cm]", value=40.0, help="Vertical distance from top water level to bottom outlet level")
+                h = st.number_input("Head Difference (h) [cm]", value=40.0)
                 A = st.number_input("Specimen Area (A) [cm²]", value=40.0)
                 t = st.number_input("Time Interval (t) [sec]", value=60.0)
                 
@@ -374,15 +349,8 @@ def app():
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A*h*t > 0: 
                         k_val = (Q*L)/(A*h*t)
-                        
                         k_formatted = format_scientific(k_val)
-                        st.success(f"""
-                        **Permeability Coefficient (k)**
-                        
-                        $$
-                        {k_formatted} \\text{{ cm/sec}}
-                        $$
-                        """)
+                        st.success(f"**Permeability Coefficient (k)**\n\n$${k_formatted} \\text{{ cm/sec}}$$")
                         st.markdown(f"""
                         <div style="background-color: #d1e7dd; padding: 20px; border-radius: 10px; border: 1px solid #0f5132; text-align: center; margin-top: 20px;">
                             <p style="color: #0f5132; margin-bottom: 8px; font-size: 16px; font-weight: 600;">Permeability Coefficient (k)</p>
@@ -399,23 +367,16 @@ def app():
                 a = st.number_input("Standpipe Area (a) [cm²]", format="%.4f", value=0.5)
                 A_soil = st.number_input("Soil Specimen Area (A) [cm²]", value=40.0)
                 L_fall = st.number_input("Specimen Length (L) [cm]", value=15.0)
-                h1 = st.number_input("Initial Head (h1) [cm]", value=50.0, help="Height from bottom water level to Start level")
-                h2 = st.number_input("Final Head (h2) [cm]", value=30.0, help="Height from bottom water level to End level")
+                h1 = st.number_input("Initial Head (h1) [cm]", value=50.0)
+                h2 = st.number_input("Final Head (h2) [cm]", value=30.0)
                 t_fall = st.number_input("Time Interval (t) [sec]", value=300.0)
 
                 st.markdown("---")
                 if st.button("Calculate Permeability (k)", type="primary"):
                     if A_soil*t_fall > 0 and h2 > 0: 
                         k_val = (2.303*a*L_fall/(A_soil*t_fall))*np.log10(h1/h2)
-                        
                         k_formatted = format_scientific(k_val)
-                        st.success(f"""
-                        **Permeability Coefficient (k)**
-                        
-                        $$
-                        {k_formatted} \\text{{ cm/sec}}
-                        $$
-                        """)
+                        st.success(f"**Permeability Coefficient (k)**\n\n$${k_formatted} \\text{{ cm/sec}}$$")
                     else:
                         st.error("Inputs invalid. h2 must be > 0.")
 
@@ -478,12 +439,12 @@ def app():
             st.pyplot(fig2)
 
     # ============================================================
-    # TAB 3 — FLOW NETS (CORRECTED FOR SHEET PILE)
+    # TAB 3 — FLOW NETS (FINAL CORRECTED VERSION)
     # ============================================================
     with tab3:
         st.markdown("### 2D Flow Net Analysis")
-        st.caption("**Flow Net Rules:** Flow lines (blue) show water paths. "
-                  "Equipotentials (red dashed) show head drops. They must be perpendicular.")
+        st.caption("**Flow Net Principles:** Blue lines = flow paths (streamlines). "
+                  "Red dashed = head drops (equipotentials). Must intersect at 90°.")
         
         col_in, col_gr = st.columns([1, 1.4])
 
@@ -524,15 +485,15 @@ def app():
 
             st.markdown("---")
             st.markdown("#### Flow Net Density")
-            Nd = max(2, int(st.number_input("Equipotential Drops (Nd)", value=10, min_value=2)))
-            Nf = max(1, int(st.number_input("Flow Channels (Nf)", value=5, min_value=1)))
+            Nd = max(2, int(st.number_input("Equipotential Drops (Nd)", value=10, min_value=2, max_value=20)))
+            Nf = max(1, int(st.number_input("Flow Channels (Nf)", value=5, min_value=1, max_value=10)))
 
             st.markdown("---")
             st.markdown("#### Pore Pressure Calculation")
             px = st.number_input("Point X Coordinate [m]", value=2.0)
             py = st.number_input("Point Y Coordinate [m]", value=-4.0, max_value=0.0)
 
-            res = calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down)
+            res = calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
             
             if res:
                 st.success(f"**Pore Pressure (u):** {res['u']:.2f} kPa")
@@ -548,65 +509,65 @@ def app():
             ax.set_aspect("equal")
             ax.set_facecolor('#f5f5dc')
 
-            # Create mesh
-            gx = np.linspace(-12, 12, 300)
-            gy = np.linspace(-soil_d, 0, 250)
+            # Create high-resolution mesh
+            gx = np.linspace(-12, 12, 400)
+            gy = np.linspace(-soil_d, 0, 300)
             X, Y = np.meshgrid(gx, gy)
 
             # Calculate complex potential
-            W = get_complex_potential(X, Y, mode, pile_d, pile_x, dam_w, h_up, h_down)
+            W = get_complex_potential(X, Y, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
             
-            # Extract components
-            Phi = np.real(W)  # Velocity potential (equipotentials)
-            Psi = np.imag(W)  # Stream function (flow lines)
+            # Extract Phi and Psi
+            Phi = np.real(W)  # Equipotentials
+            Psi = np.imag(W)  # Streamlines
 
             # Clean data
             Phi = np.where(np.isfinite(Phi), Phi, np.nan)
             Psi = np.where(np.isfinite(Psi), Psi, np.nan)
 
-            # Determine levels
-            phi_min = np.nanpercentile(Phi, 10)
-            phi_max = np.nanpercentile(Phi, 90)
-            psi_min = np.nanpercentile(Psi, 10)
-            psi_max = np.nanpercentile(Psi, 90)
-
-            if np.isfinite(phi_min) and np.isfinite(phi_max) and phi_max > phi_min:
+            # Determine contour levels
+            phi_vals = Phi[np.isfinite(Phi)]
+            psi_vals = Psi[np.isfinite(Psi)]
+            
+            if len(phi_vals) > 100:
+                phi_min, phi_max = np.percentile(phi_vals, [15, 85])
                 equi_levels = np.linspace(phi_min, phi_max, Nd + 1)
             else:
-                equi_levels = 10
+                equi_levels = Nd + 1
 
-            if np.isfinite(psi_min) and np.isfinite(psi_max) and psi_max > psi_min:
+            if len(psi_vals) > 100:
+                psi_min, psi_max = np.percentile(psi_vals, [15, 85])
                 stream_levels = np.linspace(psi_min, psi_max, Nf + 1)
             else:
-                stream_levels = 10
+                stream_levels = Nf + 1
 
-            # Plot STREAMLINES (Blue solid)
+            # Plot STREAMLINES (Blue solid - flow paths)
             try:
                 cs1 = ax.contour(X, Y, Psi,
                                levels=stream_levels,
-                               colors="blue", linewidths=2.5, alpha=0.7)
+                               colors="blue", linewidths=2.5, alpha=0.8)
             except:
                 pass
 
-            # Plot EQUIPOTENTIALS (Red dashed)
+            # Plot EQUIPOTENTIALS (Red dashed - head drops)
             try:
                 cs2 = ax.contour(X, Y, Phi,
                                levels=equi_levels,
-                               colors="red", linestyles="--", linewidths=1.8, alpha=0.7)
+                               colors="red", linestyles="--", linewidths=2.0, alpha=0.75)
             except:
                 pass
 
-            # Boundaries
-            ax.axhline(0, color="saddlebrown", lw=3, label="Ground Surface", zorder=5)
-            ax.axhline(-soil_d, color="black", lw=4, label="Impervious Layer", zorder=5)
+            # Draw boundaries
+            ax.axhline(0, color="saddlebrown", lw=3.5, label="Ground Surface", zorder=5)
+            ax.axhline(-soil_d, color="black", lw=4.5, label="Impervious Layer", zorder=5)
 
             # Water levels
             ax.fill_between([-12, -dam_w/2 if "Dam" in mode else 0], 
                           [0, 0], [h_up, h_up], 
-                          color='lightblue', alpha=0.4, label='Upstream', zorder=1)
+                          color='lightblue', alpha=0.4, label='Upstream Water', zorder=1)
             ax.fill_between([dam_w/2 if "Dam" in mode else 0, 12], 
                           [0, 0], [h_down, h_down], 
-                          color='lightcyan', alpha=0.4, label='Downstream', zorder=1)
+                          color='lightcyan', alpha=0.4, label='Downstream Water', zorder=1)
 
             # Draw structures
             if "Dam" in mode:
@@ -614,83 +575,105 @@ def app():
                     (-dam_w/2, 0), dam_w, h_up,
                     facecolor="gray", edgecolor="black", 
                     linewidth=2.5, hatch='//', alpha=0.8,
-                    label="Dam", zorder=10
+                    label="Concrete Dam", zorder=10
                 )
                 ax.add_patch(dam_rect)
-                ax.plot([-dam_w/2, dam_w/2], [-0.5, -0.5], 'k-', lw=2.5, zorder=10)
+                ax.plot([-dam_w/2, dam_w/2], [-0.5, -0.5], 'k-', lw=3, zorder=10)
                 ax.text(0, -1.0, f'B = {dam_w:.1f}m', ha='center', 
-                       fontweight='bold', bbox=dict(boxstyle='round', facecolor='white'))
+                       fontweight='bold', fontsize=11,
+                       bbox=dict(boxstyle='round', facecolor='white', edgecolor='black'))
 
             if "Pile" in mode:
                 pile_rect = patches.Rectangle(
                     (pile_x - 0.25, -pile_d),
                     0.5, pile_d,
                     facecolor="black", edgecolor="yellow", 
-                    linewidth=2.5, label="Sheet Pile", zorder=10
+                    linewidth=3, label="Sheet Pile", zorder=10
                 )
                 ax.add_patch(pile_rect)
                 
-                # Show pile depth
-                ax.annotate('', xy=(pile_x + 1.2, -pile_d), xytext=(pile_x + 1.2, 0),
-                          arrowprops=dict(arrowstyle='<->', color='black', lw=2))
-                ax.text(pile_x + 1.6, -pile_d/2, f'D = {pile_d:.1f}m', 
-                       rotation=90, va='center', fontweight='bold',
-                       bbox=dict(boxstyle='round', facecolor='white'))
+                # Pile depth annotation
+                ax.annotate('', xy=(pile_x + 1.5, -pile_d), xytext=(pile_x + 1.5, 0),
+                          arrowprops=dict(arrowstyle='<->', color='black', lw=2.5))
+                ax.text(pile_x + 2.0, -pile_d/2, f'D = {pile_d:.1f}m', 
+                       rotation=90, va='center', fontweight='bold', fontsize=11,
+                       bbox=dict(boxstyle='round', facecolor='white', edgecolor='black'))
 
             # Mark calculation point
             if res:
-                ax.scatter(px, py, c="red", s=200, zorder=15, 
+                ax.scatter(px, py, c="red", s=250, zorder=15, 
                          edgecolors='white', linewidths=3, marker='o')
-                ax.text(px + 0.7, py + 0.5, 
+                ax.text(px + 0.8, py + 0.6, 
                        f"u = {res['u']:.1f} kPa",
-                       color="red", fontweight="bold", fontsize=12,
-                       bbox=dict(facecolor='yellow', alpha=0.9, 
-                               edgecolor='red', boxstyle='round,pad=0.6', linewidth=2))
+                       color="darkred", fontweight="bold", fontsize=12,
+                       bbox=dict(facecolor='yellow', alpha=0.95, 
+                               edgecolor='red', boxstyle='round,pad=0.7', linewidth=2.5))
 
-            ax.set_xlabel("Horizontal Distance (m)", fontweight='bold', fontsize=11)
-            ax.set_ylabel("Elevation (m)", fontweight='bold', fontsize=11)
+            ax.set_xlabel("Horizontal Distance (m)", fontweight='bold', fontsize=12)
+            ax.set_ylabel("Elevation (m)", fontweight='bold', fontsize=12)
             ax.set_title(f"Flow Net: {mode}\nΔh = {h_up - h_down:.1f}m | "
-                        f"Nf = {Nf} channels | Nd = {Nd} drops", 
+                        f"Nf = {Nf} flow channels | Nd = {Nd} equipotential drops", 
                         fontweight='bold', fontsize=13)
-            ax.legend(loc='upper right', fontsize=10, framealpha=0.9)
-            ax.grid(True, alpha=0.3, linestyle=':', linewidth=0.5)
+            ax.legend(loc='upper right', fontsize=10, framealpha=0.95)
+            ax.grid(True, alpha=0.25, linestyle=':', linewidth=0.8)
             
             st.pyplot(fig)
 
-            # Explanation
+            # Educational notes
             with st.expander("📚 Understanding Sheet Pile Flow Nets"):
                 st.markdown(f"""
-                **Current Configuration:** {mode}
+                **Configuration:** {mode}  
+                **Upstream Head:** {h_up:.1f}m | **Downstream Head:** {h_down:.1f}m | **Head Loss:** {h_up - h_down:.1f}m
                 
-                **What's Happening:**
-                - Water flows horizontally from **upstream (left, h={h_up:.1f}m)** to **downstream (right, h={h_down:.1f}m)**
-                - The sheet pile **blocks** direct horizontal flow at x={pile_x:.1f}m
-                - Water is **forced to go UNDER** the pile tip at depth **D={pile_d:.1f}m**
-                - This creates a **longer flow path** → reduces seepage
+                ---
                 
-                **Flow Pattern Details:**
+                ### **What You're Seeing:**
                 
-                1. **Blue Lines (Streamlines):**
-                   - Show actual water particle paths
-                   - Start upstream, end downstream
-                   - Dip down to pass under pile tip
-                   - Horizontal far from pile, curved near pile
+                The **sheet pile** at x = {pile_x:.1f}m extends to depth D = {pile_d:.1f}m, acting as a **vertical barrier**.  
+                Water cannot flow through it, so it must travel **underneath the pile tip**.
                 
-                2. **Red Dashed Lines (Equipotentials):**
-                   - Show points of equal hydraulic head
-                   - Vertical far from pile
-                   - Curved around pile (concentrate near tip)
-                   - Each line = equal head drop = {(h_up-h_down)/Nd:.2f}m
+                ### **Flow Pattern Explanation:**
                 
-                3. **Critical Zone:**
-                   - Maximum gradient at **pile tip** (seepage exit point)
-                   - Risk of **piping failure** if gradient too high
-                   - Pore pressure highest at pile tip
+                **🔵 Blue Solid Lines (STREAMLINES):**
+                - These show the **actual paths** water particles follow
+                - Flow starts from upstream (left), travels horizontally
+                - **Curves DOWN** to pass under the pile tip
+                - Continues horizontally downstream (right)
+                - Like following a single water molecule from start to finish
                 
-                **Engineering Significance:**
-                - Deeper pile = Longer flow path = Less seepage
-                - Flow concentration at tip = Potential erosion point
-                - Seepage quantity: q = k·Δh·(Nf/Nd) per unit width
+                **🔴 Red Dashed Lines (EQUIPOTENTIALS):**
+                - These connect points with the **same hydraulic head** (pressure + elevation)
+                - Nearly **vertical** far from the pile
+                - **Bend around the pile tip** where flow concentrates
+                - Each line represents an equal drop in head = {(h_up - h_down) / Nd:.2f}m
+                
+                ### **Critical Engineering Points:**
+                
+                1. **Pile Tip = Highest Risk Zone:**
+                   - Maximum hydraulic gradient occurs here
+                   - Potential for **piping failure** (soil erosion)
+                   - Pore pressures are highest at exit point
+                
+                2. **Seepage Quantity:**
+                   $$q = k \\times \\Delta h \\times \\frac{{N_f}}{{N_d}}$$
+                   Where k = soil permeability coefficient
+                
+                3. **Flow Path Length:**
+                   - Deeper pile = Longer flow path = Less seepage
+                   - Each meter of pile depth significantly reduces flow
+                
+                4. **Orthogonality Check:**
+                   - Flow lines should intersect equipotentials at **90°**
+                   - Creates approximately **square mesh elements**
+                   - Validates the flow net accuracy
+                
+                ### **Design Implications:**
+                
+                - If gradient at pile tip > critical gradient → **Piping risk**
+                - Pile depth determines effectiveness of cutoff
+                - Exit gradient = {(h_up - h_down) / pile_d:.2f} (approximate)
+                
+                ⚠️ **Note:** This is a simplified 2D analysis. Real-world designs require 3D modeling and safety factors.
                 """)
 
 
