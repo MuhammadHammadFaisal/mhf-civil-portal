@@ -392,7 +392,7 @@ def app():
     # ============================================================
     with tab3:
         col_in, col_gr = st.columns([1, 1.4])
-     st.title("🚧 Module Under Construction")
+    st.title("🚧 Module Under Construction")
         with col_in:
             mode = st.radio(
                 "Structure Type",
