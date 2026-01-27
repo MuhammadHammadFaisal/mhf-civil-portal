@@ -113,7 +113,7 @@ def main():
                 )
                 st.markdown(
                     "<div style='color:#666; font-size:13px; margin-top:-6px; margin-bottom:22px;'>"
-                    "Theory-based · Step-by-step computation"
+                    
                     "</div>",
                     unsafe_allow_html=True
                 )
@@ -174,3 +174,4 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
