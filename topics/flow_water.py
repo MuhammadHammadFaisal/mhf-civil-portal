@@ -19,6 +19,7 @@ def format_scientific(val):
 def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width):
     z = x + 1j * y
 
+    # singularity avoidance logic stays the same...
     if np.isscalar(z):
         avoid_x = pile_x if "Pile" in mode else 0
         if abs(z - avoid_x) < 0.05:
@@ -27,38 +28,36 @@ def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width):
     with np.errstate(all="ignore"):
         if mode == "Sheet Pile Only":
             d = max(pile_depth, 0.1)
+            # Center the coordinate system on the pile
             return np.arcsinh((z - pile_x) / d)
 
         if mode == "Concrete Dam Only":
             c = max(dam_width / 2, 0.1)
+            # Dam base creates a wider flow path
             return np.arccosh(z / c)
 
         if mode == "Combined (Dam + Pile)":
+            # --- THE FIX ---
+            # We approximate the combined effect by adding the resistance 
+            # of the dam width AND the pile depth. 
+            # This is a heuristic superposition for visualization.
+            
+            # 1. Effect of Dam (base width)
+            c = max(dam_width / 2, 0.1)
+            
+            # 2. Effect of Pile (depth) - shifted by pile_x
             d = max(pile_depth, 0.1)
-            return np.arcsinh((z - pile_x) / d)
 
-    return z
-
-def solve_smart_point(x, y, h_up, h_down, datum, mode, pile_d, pile_x, dam_w):
-    W = get_complex_potential(x, y, mode, pile_d, pile_x, dam_w)
-    phi = np.imag(W)
-
-    Wu = get_complex_potential(-50, -0.1, mode, pile_d, pile_x, dam_w)
-    Wd = get_complex_potential(50, -0.1, mode, pile_d, pile_x, dam_w)
-
-    phi_u, phi_d = np.imag(Wu), np.imag(Wd)
-
-    if abs(phi_u - phi_d) < 1e-6:
-        ratio = 0.5
-    else:
-        ratio = (phi - phi_d) / (phi_u - phi_d)
-
-    ratio = np.clip(ratio, 0, 1)
-    h = h_down + ratio * (h_up - h_down)
-
-    z = y - datum
-    u = (h - z) * 9.81
-    return {"h": h, "u": u}
+            # We create a composite complex potential. 
+            # Note: This is an approximation to show the flow distortion.
+            # A true solution requires Schwarz-Christoffel mapping.
+            # Here we weight the transformation to stretch streamlines under the dam
+            # and pull them down near the pile.
+            
+            # Simple visualization hack: Use the pile formula but increase the 
+            # effective depth based on the dam width to simulate longer path
+            effective_depth = d + (c * 0.5) 
+            return np.arcsinh((z - pile_x) / effective_depth)
 
 # ============================================================
 # MAIN APP
