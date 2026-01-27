@@ -129,7 +129,25 @@ def main():
     Just transparent, deterministic engineering calculations.
     """)
     st.markdown("")
-
+# --- FEEDBACK SECTION (NEW!) ---
+    # This creates a tidy dropdown so it doesn't clutter the main view
+    with st.expander("💬 Feedback & Support"):
+        st.write("Encountered a calculation error or have a suggestion? Help improve MHF Civil.")
+        
+        # Two columns for different types of feedback
+        fb1, fb2 = st.columns(2)
+        
+        with fb1:
+            st.info("**Report a Bug**")
+            st.caption("Found an error in a formula? Send me an email directly.")
+            # Replace 'your-email' with your actual email
+            st.link_button("📧 Report via Email", "mailto:hammad.faisal@metu.edu.tr?subject=Bug Report - MHF Civil Calc")
+            
+        with fb2:
+            st.success("**Submit a Review**")
+            st.caption("Share your thoughts or request new features anonymously.")
+            # Create a free Google Form and paste the link here
+            st.link_button(" Open Feedback Form", "https://forms.google.com/your-form-link-here")
    # --- ABOUT THE DEVELOPER ---
     st.markdown("---")
     st.subheader("About MHF Civil")
@@ -158,6 +176,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
