@@ -4,27 +4,6 @@ import matplotlib.patches as patches
 import numpy as np
 
 # ============================================================
-# MAINTENANCE BANNER
-# ============================================================
-def show_maintenance_banner():
-    st.markdown("""
-    <div style="background: linear-gradient(90deg, #ff6b6b 0%, #ffa500 100%); 
-                padding: 15px; 
-                border-radius: 10px; 
-                border: 3px solid #cc0000;
-                margin-bottom: 20px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <h2 style="color: white; margin: 0; text-align: center;">
-            ⚠️ UNDER MAINTENANCE ⚠️
-        </h2>
-        <p style="color: white; margin: 10px 0 0 0; text-align: center; font-size: 16px;">
-            Flow net calculations are currently being calibrated and improved.<br>
-            Results may not be accurate. Please use with caution.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ============================================================
 # HELPER FUNCTIONS
 # ============================================================
 
@@ -447,7 +426,26 @@ def app():
                   "Red dashed = head drops (equipotentials). Must intersect at 90°.")
         
         col_in, col_gr = st.columns([1, 1.4])
-
+        # ============================================================
+        # MAINTENANCE BANNER
+        # ============================================================
+        def show_maintenance_banner():
+            st.markdown("""
+            <div style="background: linear-gradient(90deg, #ff6b6b 0%, #ffa500 100%); 
+                        padding: 15px; 
+                        border-radius: 10px; 
+                        border: 3px solid #cc0000;
+                        margin-bottom: 20px;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h2 style="color: white; margin: 0; text-align: center;">
+                    ⚠️ UNDER MAINTENANCE ⚠️
+                </h2>
+                <p style="color: white; margin: 10px 0 0 0; text-align: center; font-size: 16px;">
+                    Flow net calculations are currently being calibrated and improved.<br>
+                    Results may not be accurate. Please use with caution.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
         with col_in:
             mode = st.radio(
                 "Structure Type",
