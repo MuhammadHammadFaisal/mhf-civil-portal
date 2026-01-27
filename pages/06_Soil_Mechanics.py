@@ -16,9 +16,7 @@ def app():
     # 0. DISCLAIMER & HEADER
     # =================================================================
     st.warning("⚠️ **BETA VERSION:** This module is currently in testing. Calculations should be verified manually.", icon="🚧")
-    st.header("🏗️ Consolidation Analysis")
-    st.markdown("Select your calculation goal below. Step-by-step math is provided in the results.")
-    st.markdown("---")
+
 
     # --- PROFESSIONAL HEADER ---
     # Column Ratio [1, 5] keeps logo compact
