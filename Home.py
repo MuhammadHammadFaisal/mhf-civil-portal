@@ -114,7 +114,7 @@ def main():
                 # 1. The Clean Button
                 st.page_link(
                     f"pages/{file_name}", 
-                    label=f"👉 {module_title}",  # Simple label
+                    label=f" {module_title}",  # Simple label
                     use_container_width=True
                 )
                 # 2. The "Badge" below it (Smaller, Grey)
@@ -128,9 +128,7 @@ def main():
     st.markdown("""
     ### Precision. Logic. Deterministic.
     
-    MHF Civil is a focused engineering workspace built for **civil engineers who care about correctness**.
-    No black-box guesses. No approximations without context.
-    Just transparent, deterministic engineering calculations.
+    MHF Civil is built to provide correct, theory-based civil engineering solutions—not probabilistic AI guesses. Every calculation follows established principles, with assumptions stated clearly and results that can be trusted for academic and engineering use.
     """)
     st.markdown("")
 # --- FEEDBACK SECTION ---
@@ -152,12 +150,11 @@ def main():
     st.subheader("About MHF Civil")
     
     st.markdown("""
-    ### Muhammad Hammad Faisal
-    Developed by Muhammad Hammad Faisal 
-    Final-Year Civil Engineering Student, METU
     
-    MHF Civil is built on a simple principle:  
-    **Engineering results should be reproducible, transparent, and mathematically defensible.**
+    ### Developed by Muhammad Hammad Faisal 
+    
+    Final-Year Civil Engineering Student, METU
+
     """)
 
     st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/muhammad-hammad-20059a229")
@@ -176,6 +173,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
