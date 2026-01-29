@@ -15,7 +15,7 @@ def show_maintenance_banner():
                 margin-bottom: 20px;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
         <h2 style="color: white; margin: 0; text-align: center;">
-            ⚠️ UNDER MAINTENANCE ⚠️
+             UNDER MAINTENANCE 
         </h2>
         <p style="color: white; margin: 10px 0 0 0; text-align: center; font-size: 16px;">
             Flow net calculations are currently being calibrated and improved.<br>
@@ -619,7 +619,7 @@ def app():
             st.pyplot(fig)
 
             # Educational notes
-            with st.expander("📚 Understanding Sheet Pile Flow Nets"):
+            with st.expander(" Understanding Sheet Pile Flow Nets"):
                 st.markdown(f"""
                 **Configuration:** {mode}  
                 **Upstream Head:** {h_up:.1f}m | **Downstream Head:** {h_down:.1f}m | **Head Loss:** {h_up - h_down:.1f}m
@@ -633,14 +633,14 @@ def app():
                 
                 ### **Flow Pattern Explanation:**
                 
-                **🔵 Blue Solid Lines (STREAMLINES):**
+                ** Blue Solid Lines (STREAMLINES):**
                 - These show the **actual paths** water particles follow
                 - Flow starts from upstream (left), travels horizontally
                 - **Curves DOWN** to pass under the pile tip
                 - Continues horizontally downstream (right)
                 - Like following a single water molecule from start to finish
                 
-                **🔴 Red Dashed Lines (EQUIPOTENTIALS):**
+                ** Red Dashed Lines (EQUIPOTENTIALS):**
                 - These connect points with the **same hydraulic head** (pressure + elevation)
                 - Nearly **vertical** far from the pile
                 - **Bend around the pile tip** where flow concentrates
@@ -672,7 +672,7 @@ def app():
                 - Pile depth determines effectiveness of cutoff
                 - Exit gradient = {(h_up - h_down) / pile_d:.2f} (approximate)
                 
-                ⚠️ **Note:** This is a simplified 2D analysis. Real-world designs require 3D modeling and safety factors.
+                 **Note:** This is a simplified 2D analysis. Real-world designs require 3D modeling and safety factors.
                 """)
 
 
