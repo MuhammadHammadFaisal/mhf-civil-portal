@@ -21,7 +21,7 @@ def app():
     # =========================================================================
     with tab_rankine:
         st.header("Rankine Analysis")
-        st.info("Configure the wall and soil layers on the left. The **Soil Profile** updates automatically. Click **Calculate** to see the Pressure Graph.")
+        st.info("Configure the wall and soil layers on the left. **Select Soil Type** to auto-fill properties.")
 
         # --- LAYOUT: INPUTS (Left) | VISUALIZATION (Right) ---
         col_input, col_viz = st.columns([0.4, 0.6], gap="medium")
@@ -37,35 +37,58 @@ def app():
             st.markdown("---")
             st.subheader("2. Soil Properties")
 
-            # --- Helper for Layer Inputs ---
+            # --- Helper for Layer Inputs with Dropdown ---
             def render_layers_input(prefix, label, default_layers):
                 st.markdown(f"**{label}**")
                 num = st.number_input(f"No. of Layers ({prefix})", 1, 5, len(default_layers), key=f"{prefix}_num")
                 layers = []
                 current_z = 0.0
+                
                 for i in range(int(num)):
                     with st.expander(f"Layer {i+1} ({prefix})", expanded=False):
-                        h = st.number_input(f"H (m)", 0.1, 20.0, default_layers[i]['H'] if i < len(default_layers) else 3.0, key=f"{prefix}_h_{i}")
-                        gamma = st.number_input(f"γ (kN/m³)", 10.0, 25.0, default_layers[i]['g'] if i < len(default_layers) else 18.0, key=f"{prefix}_g_{i}")
-                        phi = st.number_input(f"ϕ' (deg)", 0.0, 45.0, default_layers[i]['p'] if i < len(default_layers) else 30.0, key=f"{prefix}_p_{i}")
-                        c = st.number_input(f"c' (kPa)", 0.0, 50.0, default_layers[i]['c'] if i < len(default_layers) else 0.0, key=f"{prefix}_c_{i}")
+                        # Defaults from arguments or generic
+                        def_h = default_layers[i]['H'] if i < len(default_layers) else 3.0
                         
-                        layers.append({"id": i+1, "H": h, "gamma": gamma, "phi": phi, "c": c, "top": current_z, "bottom": current_z + h})
+                        # --- Soil Type Dropdown ---
+                        # We use the type to determine default values for gamma, phi, c
+                        type_key = f"{prefix}_type_{i}"
+                        soil_type = st.selectbox("Soil Type", ["Sand", "Clay", "Custom"], key=type_key)
+                        
+                        # Dynamic Defaults based on Type
+                        if soil_type == "Sand":
+                            d_g, d_p, d_c = 18.0, 35.0, 0.0
+                        elif soil_type == "Clay":
+                            d_g, d_p, d_c = 20.0, 25.0, 20.0
+                        else: # Custom or existing default
+                            d_g = default_layers[i]['g'] if i < len(default_layers) else 19.0
+                            d_p = default_layers[i]['p'] if i < len(default_layers) else 30.0
+                            d_c = default_layers[i]['c'] if i < len(default_layers) else 5.0
+
+                        # Note: We use the soil_type in the key to force refresh if type changes
+                        h = st.number_input(f"H (m)", 0.1, 20.0, def_h, key=f"{prefix}_h_{i}")
+                        
+                        c1, c2 = st.columns(2)
+                        gamma = c1.number_input(f"γ (kN/m³)", 10.0, 25.0, d_g, key=f"{prefix}_g_{i}_{soil_type}")
+                        phi = c2.number_input(f"ϕ' (deg)", 0.0, 45.0, d_p, key=f"{prefix}_p_{i}_{soil_type}")
+                        c = st.number_input(f"c' (kPa)", 0.0, 100.0, d_c, key=f"{prefix}_c_{i}_{soil_type}")
+                        
+                        layers.append({"id": i+1, "H": h, "gamma": gamma, "phi": phi, "c": c, "top": current_z, "bottom": current_z + h, "type": soil_type})
                         current_z += h
                 return layers
 
-            # Left Side Inputs
+            # Left Side Inputs (Passive)
             st.caption("⬅️ Left Side (Passive / Excavation)")
-            left_wt = st.number_input("Left WT Depth (m)", 0.0, 20.0, 1.5, help="Depth from the excavated surface")
+            left_wt = st.number_input("Left WT Depth (m)", 0.0, 20.0, 1.5)
+            # Defaults for initial load
             def_left = [{'H': 1.5, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
             left_layers = render_layers_input("L", "Passive Layers", def_left)
 
             st.markdown("---")
             
-            # Right Side Inputs
+            # Right Side Inputs (Active)
             st.caption("➡️ Right Side (Active / Backfill)")
             right_q = st.number_input("Surcharge q (kPa)", 0.0, 100.0, 50.0)
-            right_wt = st.number_input("Right WT Depth (m)", 0.0, 20.0, 6.0, help="Depth from the top of the wall")
+            right_wt = st.number_input("Right WT Depth (m)", 0.0, 20.0, 6.0)
             def_right = [{'H': 6.0, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
             right_layers = render_layers_input("R", "Active Layers", def_right)
 
@@ -79,7 +102,10 @@ def app():
         # -------------------------------------------------
         with col_viz:
             # ============================================
-            # A. LIVE SOIL PROFILE (No Calculation Needed)
+            # A. LIVE SOIL PROFILE 
+
+[Image of Soil Profile Diagram]
+
             # ============================================
             st.subheader("Soil Profile Preview")
             
@@ -96,18 +122,20 @@ def app():
             current_y = Y_top
             for l in right_layers:
                 h = l['H']
-                rect = patches.Rectangle((wall_width/2, current_y - h), 6, h, facecolor='#E6D690' if l['id']%2!=0 else '#C1B088', edgecolor='gray', alpha=0.5)
+                color = '#E6D690' if l['type'] == "Sand" else ('#B0A494' if l['type'] == "Clay" else '#C1B088')
+                rect = patches.Rectangle((wall_width/2, current_y - h), 6, h, facecolor=color, edgecolor='gray', alpha=0.6)
                 ax_p.add_patch(rect)
-                ax_p.text(wall_width/2 + 3, current_y - h/2, f"Backfill Layer {l['id']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
+                ax_p.text(wall_width/2 + 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
                 current_y -= h
 
             # Draw Soil Layers (Left)
             current_y = Y_exc
             for l in left_layers:
                 h = l['H']
-                rect = patches.Rectangle((-wall_width/2 - 6, current_y - h), 6, h, facecolor='#A4C2A5' if l['id']%2!=0 else '#86A388', edgecolor='gray', alpha=0.5)
+                color = '#E6D690' if l['type'] == "Sand" else ('#B0A494' if l['type'] == "Clay" else '#C1B088')
+                rect = patches.Rectangle((-wall_width/2 - 6, current_y - h), 6, h, facecolor=color, edgecolor='gray', alpha=0.6)
                 ax_p.add_patch(rect)
-                ax_p.text(-wall_width/2 - 3, current_y - h/2, f"Passive Layer {l['id']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
+                ax_p.text(-wall_width/2 - 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
                 current_y -= h
                 
             # Surcharge
@@ -138,7 +166,7 @@ def app():
             st.pyplot(fig_profile)
 
             # ============================================
-            # B. CALCULATION & PRESSURE GRAPH
+            # B. CALCULATION & PRESSURE GRAPH 
             # ============================================
             if calc_trigger:
                 st.markdown("---")
@@ -190,14 +218,13 @@ def app():
                     sig, _, _, _ = calculate_stress(y_depth, left_layers, left_wt, 0, "Passive")
                     p_left.append(sig)
 
-                # Plot Active vs Depth (Note: Plotting Pressure on X, Depth on Y)
-                ax_s.plot(p_right, y_steps, 'r-', linewidth=2, label="Active Pressure (Right Side)")
+                # Plot Active vs Depth
+                ax_s.plot(p_right, y_steps, 'r-', linewidth=2, label="Active Pressure (Right)")
                 ax_s.fill_betweenx(y_steps, 0, p_right, color='red', alpha=0.1)
                 
-                # Plot Passive vs Depth (Shifted to match excavation depth)
-                # Passive depth 0 corresponds to Global Depth = excavation_depth
+                # Plot Passive vs Depth
                 global_depth_l = y_steps_l + excavation_depth
-                ax_s.plot(p_left, global_depth_l, 'g-', linewidth=2, label="Passive Pressure (Left Side)")
+                ax_s.plot(p_left, global_depth_l, 'g-', linewidth=2, label="Passive Pressure (Left)")
                 ax_s.fill_betweenx(global_depth_l, 0, p_left, color='green', alpha=0.1)
 
                 ax_s.invert_yaxis()
