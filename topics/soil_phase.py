@@ -389,7 +389,7 @@ def app():
         if target in formulas:
             for requirements, latex, description in formulas[target]:
                 if requirements.issubset(cleaned_knowns):
-                    st.success(f"✅ **Formula Found:** {description}")
+                    st.success(f" **Formula Found:** {description}")
                     st.latex(latex)
                     found_any = True
         
