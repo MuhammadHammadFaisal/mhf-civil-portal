@@ -4,6 +4,8 @@ from topics import soil_phase
 from topics import effective_stress
 from topics import flow_water
 from topics import consolidation
+from topics import shear_strenght
+
 # 1. PAGE CONFIG
 st.set_page_config(
     page_title="Soil Mechanics", 
@@ -12,12 +14,6 @@ st.set_page_config(
 )
 
 def app():
-    # =================================================================
-    # 0. DISCLAIMER & HEADER
-    # =================================================================
-    st.warning("⚠️ **BETA VERSION:** This module is currently in testing. Calculations should be verified manually.", icon="🚧")
-
-
     # --- PROFESSIONAL HEADER ---
     # Column Ratio [1, 5] keeps logo compact
     col_logo, col_text = st.columns([1, 5])
@@ -66,7 +62,8 @@ def app():
                 "Phase Relationships",
                 "Effective Stress",
                 "Flow of Water in Soils",
-                "Consolidation Theory"
+                "Consolidation Theory",
+                "Shear Strenght of Soils"
             ]
         )
 
@@ -79,8 +76,13 @@ def app():
 
     elif topic == "Flow of Water in Soils":
         flow_water.app()
+        
     elif topic == "Consolidation Theory":
         consolidation.app()
+        
+    elif topic == "Shear Strenght of Soils":
+        shear_strenght.app()
+
 
 if __name__ == "__main__":
     app()
