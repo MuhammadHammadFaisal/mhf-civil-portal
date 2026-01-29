@@ -61,7 +61,6 @@ def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
     """
     Calculates lateral stress at a specific depth (Rankine).
     """
-    # Identify active layer
     active_layer = layers[-1]
     for l in layers:
         if z_local < l['bottom']: 
@@ -71,7 +70,6 @@ def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
             active_layer = l
             break
     
-    # Vertical Stress Calculation
     sig_v = surcharge
     for l in layers:
         if z_local > l['bottom']:
@@ -80,21 +78,19 @@ def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
             sig_v += (z_local - l['top']) * l['gamma']
             break
     
-    # Pore Pressure
     u = 0.0
     if z_local > wt_depth:
         u = (z_local - wt_depth) * GAMMA_W
     
     sig_v_eff = sig_v - u
     
-    # Lateral Coefficients
     phi_r = np.radians(active_layer['phi'])
     c_val = active_layer['c']
     
     if mode == "Active":
         K = (1 - np.sin(phi_r)) / (1 + np.sin(phi_r))
         sig_lat_eff = (sig_v_eff * K) - (2 * c_val * np.sqrt(K))
-    else: # Passive
+    else: 
         K = (1 + np.sin(phi_r)) / (1 - np.sin(phi_r))
         sig_lat_eff = (sig_v_eff * K) + (2 * c_val * np.sqrt(K))
         
@@ -119,11 +115,11 @@ def app():
     # ---------------------------------------------------------
     with tab_rankine:
         st.header("Rankine Analysis")
-        st.info("Configure the wall and soil layers. The **Soil Profile** updates automatically.")
+        st.info("Configure the wall and soil layers.")
 
         col_input, col_viz = st.columns([0.4, 0.6], gap="medium")
 
-        # --- LEFT COLUMN: INPUTS ---
+        # --- RANKINE INPUTS ---
         with col_input:
             st.subheader("1. Wall Geometry")
             wall_height = st.number_input("Total Wall Height (m)", 1.0, 30.0, 9.0, step=0.5)
@@ -132,7 +128,6 @@ def app():
             st.markdown("---")
             st.subheader("2. Soil Properties")
 
-            # Left Side Inputs
             st.caption("⬅️ Left Side (Passive / Excavation)")
             left_wt = st.number_input("Left WT Depth (m)", 0.0, 20.0, 1.5)
             def_left = [{'H': 1.5, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
@@ -140,7 +135,6 @@ def app():
 
             st.markdown("---")
             
-            # Right Side Inputs
             st.caption("➡️ Right Side (Active / Backfill)")
             right_q = st.number_input("Surcharge q (kPa)", 0.0, 100.0, 50.0)
             right_wt = st.number_input("Right WT Depth (m)", 0.0, 20.0, 6.0)
@@ -150,9 +144,8 @@ def app():
             st.markdown("---")
             calc_trigger = st.button("Calculate Pressure Profile", type="primary", use_container_width=True)
 
-        # --- RIGHT COLUMN: VISUALIZATION ---
+        # --- RANKINE VIZ ---
         with col_viz:
-            # 1. LIVE PROFILE
             st.subheader("Soil Profile Preview")
             
             fig_profile, ax_p = plt.subplots(figsize=(8, 6))
@@ -163,7 +156,7 @@ def app():
             Y_top = wall_height
             Y_exc = wall_height - excavation_depth 
             
-            # Draw Right Layers
+            # Draw Layers (Right & Left)
             current_y = Y_top
             for l in right_layers:
                 h = l['H']
@@ -173,7 +166,6 @@ def app():
                 ax_p.text(wall_width/2 + 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
                 current_y -= h
 
-            # Draw Left Layers
             current_y = Y_exc
             for l in left_layers:
                 h = l['H']
@@ -182,7 +174,7 @@ def app():
                 ax_p.add_patch(rect)
                 ax_p.text(-wall_width/2 - 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
                 current_y -= h
-                
+            
             # Annotations
             if right_q > 0:
                 for x in np.linspace(wall_width/2 + 0.5, wall_width/2 + 5.5, 6):
@@ -206,28 +198,19 @@ def app():
             ax_p.axis('off')
             st.pyplot(fig_profile)
 
-            # 2. PRESSURE GRAPH
+            # Pressure Graph
             if calc_trigger:
                 st.markdown("---")
                 st.subheader("Pressure Graph")
                 
                 fig_stress, ax_s = plt.subplots(figsize=(8, 6))
                 
-                # Active (Right)
                 y_steps = np.linspace(0, wall_height, 100)
-                p_right = []
-                for y_depth in y_steps:
-                    sig, _, _, _ = calculate_stress(y_depth, right_layers, right_wt, right_q, "Active")
-                    p_right.append(sig)
+                p_right = [calculate_stress(y, right_layers, right_wt, right_q, "Active")[0] for y in y_steps]
                 
-                # Passive (Left)
                 y_steps_l = np.linspace(0, wall_height - excavation_depth, 100)
-                p_left = []
-                for y_depth in y_steps_l:
-                    sig, _, _, _ = calculate_stress(y_depth, left_layers, left_wt, 0, "Passive")
-                    p_left.append(sig)
+                p_left = [calculate_stress(y, left_layers, left_wt, 0, "Passive")[0] for y in y_steps_l]
 
-                # Plot
                 ax_s.plot(p_right, y_steps, 'r-', linewidth=2, label="Active (Right)")
                 ax_s.fill_betweenx(y_steps, 0, p_right, color='red', alpha=0.1)
                 
@@ -242,21 +225,18 @@ def app():
                 ax_s.legend()
                 st.pyplot(fig_stress)
 
-        # --- RESULTS TABLE ---
+        # --- RANKINE RESULTS TABLE ---
         if calc_trigger:
             st.markdown("---")
             st.subheader("Stress Table")
             table_data = []
             for z in range(0, int(wall_height) + 1):
                 row = {"Depth (m)": float(z)}
-                
-                # Active
                 r_sig, r_u, r_K, r_L = calculate_stress(float(z), right_layers, right_wt, right_q, "Active")
                 row["[R] Layer"] = r_L
                 row["[R] Total Stress"] = r_sig
                 row["[R] Ka"] = r_K
                 
-                # Passive
                 local_z_left = z - excavation_depth
                 if local_z_left >= 0:
                     l_sig, l_u, l_K, l_L = calculate_stress(local_z_left, left_layers, left_wt, 0, "Passive")
@@ -267,7 +247,6 @@ def app():
                     row["[L] Layer"] = "-"
                     row["[L] Total Stress"] = 0.0
                     row["[L] Kp"] = 0.0
-                
                 table_data.append(row)
             
             df = pd.DataFrame(table_data)
@@ -284,7 +263,7 @@ def app():
     # ---------------------------------------------------------
     with tab_coulomb:
         st.header("Coulomb's Wedge Theory")
-        st.info("Uses the **Force Polygon** method. Visualizes the sliding wedge, wall batter, and friction.")
+        st.info("Visualizes the soil wedge and failure plane based on wall friction and batter.")
         
         # --- LAYOUT: INPUTS (Left) | VISUALIZATION (Right) ---
         col_c_in, col_c_viz = st.columns([0.4, 0.6], gap="medium")
@@ -299,7 +278,7 @@ def app():
             st.markdown("---")
             st.subheader("2. Soil & Interface")
             
-            # Soil Type Dropdown
+            # Soil Dropdown
             c_soil_type = st.selectbox("Soil Type", ["Sand", "Custom"], key="c_soil_type")
             
             if c_soil_type == "Sand":
@@ -314,110 +293,92 @@ def app():
             st.markdown("---")
             c_calc_btn = st.button("Calculate Wedge", type="primary", use_container_width=True)
 
-        # --- RIGHT: VISUALIZATION ---
+        # --- RIGHT: LIVE VISUALIZATION ---
         with col_c_viz:
-            if c_calc_btn:
-                st.subheader("Wedge Visualization")
-                
-                # --- CALCULATION ---
-                # Convert to radians
-                phi_r = np.radians(phi_c)
-                del_r = np.radians(delta)
-                alp_r = np.radians(alpha)
-                bet_r = np.radians(beta_c)
+            st.subheader("Wedge Visualization")
+            
+            # --- VIZ CALCS ---
+            # Radians
+            phi_r = np.radians(phi_c)
+            del_r = np.radians(delta)
+            alp_r = np.radians(alpha)
+            bet_r = np.radians(beta_c)
+            
+            # Coordinates
+            top_x = H_c * np.tan(alp_r)
+            
+            # Failure Plane Angle: Approx 45 + phi/2 for visual
+            # OR Dynamic based on input angle if desired. 
+            # Note: Critical angle rho depends on phi, delta, beta, alpha.
+            # We use a visual approximation that responds to phi.
+            rho_approx = 45 + (phi_c / 2)
+            rho_rad = np.radians(rho_approx)
+            
+            # Calculate Intersection of Failure Plane & Ground
+            # Failure Line: y = x * tan(rho)
+            # Ground Line:  y = H + (x - top_x) * tan(beta)
+            # Intersection X:
+            if rho_rad > bet_r: # Ensure failure plane is steeper than ground
+                wedge_x = (H_c - top_x * np.tan(bet_r)) / (np.tan(rho_rad) - np.tan(bet_r))
+                wedge_y = wedge_x * np.tan(rho_rad)
+            else:
+                wedge_x = top_x + 5 # Fallback
+                wedge_y = wedge_x # Fallback
 
-                # Coulomb Ka Formula
+            # --- PLOTTING ---
+            fig_w, ax_w = plt.subplots(figsize=(8, 8))
+            
+            # 1. Wall Polygon
+            wall_poly = [[0, 0], [top_x, H_c], [top_x - 1.0, H_c], [-1.0, 0]]
+            wall_patch = patches.Polygon(wall_poly, facecolor='lightgrey', edgecolor='black', hatch='//')
+            ax_w.add_patch(wall_patch)
+            
+            # 2. Soil Wedge Polygon
+            soil_poly = [[0, 0], [top_x, H_c], [wedge_x, wedge_y]]
+            soil_patch = patches.Polygon(soil_poly, facecolor='#E6D690', alpha=0.6, edgecolor='none')
+            ax_w.add_patch(soil_patch)
+            
+            # 3. Lines
+            # Ground Line
+            ax_w.plot([top_x, wedge_x + 2], [H_c, H_c + (wedge_x + 2 - top_x)*np.tan(bet_r)], 'k-', linewidth=2)
+            # Failure Plane
+            ax_w.plot([0, wedge_x], [0, wedge_y], 'r--', linewidth=2, label=f"Failure Plane (approx {rho_approx:.1f}°)")
+            
+            # 4. Markers
+            ax_w.text(wedge_x/2, wedge_y/2 + 0.5, "Sliding\nWedge", ha='center', fontsize=10, color='brown')
+
+            # --- FORCE VECTORS (Only if Calculated) ---
+            if c_calc_btn:
+                # Coulomb Ka
                 term1 = np.sqrt(np.sin(phi_r + del_r) * np.sin(phi_r - bet_r))
                 term2 = np.sqrt(np.cos(alp_r + del_r) * np.cos(alp_r - bet_r))
                 denom = (np.cos(alp_r)**2) * np.cos(alp_r + del_r) * (1 + (term1/term2))**2
                 Ka_c = (np.cos(phi_r - alp_r)**2) / denom
-                
-                # Total Force
                 Pa = 0.5 * gamma_c * (H_c**2) * Ka_c
+
+                # Draw Forces
+                cx, cy = (0+top_x+wedge_x)/3, (0+H_c+wedge_y)/3 # Centroid
                 
-                # --- VIZ LOGIC (Trial Wedge Representation) ---
-                fig_w, ax_w = plt.subplots(figsize=(8, 8))
-                
-                # 1. Coordinates for Wall
-                # Toe at (0,0). Top Inner at (H*tan(alpha), H).
-                # Assume Top Width = 0.5m for visual
-                top_x = H_c * np.tan(alp_r)
-                wall_poly = [[0, 0], [top_x, H_c], [top_x - 1.0, H_c], [-1.0, 0]]
-                wall_patch = patches.Polygon(wall_poly, facecolor='lightgrey', edgecolor='black', hatch='//')
-                ax_w.add_patch(wall_patch)
-                
-                # 2. Backfill Line
-                # Starts at (top_x, H_c) and goes up at angle beta
-                # y = H + (x - top_x) * tan(beta)
-                x_ground = np.linspace(top_x, top_x + H_c * 2.5, 100)
-                y_ground = H_c + (x_ground - top_x) * np.tan(bet_r)
-                ax_w.plot(x_ground, y_ground, 'k-', linewidth=2)
-                
-                # 3. Failure Plane
-                # Approximate critical angle rho = 45 + phi/2 (simplified for visual, but usually closer to 60)
-                # Let's use a "Visual Trial Plane"
-                rho_approx = 45 + (phi_c / 2)
-                rho_rad = np.radians(rho_approx)
-                
-                # Intersection of Failure Plane (from Heel 0,0) and Ground Line
-                # Line 1 (Fail): y = x * tan(rho)
-                # Line 2 (Gnd):  y = H + (x - top_x) * tan(beta)
-                # x * tan(rho) = H + x*tan(beta) - top_x*tan(beta)
-                # x (tan(rho) - tan(beta)) = H - top_x*tan(beta)
-                
-                wedge_x = (H_c - top_x * np.tan(bet_r)) / (np.tan(rho_rad) - np.tan(bet_r))
-                wedge_y = wedge_x * np.tan(rho_rad)
-                
-                # Draw Wedge (Soil Mass)
-                wedge_poly = [[0, 0], [top_x, H_c], [wedge_x, wedge_y]]
-                wedge_patch = patches.Polygon(wedge_poly, facecolor='#E6D690', alpha=0.5, edgecolor='none')
-                ax_w.add_patch(wedge_patch)
-                
-                # Draw Failure Line
-                ax_w.plot([0, wedge_x], [0, wedge_y], 'r--', linewidth=2, label="Failure Plane")
-                
-                # 4. Force Vectors
-                # Centroid of wedge (approx)
-                cx = (0 + top_x + wedge_x) / 3
-                cy = (0 + H_c + wedge_y) / 3
-                
-                # Weight W (Down)
+                # W (Weight)
                 ax_w.arrow(cx, cy, 0, -1.5, head_width=0.2, color='purple', width=0.05)
                 ax_w.text(cx + 0.2, cy - 1.0, "W", color='purple', fontweight='bold')
                 
-                # Active Thrust P (On wall, angle delta to normal)
-                # Normal to wall is (90 - alpha). P is at (90 - alpha + delta) from horizontal?
-                # Actually P acts on the wall face.
-                px_start = top_x / 2
-                py_start = H_c / 3 # Acts at H/3
-                # Draw arrow pointing TO the wall
-                ax_w.arrow(px_start + 1.0, py_start + 0.5, -1.0, -0.5, head_width=0.2, color='red', width=0.05)
-                ax_w.text(px_start + 1.2, py_start + 0.5, "P_a", color='red', fontweight='bold')
-                
-                # Reaction R (On failure plane, angle phi to normal)
-                rx_start = wedge_x / 2
-                ry_start = wedge_y / 2
-                ax_w.arrow(rx_start, ry_start, -0.5, 1.0, head_width=0.2, color='green', width=0.05)
-                ax_w.text(rx_start - 0.5, ry_start + 0.5, "R", color='green', fontweight='bold')
+                # P (Thrust) - Approx location
+                px, py = top_x/2 + 1.0, H_c/3 + 0.5
+                ax_w.arrow(px, py, -1.0, -0.5, head_width=0.2, color='red', width=0.05)
+                ax_w.text(px + 0.2, py, "Pa", color='red', fontweight='bold')
 
-                ax_w.set_aspect('equal')
-                ax_w.axis('off')
-                ax_w.set_title("Trial Wedge Forces", fontweight='bold')
-                st.pyplot(fig_w)
-                
-                # --- RESULTS ---
-                st.success("Calculation Successful")
-                c1, c2 = st.columns(2)
-                c1.metric("Coulomb Ka", f"{Ka_c:.3f}")
-                c2.metric("Active Force (Pa)", f"{Pa:.2f} kN/m")
-                
-            else:
-                st.info("Adjust inputs and click **Calculate Wedge**.")
-                # Placeholder image or empty plot
-                fig_empty, ax_e = plt.subplots()
-                ax_e.text(0.5, 0.5, "Wedge Diagram will appear here", ha='center')
-                ax_e.axis('off')
-                st.pyplot(fig_empty)
+                # Result Info
+                st.success(f"Calculated Ka: **{Ka_c:.3f}**")
+                st.info(f"Active Force Pa: **{Pa:.2f} kN/m**")
+
+            # Final Plot Settings
+            ax_w.set_aspect('equal')
+            ax_w.set_xlim(-2, wedge_x + 2)
+            ax_w.set_ylim(-1, max(H_c, wedge_y) + 2)
+            ax_w.axis('off')
+            ax_w.set_title("Coulomb Wedge Diagram", fontweight='bold')
+            st.pyplot(fig_w)
 
 if __name__ == "__main__":
     app()
