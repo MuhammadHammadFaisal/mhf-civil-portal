@@ -4,7 +4,7 @@ from topics import soil_phase
 from topics import effective_stress
 from topics import flow_water
 from topics import consolidation
-from topics import shear_strenght
+from topics import shear_strength
 
 # 1. PAGE CONFIG
 st.set_page_config(
