@@ -127,6 +127,8 @@ def app():
     # ---------------------------------------------------------
     with tab_rot:
         st.header("Rotational Slip Analysis")
+        st.info("Analyzes circular failure surfaces. Choose the method below.")
+        
         method = st.radio("**Calculation Method:**", 
                           ["A. Mass Procedure (Undrained / ϕ=0)", "B. Method of Slices"], 
                           horizontal=True, key="rot_method_select") 
@@ -160,23 +162,26 @@ def app():
                 st.subheader("Failure Diagram")
                 fig_c, ax_c = plt.subplots(figsize=(8, 6))
                 
-                # Draw Slope
-                toe_x, toe_y = 0, 0
-                crest_x = H_slope / math.tan(math.radians(beta_slope))
-                crest_y = H_slope
-                ground_x = [-10, 0, crest_x, crest_x + 10]
+                # 1. Slope Geometry
+                # Use standard variable names X_crest and Y_crest
+                X_crest = H_slope / math.tan(math.radians(beta_slope)) if beta_slope > 0 else 10
+                Y_crest = H_slope
+                
+                ground_x = [-10, 0, X_crest, X_crest + 10]
                 ground_y = [0, 0, Y_crest, Y_crest]
                 
                 ax_c.plot(ground_x, ground_y, 'k-', linewidth=2.5, label="Ground Surface")
                 
-                # Draw Failure Circle
+                # 2. Failure Circle (Arc)
                 o_x = -2.0 
                 o_y = math.sqrt(R**2 - o_x**2) 
                 
                 # Calculate Intersection with Crest
                 term = R**2 - (Y_crest - o_y)**2
+                
                 if term > 0:
                     x_intersect = o_x + math.sqrt(term)
+                    
                     theta_start = math.atan2(0 - o_y, 0 - o_x)
                     theta_end = math.atan2(Y_crest - o_y, x_intersect - o_x)
                     
@@ -184,6 +189,7 @@ def app():
                     arc_x = o_x + R * np.cos(thetas)
                     arc_y = o_y + R * np.sin(thetas)
                     
+                    # 3. Create the "Wedge" Polygon (Hatched)
                     poly_verts = list(zip(arc_x, arc_y))
                     poly_verts.append((X_crest, Y_crest)) 
                     poly_verts.append((0, 0)) 
@@ -197,7 +203,7 @@ def app():
                     L_calc = (theta_deg/360) * 2 * math.pi * R
                 else:
                     L_calc = 0
-                    st.error("Geometry Error: Circle does not intersect crest.")
+                    st.error("Geometry Error: Circle does not intersect crest or R is too small.")
 
                 # Annotations
                 ax_c.plot(o_x, o_y, 'bo', label="O")
@@ -233,7 +239,7 @@ def app():
                         if FS < 1.0: st.error(f"**FS = {FS:.2f} (Unstable)**")
                         else: st.success(f"**FS = {FS:.2f} (Stable)**")
 
-        # --- B. METHOD OF SLICES (UNCHANGED) ---
+        # --- B. METHOD OF SLICES ---
         else:
             col_s1, col_s2 = st.columns([0.4, 0.6], gap="medium")
             with col_s1:
@@ -276,7 +282,7 @@ def app():
                         st.dataframe(pd.DataFrame(details))
 
     # ---------------------------------------------------------
-    # TAB 3: COMPOUND (BLOCK & WEDGE) - MATCHING SKETCH
+    # TAB 3: COMPOUND (BLOCK & WEDGE)
     # ---------------------------------------------------------
     with tab_comp:
         st.header("Compound Slide Analysis")
@@ -295,6 +301,7 @@ def app():
             st.markdown("**Forces**")
             Pa = st.number_input("Active Thrust (Driving) Pa [kN]", 0.0, 5000.0, 500.0, key="block_Pa")
             Pp = st.number_input("Passive Resistance (Resisting) Pp [kN]", 0.0, 5000.0, 200.0, key="block_Pp")
+            W_block = st.number_input("Weight of Central Block [kN]", 0.0, 10000.0, 2000.0, key="block_W")
             
             st.markdown("**Weak Layer**")
             c_base = st.number_input("Base Cohesion (c') [kPa]", 0.0, 100.0, 5.0, key="block_c")
@@ -306,10 +313,7 @@ def app():
             st.subheader("Block & Wedge Diagram")
             fig_b, ax_b = plt.subplots(figsize=(8, 4))
             
-            # Coordinates for Drawing
-            # Left Wedge (Passive) - Triangle
-            # Toe at (0,0). Height H_left. Angle 45-phi/2?
-            # Let's assume typical wedge angles for visual (45 deg)
+            # Draw Geometry matching User Image
             wedge_L_width = H_left 
             wedge_R_width = H_right
             
@@ -317,11 +321,9 @@ def app():
             passive_poly = [[0, 0], [wedge_L_width, H_left], [wedge_L_width, 0]]
             ax_b.add_patch(patches.Polygon(passive_poly, facecolor='#A5D6A7', edgecolor='black', alpha=0.5))
             ax_b.text(wedge_L_width/2, H_left/3, "Passive\nWedge", ha='center', fontsize=8)
-            ax_b.text(wedge_L_width/2, 0.2, "45+ϕ/2", fontsize=7)
+            ax_b.text(wedge_L_width/2, 0.2, "45-ϕ/2", fontsize=7)
             
             # 2. Central Block
-            # Starts at wedge_L_width. Width L_block. Height grows from H_left to H_right?
-            # Usually block slides on flat plane. Top surface connects wedges.
             block_x_start = wedge_L_width
             block_x_end = wedge_L_width + L_block
             block_poly = [
@@ -335,21 +337,18 @@ def app():
             active_poly = [[block_x_end, 0], [block_x_end, H_right], [block_x_end + wedge_R_width, H_right]]
             ax_b.add_patch(patches.Polygon(active_poly, facecolor='#FFCCBC', edgecolor='black', alpha=0.5))
             ax_b.text(block_x_end + wedge_R_width/3, H_right*0.8, "Active\nWedge", ha='center', fontsize=8)
+            ax_b.text(block_x_end + wedge_R_width/2, 0.2, "45+ϕ/2", fontsize=7)
             
             # 4. Forces
-            # Pa acts on right face of block
             ax_b.arrow(block_x_end + 1.5, H_right/3, -1.5, 0, head_width=0.3, color='red', width=0.05)
             ax_b.text(block_x_end + 1.6, H_right/3, "Pa", color='red', fontweight='bold', va='center')
             
-            # Pp acts on left face of block
             ax_b.arrow(block_x_start - 1.5, H_left/3, 1.5, 0, head_width=0.3, color='green', width=0.05)
             ax_b.text(block_x_start - 2.0, H_left/3, "Pp", color='green', fontweight='bold', va='center')
             
-            # Shear on base
             ax_b.text((block_x_start+block_x_end)/2, -0.5, r"$\tau_f$ (Weak Layer)", ha='center')
             ax_b.arrow((block_x_start+block_x_end)/2, 0, -2, 0, head_width=0.2, color='black') # Resisting shear
             
-            # Dimensions
             ax_b.annotate(f"L={L_block}m", xy=(block_x_start, -1), xytext=(block_x_end, -1), arrowprops=dict(arrowstyle='<->'))
 
             ax_b.set_xlim(-2, block_x_end + wedge_R_width + 2)
@@ -358,31 +357,19 @@ def app():
             st.pyplot(fig_b)
             
             if calc_blk:
-                # Approximate weight of block if not given? No, user inputs W.
-                # Just base resistance calculation.
-                # Assume Normal Force N' approx equals Weight of Block (for flat slope)
-                # T_base = c'L + W tan phi'
-                # Note: User input W_block directly.
-                
-                # Check if W is provided? We used the input `W_block`.
-                # Wait, earlier code had W_block input. Yes it is there.
-                
                 resisting_base = (c_base * L_block) + (W_block * math.tan(math.radians(phi_base)))
                 total_resisting = Pp + resisting_base
                 total_driving = Pa
                 
                 if total_driving > 0:
                     FS_block = total_resisting / total_driving
-                    
                     st.markdown("### Results")
                     st.latex(r"FS = \frac{P_p + (c'L + W_{block}\tan\phi')}{P_a}")
                     st.write(f"**Base Resistance:** {resisting_base:.1f} kN")
                     st.write(f"**Total Resisting:** {total_resisting:.1f} kN")
                     
-                    if FS_block < 1:
-                        st.error(f"**FS = {FS_block:.2f} (Unstable)**")
-                    else:
-                        st.success(f"**FS = {FS_block:.2f} (Stable)**")
+                    if FS_block < 1: st.error(f"**FS = {FS_block:.2f} (Unstable)**")
+                    else: st.success(f"**FS = {FS_block:.2f} (Stable)**")
                 else:
                     st.error("Active Thrust (Pa) must be > 0")
 
