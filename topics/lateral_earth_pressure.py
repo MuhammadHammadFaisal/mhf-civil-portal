@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 # =========================================================
-# HELPER FUNCTIONS (Moved outside to prevent Indentation Errors)
+# HELPER FUNCTIONS (Kept outside to prevent indentation errors)
 # =========================================================
 GAMMA_W = 9.81
 
@@ -152,10 +152,7 @@ def app():
 
         # --- RIGHT COLUMN: VISUALIZATION ---
         with col_viz:
-            # 1. LIVE PROFILE (Always Visible) 
-
-[Image of Soil Profile Diagram]
-
+            # 1. LIVE PROFILE (Always Visible)
             st.subheader("Soil Profile Preview")
             
             fig_profile, ax_p = plt.subplots(figsize=(8, 6))
@@ -209,7 +206,7 @@ def app():
             ax_p.axis('off')
             st.pyplot(fig_profile)
 
-            # 2. PRESSURE GRAPH (Conditional) 
+            # 2. PRESSURE GRAPH (Conditional)
             if calc_trigger:
                 st.markdown("---")
                 st.subheader("Pressure Graph")
