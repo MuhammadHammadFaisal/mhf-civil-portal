@@ -57,7 +57,7 @@ def app():
         # 1. LEFT SIDE (PASSIVE)
         with col_left:
             st.info("⬅️ **Left Side (Passive)**")
-            # Default: 1.5m Sand, 3m Clay (matches your image example relative to excavation)
+            # Default: Matches your handwritten example (1.5m Sand + 3m Clay)
             def_left = [{'H': 1.5, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
             left_wt = st.number_input("Left WT Depth (from Left Surface) (m)", 0.0, 20.0, 1.5, key="l_wt")
             left_layers = render_layers_input("L", "Passive Soil Layers", def_left)
@@ -65,7 +65,7 @@ def app():
         # 2. RIGHT SIDE (ACTIVE)
         with col_right:
             st.warning("➡️ **Right Side (Active)**")
-            # Default: 6m Sand, 3m Clay (matches your image example)
+            # Default: Matches your handwritten example (6m Sand + 3m Clay)
             def_right = [{'H': 6.0, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
             right_q = st.number_input("Surcharge q (kPa)", 0.0, 100.0, 50.0, key="r_q")
             right_wt = st.number_input("Right WT Depth (from Right Surface) (m)", 0.0, 20.0, 6.0, key="r_wt")
@@ -128,30 +128,22 @@ def app():
         
         # 1. Draw Wall
         wall_width = 1.0
-        # Wall goes from Global 0 to Global Wall Height
         rect_wall = patches.Rectangle((-wall_width/2, 0), wall_width, wall_height, facecolor='lightgrey', edgecolor='black', hatch='//')
         ax.add_patch(rect_wall)
-        
-        # 2. Draw Right Side (Active)
-        # Global Y = 0 is Top of Wall. Y increases downwards? No, let's plot Elevation Y.
-        # Let Top of Wall = Elevation H. Bottom = 0.
         
         Y_top = wall_height
         Y_exc = wall_height - excavation_depth # Elevation of left surface
         
         # -- Right Layers --
-        r_stress_points = [] # For plotting stress profile
         current_y = Y_top
         for l in right_layers:
             h = l['H']
-            # Draw Soil Box
             rect = patches.Rectangle((wall_width/2, current_y - h), 5, h, facecolor='#E6D690' if l['id']%2!=0 else '#C1B088', edgecolor='gray', alpha=0.5)
             ax.add_patch(rect)
             ax.text(wall_width/2 + 2.5, current_y - h/2, f"R-L{l['id']}\n$\gamma={l['gamma']}$", ha='center', fontsize=8)
             current_y -= h
 
         # -- Left Layers --
-        l_stress_points = []
         current_y = Y_exc
         for l in left_layers:
             h = l['H']
@@ -183,7 +175,6 @@ def app():
 
         # -- Pressure Diagrams --
         # Calculate Right Stress Profile
-        # We calculate at Y_top down to 0
         y_steps = np.linspace(0, wall_height, 50)
         p_right = []
         for y_depth in y_steps:
@@ -191,21 +182,18 @@ def app():
             p_right.append(sig)
         
         # Plot Active (Red) on Right
-        # Scale factor for visualization
         scale = 0.05 
         ax.plot([wall_width/2 + p * scale for p in p_right], [Y_top - y for y in y_steps], 'r-', linewidth=2)
         ax.fill_betweenx([Y_top - y for y in y_steps], wall_width/2, [wall_width/2 + p * scale for p in p_right], color='red', alpha=0.3)
 
         # Calculate Left Stress Profile
-        # Valid only below excavation
-        y_steps_l = np.linspace(0, wall_height - excavation_depth, 50) # local depth 0 to remaining height
+        y_steps_l = np.linspace(0, wall_height - excavation_depth, 50) 
         p_left = []
         for y_depth in y_steps_l:
             sig, _, _, _ = calculate_stress(y_depth, left_layers, left_wt, 0, "Passive")
             p_left.append(sig)
             
         # Plot Passive (Green) on Left
-        # Note: Passive pushes TO the right, so we plot it extending leftwards from left face
         ax.plot([-wall_width/2 - p * scale for p in p_left], [Y_exc - y for y in y_steps_l], 'g-', linewidth=2)
         ax.fill_betweenx([Y_exc - y for y in y_steps_l], -wall_width/2, [-wall_width/2 - p * scale for p in p_left], color='green', alpha=0.3)
 
@@ -226,7 +214,7 @@ def app():
         # Generate rows based on Global Depth (from Top of Wall = 0)
         table_data = []
         for z in range(0, int(wall_height) + 1):
-            row = {"Global Depth (m)": z}
+            row = {"Global Depth (m)": float(z)}
             
             # Right Side (Active) Calculation
             r_sig, r_u, r_K, r_L = calculate_stress(float(z), right_layers, right_wt, right_q, "Active")
@@ -251,16 +239,17 @@ def app():
             
         df = pd.DataFrame(table_data)
         
-        # Define specific formatting to handle the "-" string in [L] Layer safely
-        format_dict = {
+        # FIX: Apply number formatting strictly to numeric columns only
+        # This prevents the "ValueError: Unknown format code 'f' for object of type 'str'"
+        # when the "-" string is encountered in the Layer column.
+        
+        st.dataframe(df.style.format({
             "Global Depth (m)": "{:.1f}",
             "[R] Total Lat. Stress (kPa)": "{:.2f}",
             "[R] Ka": "{:.3f}",
             "[L] Total Lat. Stress (kPa)": "{:.2f}",
             "[L] Kp": "{:.3f}"
-        }
-        
-        st.dataframe(df.style.format(format_dict))
+        }))
 
     # =========================================================================
     # TAB 2: COULOMB'S WEDGE THEORY (Simplified)
