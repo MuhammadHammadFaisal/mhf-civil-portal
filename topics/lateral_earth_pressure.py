@@ -45,10 +45,8 @@ def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
     """Calculates lateral stress at a specific depth (Rankine)."""
     active_layer = layers[-1]
     for l in layers:
-        if z_local < l['bottom']: 
-            active_layer = l; break
-        if z_local == l['bottom']: 
-            active_layer = l; break
+        if z_local < l['bottom']: active_layer = l; break
+        if z_local == l['bottom']: active_layer = l; break
     
     sig_v = surcharge
     for l in layers:
@@ -82,7 +80,7 @@ def app():
     tab_rankine, tab_coulomb = st.tabs(["1. Rankine's Theory (Wall Profile)", "2. Coulomb's Wedge Theory"])
 
     # ---------------------------------------------------------
-    # TAB 1: RANKINE (UNCHANGED)
+    # TAB 1: RANKINE (Standard)
     # ---------------------------------------------------------
     with tab_rankine:
         st.header("Rankine Analysis")
@@ -134,6 +132,7 @@ def app():
                 ax_p.add_patch(rect)
                 ax_p.text(-wall_width/2 - 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
                 current_y -= h
+            
             # Annotations
             if right_q > 0:
                 for x in np.linspace(wall_width/2 + 0.5, wall_width/2 + 5.5, 6):
@@ -177,7 +176,7 @@ def app():
             st.dataframe(df.style.format({"Depth (m)": "{:.1f}", "[R] Stress": "{:.2f}", "[R] Ka": "{:.3f}", "[L] Stress": "{:.2f}", "[L] Kp": "{:.3f}"}))
 
     # ---------------------------------------------------------
-    # TAB 2: COULOMB (UPDATED VISUALIZATION)
+    # TAB 2: COULOMB (MATCHING HANDWRITTEN DIAGRAM)
     # ---------------------------------------------------------
     with tab_coulomb:
         st.header("Coulomb's Wedge Theory")
@@ -189,117 +188,114 @@ def app():
             H_c = st.number_input("Wall Height (H) [m]", 1.0, 20.0, 6.0)
             alpha = st.number_input("Wall Batter (α) [deg]", 0.0, 30.0, 10.0, help="Angle from vertical")
             beta_c = st.number_input("Backfill Slope (β) [deg]", 0.0, 30.0, 15.0)
-            
             st.markdown("---")
             st.subheader("2. Soil & Interface")
-            
             c_soil_type = st.selectbox("Soil Type", ["Sand", "Custom"], key="c_soil_type")
             if c_soil_type == "Sand": d_phi, d_delta, d_gam = 32.0, 20.0, 18.0
             else: d_phi, d_delta, d_gam = 30.0, 15.0, 19.0
-            
             phi_c = st.number_input("Friction Angle (ϕ') [deg]", 20.0, 45.0, d_phi)
             delta = st.number_input("Wall Friction (δ) [deg]", 0.0, 30.0, d_delta)
             gamma_c = st.number_input("Unit Weight (γ) [kN/m³]", 10.0, 25.0, d_gam)
-            
             st.markdown("---")
             c_calc_btn = st.button("Calculate Wedge Forces", type="primary", use_container_width=True)
 
         with col_c_viz:
-            st.subheader("Failure Wedge Diagram")
+            st.subheader("Failure Wedge Diagram (FBD)")
             
-            # Constants
+            # Constants & Geometry
             phi_r, del_r = np.radians(phi_c), np.radians(delta)
             alp_r, bet_r = np.radians(alpha), np.radians(beta_c)
+            top_x = H_c * np.tan(alp_r)
+            rho_approx = 45 + (phi_c/2) # Approx failure plane for viz
+            rho_rad = np.radians(rho_approx)
             
-            # Geometry Calculation
-            # Point B is (0,0) - Heel
-            # Point A is Top of Wall
-            xA, yA = H_c * np.tan(alp_r), H_c
-            
-            # Failure Plane Angle rho (Approximation for diagram visualization)
-            # In Coulomb, rho = 45 + phi/2 is accurate for Rankine but approx for Coulomb.
-            # We use it to draw a representative wedge.
-            rho_viz = 45 + (phi_c/2)
-            rho_rad = np.radians(rho_viz)
-            
-            # Point C (Surface Intersection)
-            # Line AC (Ground): y - H = tan(beta)*(x - xA)
-            # Line BC (Failure): y = tan(rho)*x
-            # x*tan(rho) = H + x*tan(beta) - xA*tan(beta)
-            # x*(tan(rho) - tan(beta)) = H - xA*tan(beta)
-            
+            # Intersection C
             if rho_rad > bet_r:
-                xC = (H_c - xA * np.tan(bet_r)) / (np.tan(rho_rad) - np.tan(bet_r))
-                yC = xC * np.tan(rho_rad)
+                wedge_x = (H_c - top_x * np.tan(bet_r)) / (np.tan(rho_rad) - np.tan(bet_r))
+                wedge_y = wedge_x * np.tan(rho_rad)
             else:
-                xC, yC = xA + 5, yA + 2 # Fallback
-            
-            # Plot
+                wedge_x, wedge_y = top_x + 5, top_x + 5 # Fallback
+
+            # --- PLOT ---
             fig_w, ax_w = plt.subplots(figsize=(8, 8))
             
-            # 1. Wall
-            wall_poly = [[0, 0], [xA, yA], [xA - 1.5, yA], [-1.5, 0]]
+            # A. GEOMETRY
+            # Wall
+            wall_poly = [[0, 0], [top_x, H_c], [top_x - 1.5, H_c], [-1.5, 0]]
             ax_w.add_patch(patches.Polygon(wall_poly, facecolor='lightgrey', edgecolor='black', hatch='//'))
+            # Wedge
+            soil_poly = [[0, 0], [top_x, H_c], [wedge_x, wedge_y]]
+            ax_w.add_patch(patches.Polygon(soil_poly, facecolor='#FFE0B2', alpha=0.5, edgecolor='none'))
+            # Ground & Failure Lines
+            ax_w.plot([top_x, wedge_x + 2], [H_c, H_c + (wedge_x + 2 - top_x)*np.tan(bet_r)], 'k-', linewidth=2)
+            ax_w.plot([0, wedge_x], [0, wedge_y], 'r--', linewidth=2)
             
-            # 2. Wedge (ABC)
-            wedge_poly = [[0, 0], [xA, yA], [xC, yC]]
-            ax_w.add_patch(patches.Polygon(wedge_poly, facecolor='#FFE0B2', alpha=0.6, edgecolor='none'))
-            ax_w.plot([0, xC], [0, yC], 'r--', linewidth=2, label="Failure Plane")
-            ax_w.plot([xA, xC+2], [yA, yC + 2*np.tan(bet_r)], 'k-', linewidth=2) # Ground ext
+            # B. ANNOTATIONS (Normals & Angles) - To match handwritten sketch
+            # 1. Wall Normal (at mid height)
+            mid_wall_x, mid_wall_y = top_x/2, H_c/2
+            # Wall slope is (H_c / top_x). Normal slope is -top_x/H_c
+            dx_wn, dy_wn = 1.5, 1.5 * (top_x/H_c) # Perpendicular direction away from soil
+            ax_w.plot([mid_wall_x, mid_wall_x - dx_wn], [mid_wall_y, mid_wall_y + dy_wn], 'k--', linewidth=1, alpha=0.7) # Normal line
             
-            # 3. Input Annotations (Variables on Diagram)
-            # Place text in the middle of the wedge
-            cx, cy = (0+xA+xC)/3, (0+yA+yC)/3
-            ax_w.text(cx, cy, f"Soil Wedge\n$\gamma={gamma_c}$\n$\phi'={phi_c}^\circ$", ha='center', fontsize=9, color='#5D4037')
-            
-            # Angle Arcs
-            # Beta (Slope)
-            arc_beta = patches.Arc((xA+2, yA + 2*np.tan(bet_r)), 2, 2, theta1=180, theta2=180+beta_c, color='blue')
-            ax_w.add_patch(arc_beta)
-            ax_w.text(xA+3, yA+0.5, f"$\\beta={beta_c}^\circ$", color='blue', fontsize=8)
+            # 2. Failure Plane Normal
+            mid_fail_x, mid_fail_y = wedge_x/2, wedge_y/2
+            # Plane slope is tan(rho). Normal slope is -1/tan(rho)
+            dx_fn, dy_fn = -1.5 * np.sin(rho_rad), 1.5 * np.cos(rho_rad) # Pointing up-left
+            ax_w.plot([mid_fail_x, mid_fail_x + dx_fn], [mid_fail_y, mid_fail_y + dy_fn], 'k--', linewidth=1, alpha=0.7)
 
-            # 4. Forces (Vectors)
+            # C. FORCES (If Calculated)
             if c_calc_btn:
-                # Coulomb Ka Calculation
+                # Calc
                 term1 = np.sqrt(np.sin(phi_r + del_r) * np.sin(phi_r - bet_r))
                 term2 = np.sqrt(np.cos(alp_r + del_r) * np.cos(alp_r - bet_r))
                 denom = (np.cos(alp_r)**2) * np.cos(alp_r + del_r) * (1 + (term1/term2))**2
                 Ka_c = (np.cos(phi_r - alp_r)**2) / denom
                 Pa = 0.5 * gamma_c * (H_c**2) * Ka_c
-                
-                # Draw Vectors
-                # W (Weight) at Centroid
-                ax_w.arrow(cx, cy, 0, -1.5, head_width=0.2, color='purple', width=0.05, zorder=5)
+
+                # 1. Weight (W)
+                cx, cy = (0+top_x+wedge_x)/3, (0+H_c+wedge_y)/3
+                ax_w.arrow(cx, cy, 0, -2.0, head_width=0.2, color='purple', width=0.05, zorder=10)
                 ax_w.text(cx + 0.3, cy - 1.0, "W", color='purple', fontweight='bold', fontsize=12)
-                
-                # P (Active Thrust) on Wall Face (at H/3 from base)
-                # Geometric location on wall face:
-                px = xA * (1/3) # Linear interp between (0,0) and (xA, yA) at 1/3 height
-                py = yA * (1/3)
-                # Angle: Perpendicular to wall is (90-alpha). P is at delta below normal.
-                # Vector angle = (180 - (90-alpha) - delta) ... roughly pointing down-left
-                ax_w.arrow(px + 1.5, py + 1.0, -1.5, -1.0, head_width=0.2, color='red', width=0.05, zorder=5)
-                ax_w.text(px + 1.6, py + 1.0, f"$P_a$\n({Pa:.1f})", color='red', fontweight='bold', fontsize=12)
-                
-                # R (Reaction) on Failure Plane
-                rx, ry = xC/3, yC/3
-                ax_w.arrow(rx + 0.5, ry - 1.0, -0.5, 1.0, head_width=0.2, color='green', width=0.05, zorder=5)
-                ax_w.text(rx + 0.6, ry - 1.0, "R", color='green', fontweight='bold', fontsize=12)
+
+                # 2. Wall Reaction (P) - Force of Wall ON Soil (FBD of Wedge)
+                # Acts at angle delta ABOVE the normal
+                # Normal angle (from horizontal) = 180 - (90 - alpha) = 90 + alpha.
+                # Force P angle = (90 + alpha) + (90 - delta)? No.
+                # Wall face angle = 90 - alpha. Normal is (90-alpha)+90 = 180-alpha.
+                # P acts at angle delta from Normal, opposing sliding (sliding is down).
+                # So P points UP relative to normal. 
+                # Visual check: It should point Up and Right.
+                px, py = top_x/3, H_c/3 # Lower third
+                ax_w.arrow(px, py, 1.5, 1.0, head_width=0.2, color='red', width=0.05, zorder=10)
+                ax_w.text(px + 1.6, py + 1.0, "P", color='red', fontweight='bold', fontsize=12)
+                # Delta Arc
+                ax_w.text(px + 0.3, py + 0.8, f"δ={delta}°", fontsize=8)
+
+                # 3. Soil Reaction (R) - Force of Soil ON Soil
+                # Acts at angle phi from Normal to failure plane.
+                # Normal is 90 + rho. R is 90 + rho + phi?
+                # Resists sliding down. So R points Up-Left.
+                rx, ry = wedge_x/3, wedge_y/3
+                ax_w.arrow(rx, ry, -0.8, 1.5, head_width=0.2, color='green', width=0.05, zorder=10)
+                ax_w.text(rx - 0.8, ry + 1.5, "R", color='green', fontweight='bold', fontsize=12)
+                # Phi Arc
+                ax_w.text(rx - 0.3, ry + 0.8, f"ϕ={phi_c}°", fontsize=8)
 
             ax_w.set_aspect('equal')
+            ax_w.set_xlim(-3, wedge_x + 2)
+            ax_w.set_ylim(-1, max(H_c, wedge_y) + 2)
             ax_w.axis('off')
+            ax_w.set_title("Free Body Diagram of Wedge", fontweight='bold')
             st.pyplot(fig_w)
             
-            # --- DETAILED CALCULATION PANEL ---
+            # --- CALCULATION PANEL ---
             if c_calc_btn:
                 with st.expander("📝 Detailed Calculation Steps", expanded=True):
                     st.markdown(r"**1. Coulomb Coefficient ($K_a$):**")
                     st.latex(r"K_a = \frac{\cos^2(\phi - \alpha)}{\cos^2\alpha \cos(\alpha + \delta) \left[ 1 + \sqrt{\frac{\sin(\phi + \delta) \sin(\phi - \beta)}{\cos(\alpha + \delta) \cos(\alpha - \beta)}} \right]^2}")
                     st.write(f"Substituting values: **$K_a = {Ka_c:.4f}$**")
-                    
                     st.markdown(r"**2. Total Active Force ($P_a$):**")
                     st.latex(r"P_a = \frac{1}{2} \gamma H^2 K_a")
-                    st.write(f"$P_a = 0.5 \\times {gamma_c} \\times {H_c}^2 \\times {Ka_c:.4f}$")
                     st.success(f"**Result: $P_a = {Pa:.2f}$ kN/m**")
 
 if __name__ == "__main__":
