@@ -7,7 +7,7 @@ def app():
     # =================================================================
     # 1. HEADER & MODE
     # =================================================================
-    st.header("🏗️ Consolidation Analysis")
+    st.header("Consolidation Analysis")
     st.markdown("---")
 
     calc_mode = st.radio(
@@ -196,7 +196,7 @@ def app():
     if "1. Final" in calc_mode:
         st.markdown("---")
         if st.button("Calculate $S_{final}$", type="primary"):
-            st.markdown("### 📊 Results: Final Settlement")
+            st.markdown("### Results: Final Settlement")
             
             total_settlement = 0.0
             calculated_layers = []
