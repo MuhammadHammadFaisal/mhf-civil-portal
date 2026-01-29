@@ -21,7 +21,7 @@ def app():
     # =========================================================================
     with tab_rankine:
         st.header("Rankine Analysis")
-        st.info("Configure the wall and soil layers on the left, then click Calculate.")
+        st.info("Configure the wall and soil layers on the left. The **Soil Profile** updates automatically. Click **Calculate** to see the Pressure Graph.")
 
         # --- LAYOUT: INPUTS (Left) | VISUALIZATION (Right) ---
         col_input, col_viz = st.columns([0.4, 0.6], gap="medium")
@@ -75,140 +75,139 @@ def app():
             calc_trigger = st.button("Calculate Pressure Profile", type="primary", use_container_width=True)
 
         # -------------------------------------------------
-        # CALCULATION LOGIC
-        # -------------------------------------------------
-        def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
-            # Identify layer
-            active_layer = layers[-1]
-            for l in layers:
-                if z_local < l['bottom']: 
-                    active_layer = l
-                    break
-                if z_local == l['bottom']: 
-                    active_layer = l
-                    break
-            
-            # Vertical Stress
-            sig_v = surcharge
-            for l in layers:
-                if z_local > l['bottom']:
-                    sig_v += l['H'] * l['gamma']
-                else:
-                    sig_v += (z_local - l['top']) * l['gamma']
-                    break
-            
-            # Pore Pressure
-            u = 0.0
-            if z_local > wt_depth:
-                u = (z_local - wt_depth) * GAMMA_W
-            
-            sig_v_eff = sig_v - u
-            
-            # Coefficients
-            phi_r = np.radians(active_layer['phi'])
-            c_val = active_layer['c']
-            
-            if mode == "Active":
-                K = (1 - np.sin(phi_r)) / (1 + np.sin(phi_r))
-                sig_lat_eff = (sig_v_eff * K) - (2 * c_val * np.sqrt(K))
-            else: # Passive
-                K = (1 + np.sin(phi_r)) / (1 - np.sin(phi_r))
-                sig_lat_eff = (sig_v_eff * K) + (2 * c_val * np.sqrt(K))
-                
-            if sig_lat_eff < 0: sig_lat_eff = 0
-            
-            sig_lat_tot = sig_lat_eff + u
-            
-            return sig_lat_tot, u, K, active_layer['id']
-
-        # -------------------------------------------------
         # 2. VISUALIZATION PANEL (RIGHT COLUMN)
         # -------------------------------------------------
         with col_viz:
+            # ============================================
+            # A. LIVE SOIL PROFILE (No Calculation Needed)
+            # ============================================
+            st.subheader("Soil Profile Preview")
+            
+            fig_profile, ax_p = plt.subplots(figsize=(8, 6))
+            
+            wall_width = 1.0
+            rect_wall = patches.Rectangle((-wall_width/2, 0), wall_width, wall_height, facecolor='lightgrey', edgecolor='black', hatch='//')
+            ax_p.add_patch(rect_wall)
+            
+            Y_top = wall_height
+            Y_exc = wall_height - excavation_depth 
+            
+            # Draw Soil Layers (Right)
+            current_y = Y_top
+            for l in right_layers:
+                h = l['H']
+                rect = patches.Rectangle((wall_width/2, current_y - h), 6, h, facecolor='#E6D690' if l['id']%2!=0 else '#C1B088', edgecolor='gray', alpha=0.5)
+                ax_p.add_patch(rect)
+                ax_p.text(wall_width/2 + 3, current_y - h/2, f"Backfill Layer {l['id']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
+                current_y -= h
+
+            # Draw Soil Layers (Left)
+            current_y = Y_exc
+            for l in left_layers:
+                h = l['H']
+                rect = patches.Rectangle((-wall_width/2 - 6, current_y - h), 6, h, facecolor='#A4C2A5' if l['id']%2!=0 else '#86A388', edgecolor='gray', alpha=0.5)
+                ax_p.add_patch(rect)
+                ax_p.text(-wall_width/2 - 3, current_y - h/2, f"Passive Layer {l['id']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
+                current_y -= h
+                
+            # Surcharge
+            if right_q > 0:
+                for x in np.linspace(wall_width/2 + 0.5, wall_width/2 + 5.5, 6):
+                    ax_p.arrow(x, Y_top + 1.0, 0, -0.8, head_width=0.2, fc='red', ec='red')
+                ax_p.text(wall_width/2 + 3, Y_top + 1.2, f"q = {right_q} kPa", color='red', ha='center', fontweight='bold')
+
+            # Water Tables
+            wt_elev_r = Y_top - right_wt
+            ax_p.plot([wall_width/2, wall_width/2 + 6], [wt_elev_r, wt_elev_r], 'b--', linewidth=2)
+            ax_p.text(wall_width/2 + 5.5, wt_elev_r, "▽ WT", color='blue', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            
+            wt_elev_l = Y_exc - left_wt
+            ax_p.plot([-wall_width/2 - 6, -wall_width/2], [wt_elev_l, wt_elev_l], 'b--', linewidth=2)
+            ax_p.text(-wall_width/2 - 5.5, wt_elev_l, "▽ WT", color='blue', ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+            # Ground Lines
+            ax_p.plot([wall_width/2, wall_width/2 + 6], [Y_top, Y_top], 'k-', linewidth=2) 
+            ax_p.plot([-wall_width/2 - 6, -wall_width/2], [Y_exc, Y_exc], 'k-', linewidth=2) 
+
+            ax_p.set_xlim(-8, 8)
+            ax_p.set_ylim(-2, wall_height + 3)
+            ax_p.set_aspect('equal')
+            ax_p.axis('off')
+            ax_p.set_title("Physical Diagram", fontweight='bold')
+            
+            st.pyplot(fig_profile)
+
+            # ============================================
+            # B. CALCULATION & PRESSURE GRAPH
+            # ============================================
             if calc_trigger:
-                st.subheader("Pressure Diagrams")
+                st.markdown("---")
+                st.subheader("Pressure Distribution Graph")
                 
-                # --- PLOT GENERATION ---
-                fig, ax = plt.subplots(figsize=(8, 10)) # Taller figure
-                
-                wall_width = 1.0
-                rect_wall = patches.Rectangle((-wall_width/2, 0), wall_width, wall_height, facecolor='lightgrey', edgecolor='black', hatch='//')
-                ax.add_patch(rect_wall)
-                
-                Y_top = wall_height
-                Y_exc = wall_height - excavation_depth 
-                
-                # Draw Soil Layers (Right)
-                current_y = Y_top
-                for l in right_layers:
-                    h = l['H']
-                    rect = patches.Rectangle((wall_width/2, current_y - h), 6, h, facecolor='#E6D690' if l['id']%2!=0 else '#C1B088', edgecolor='gray', alpha=0.5)
-                    ax.add_patch(rect)
-                    ax.text(wall_width/2 + 3, current_y - h/2, f"Backfill Layer {l['id']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
-                    current_y -= h
-
-                # Draw Soil Layers (Left)
-                current_y = Y_exc
-                for l in left_layers:
-                    h = l['H']
-                    rect = patches.Rectangle((-wall_width/2 - 6, current_y - h), 6, h, facecolor='#A4C2A5' if l['id']%2!=0 else '#86A388', edgecolor='gray', alpha=0.5)
-                    ax.add_patch(rect)
-                    ax.text(-wall_width/2 - 3, current_y - h/2, f"Passive Layer {l['id']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
-                    current_y -= h
+                # --- CALCULATION LOGIC ---
+                def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
+                    active_layer = layers[-1]
+                    for l in layers:
+                        if z_local < l['bottom']: active_layer = l; break
+                        if z_local == l['bottom']: active_layer = l; break
                     
-                # Surcharge
-                if right_q > 0:
-                    for x in np.linspace(wall_width/2 + 0.5, wall_width/2 + 5.5, 6):
-                        ax.arrow(x, Y_top + 1.0, 0, -0.8, head_width=0.2, fc='red', ec='red')
-                    ax.text(wall_width/2 + 3, Y_top + 1.2, f"q = {right_q} kPa", color='red', ha='center', fontweight='bold')
+                    sig_v = surcharge
+                    for l in layers:
+                        if z_local > l['bottom']: sig_v += l['H'] * l['gamma']
+                        else: sig_v += (z_local - l['top']) * l['gamma']; break
+                    
+                    u = (z_local - wt_depth) * GAMMA_W if z_local > wt_depth else 0.0
+                    sig_v_eff = sig_v - u
+                    
+                    phi_r = np.radians(active_layer['phi'])
+                    c_val = active_layer['c']
+                    
+                    if mode == "Active":
+                        K = (1 - np.sin(phi_r)) / (1 + np.sin(phi_r))
+                        sig_lat_eff = (sig_v_eff * K) - (2 * c_val * np.sqrt(K))
+                    else: 
+                        K = (1 + np.sin(phi_r)) / (1 - np.sin(phi_r))
+                        sig_lat_eff = (sig_v_eff * K) + (2 * c_val * np.sqrt(K))
+                        
+                    if sig_lat_eff < 0: sig_lat_eff = 0
+                    sig_lat_tot = sig_lat_eff + u
+                    return sig_lat_tot, u, K, active_layer['id']
 
-                # Water Tables
-                wt_elev_r = Y_top - right_wt
-                ax.plot([wall_width/2, wall_width/2 + 6], [wt_elev_r, wt_elev_r], 'b--', linewidth=2)
-                ax.text(wall_width/2 + 5.5, wt_elev_r, "▽ WT", color='blue', ha='center', va='bottom', fontsize=10, fontweight='bold')
+                # --- PRESSURE PLOTTING ---
+                fig_stress, ax_s = plt.subplots(figsize=(8, 6))
                 
-                wt_elev_l = Y_exc - left_wt
-                ax.plot([-wall_width/2 - 6, -wall_width/2], [wt_elev_l, wt_elev_l], 'b--', linewidth=2)
-                ax.text(-wall_width/2 - 5.5, wt_elev_l, "▽ WT", color='blue', ha='center', va='bottom', fontsize=10, fontweight='bold')
-
-                # Ground Lines
-                ax.plot([wall_width/2, wall_width/2 + 6], [Y_top, Y_top], 'k-', linewidth=2) 
-                ax.plot([-wall_width/2 - 6, -wall_width/2], [Y_exc, Y_exc], 'k-', linewidth=2) 
-
-                # --- PRESSURE PROFILES ---
-                # Right Side
+                # Right Side (Active)
                 y_steps = np.linspace(0, wall_height, 100)
                 p_right = []
                 for y_depth in y_steps:
                     sig, _, _, _ = calculate_stress(y_depth, right_layers, right_wt, right_q, "Active")
                     p_right.append(sig)
                 
-                scale = 0.05 
-                ax.plot([wall_width/2 + p * scale for p in p_right], [Y_top - y for y in y_steps], 'r-', linewidth=2, label="Active Pressure")
-                ax.fill_betweenx([Y_top - y for y in y_steps], wall_width/2, [wall_width/2 + p * scale for p in p_right], color='red', alpha=0.3)
-
-                # Left Side
+                # Left Side (Passive)
                 y_steps_l = np.linspace(0, wall_height - excavation_depth, 100)
                 p_left = []
                 for y_depth in y_steps_l:
                     sig, _, _, _ = calculate_stress(y_depth, left_layers, left_wt, 0, "Passive")
                     p_left.append(sig)
-                    
-                ax.plot([-wall_width/2 - p * scale for p in p_left], [Y_exc - y for y in y_steps_l], 'g-', linewidth=2, label="Passive Pressure")
-                ax.fill_betweenx([Y_exc - y for y in y_steps_l], -wall_width/2, [-wall_width/2 - p * scale for p in p_left], color='green', alpha=0.3)
 
-                # Final Plot Settings
-                ax.set_xlim(-8, 8)
-                ax.set_ylim(-2, wall_height + 3)
-                ax.set_aspect('equal')
-                ax.axis('off')
-                ax.legend(loc='lower center', ncol=2)
-                st.pyplot(fig)
+                # Plot Active vs Depth (Note: Plotting Pressure on X, Depth on Y)
+                ax_s.plot(p_right, y_steps, 'r-', linewidth=2, label="Active Pressure (Right Side)")
+                ax_s.fill_betweenx(y_steps, 0, p_right, color='red', alpha=0.1)
+                
+                # Plot Passive vs Depth (Shifted to match excavation depth)
+                # Passive depth 0 corresponds to Global Depth = excavation_depth
+                global_depth_l = y_steps_l + excavation_depth
+                ax_s.plot(p_left, global_depth_l, 'g-', linewidth=2, label="Passive Pressure (Left Side)")
+                ax_s.fill_betweenx(global_depth_l, 0, p_left, color='green', alpha=0.1)
 
-            else:
-                # Placeholder when not calculated
-                st.info("Waiting for calculation...")
-                st.write("Adjust inputs on the left and press **Calculate**.")
+                ax_s.invert_yaxis()
+                ax_s.set_ylabel("Global Depth (m)")
+                ax_s.set_xlabel("Lateral Earth Pressure (kPa)")
+                ax_s.set_title("Lateral Stress Distribution")
+                ax_s.grid(True, linestyle='--', alpha=0.6)
+                ax_s.legend()
+                
+                st.pyplot(fig_stress)
 
         # -------------------------------------------------
         # 3. RESULTS TABLE (Full Width Below)
@@ -243,7 +242,6 @@ def app():
                 
             df = pd.DataFrame(table_data)
             
-            # Safe Formatting
             st.dataframe(df.style.format({
                 "Global Depth (m)": "{:.1f}",
                 "[R] Total Lat. Stress (kPa)": "{:.2f}",
@@ -253,7 +251,7 @@ def app():
             }))
 
     # =========================================================================
-    # TAB 2: COULOMB'S WEDGE THEORY
+    # TAB 2: COULOMB'S WEDGE THEORY (Simplified)
     # =========================================================================
     with tab_coulomb:
         st.header("Coulomb's Wedge Theory")
