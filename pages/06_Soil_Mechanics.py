@@ -5,6 +5,7 @@ from topics import effective_stress
 from topics import flow_water
 from topics import consolidation
 from topics import shear_strength
+from topics import lateral_earth_pressure
 
 # 1. PAGE CONFIG
 st.set_page_config(
@@ -63,7 +64,8 @@ def app():
                 "Effective Stress",
                 "Flow of Water in Soils",
                 "Consolidation Theory",
-                "Shear Strenght of Soils"
+                "Shear Strenght of Soils",
+                "Lateral Earth Pressure"
             ]
         )
 
@@ -82,6 +84,10 @@ def app():
         
     elif topic == "Shear Strenght of Soils":
         shear_strength.app()
+        
+    elif topic == "Lateral Earth Pressure":
+        lateral_earth_pressure.app()
+
 
 
 if __name__ == "__main__":
