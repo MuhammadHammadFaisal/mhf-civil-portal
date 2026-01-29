@@ -250,7 +250,17 @@ def app():
             table_data.append(row)
             
         df = pd.DataFrame(table_data)
-        st.dataframe(df.style.format("{:.2f}"))
+        
+        # Define specific formatting to handle the "-" string in [L] Layer safely
+        format_dict = {
+            "Global Depth (m)": "{:.1f}",
+            "[R] Total Lat. Stress (kPa)": "{:.2f}",
+            "[R] Ka": "{:.3f}",
+            "[L] Total Lat. Stress (kPa)": "{:.2f}",
+            "[L] Kp": "{:.3f}"
+        }
+        
+        st.dataframe(df.style.format(format_dict))
 
     # =========================================================================
     # TAB 2: COULOMB'S WEDGE THEORY (Simplified)
