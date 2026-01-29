@@ -6,7 +6,7 @@ from topics import flow_water
 from topics import consolidation
 from topics import shear_strength
 from topics import lateral_earth_pressure
-
+from topics import Stability_of_Slopes
 # 1. PAGE CONFIG
 st.set_page_config(
     page_title="Soil Mechanics", 
@@ -65,7 +65,8 @@ def app():
                 "Flow of Water in Soils",
                 "Consolidation Theory",
                 "Shear Strenght of Soils",
-                "Lateral Earth Pressure"
+                "Lateral Earth Pressure",
+                "Stability of Slopes"
             ]
         )
 
@@ -88,6 +89,8 @@ def app():
     elif topic == "Lateral Earth Pressure":
         lateral_earth_pressure.app()
 
+    elif topic == "Stability of Slopes":
+        Stability_of_Slopes.app()
 
 
 if __name__ == "__main__":
