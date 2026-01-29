@@ -81,7 +81,7 @@ def app():
         consolidation.app()
         
     elif topic == "Shear Strenght of Soils":
-        shear_strenght.app()
+        shear_strength.app()
 
 
 if __name__ == "__main__":
