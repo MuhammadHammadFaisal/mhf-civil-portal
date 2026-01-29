@@ -71,27 +71,29 @@ def app():
         with col_t1:
             st.subheader("Inputs")
             soil_case = st.radio("Soil Condition:", 
-                               ["Dry Cohesionless (Sand)", "Seepage Parallel to Slope", "Cohesive Soil (c-ϕ)"])
+                               ["Dry Cohesionless (Sand)", "Seepage Parallel to Slope", "Cohesive Soil (c-ϕ)"],
+                               key="trans_case") # Added Key
             
-            beta = st.number_input("Slope Angle (β) [deg]", 0.0, 60.0, 25.0)
-            z = st.number_input("Depth to Failure Plane (z) [m]", 0.5, 20.0, 5.0)
+            beta = st.number_input("Slope Angle (β) [deg]", 0.0, 60.0, 25.0, key="trans_beta") # Added Key
+            z = st.number_input("Depth to Failure Plane (z) [m]", 0.5, 20.0, 5.0, key="trans_z") # Added Key
             
             # Dynamic Inputs
             c_prime, phi_prime, gamma, gamma_sat, u_val = 0.0, 30.0, 18.0, 20.0, 0.0
             
             if soil_case == "Dry Cohesionless (Sand)":
-                phi_prime = st.number_input("Friction Angle (ϕ') [deg]", 10.0, 45.0, 32.0)
+                phi_prime = st.number_input("Friction Angle (ϕ') [deg]", 10.0, 45.0, 32.0, key="trans_phi_sand")
             elif soil_case == "Seepage Parallel to Slope":
-                phi_prime = st.number_input("Friction Angle (ϕ') [deg]", 10.0, 45.0, 32.0)
-                gamma_sat = st.number_input("Saturated Unit Weight (γ_sat) [kN/m³]", 15.0, 25.0, 20.0)
+                phi_prime = st.number_input("Friction Angle (ϕ') [deg]", 10.0, 45.0, 32.0, key="trans_phi_seep")
+                gamma_sat = st.number_input("Saturated Unit Weight (γ_sat) [kN/m³]", 15.0, 25.0, 20.0, key="trans_gsat")
             else:
-                c_prime = st.number_input("Cohesion (c') [kPa]", 0.0, 100.0, 10.0)
-                phi_prime = st.number_input("Friction Angle (ϕ') [deg]", 0.0, 45.0, 25.0)
-                gamma = st.number_input("Unit Weight (γ) [kN/m³]", 15.0, 25.0, 19.0)
-                if st.checkbox("Include Pore Pressure?"):
-                    u_val = st.number_input("Pore Pressure (u) [kPa]", 0.0, 100.0, 20.0)
+                c_prime = st.number_input("Cohesion (c') [kPa]", 0.0, 100.0, 10.0, key="trans_c")
+                phi_prime = st.number_input("Friction Angle (ϕ') [deg]", 0.0, 45.0, 25.0, key="trans_phi_coh")
+                gamma = st.number_input("Unit Weight (γ) [kN/m³]", 15.0, 25.0, 19.0, key="trans_gamma")
+                if st.checkbox("Include Pore Pressure?", key="trans_check_u"):
+                    u_val = st.number_input("Pore Pressure (u) [kPa]", 0.0, 100.0, 20.0, key="trans_u")
 
-            calc_t = st.button("Calculate FS", type="primary")
+            # FIX: Added unique key
+            calc_t = st.button("Calculate FS", type="primary", key="btn_calc_translational")
 
         with col_t2:
             st.subheader("Analysis")
@@ -101,8 +103,6 @@ def app():
             x = np.linspace(0, 10, 100)
             beta_r = math.radians(beta)
             y_surf = x * math.tan(beta_r)
-            # Failure plane is parallel at depth z (vertical depth z, or perpendicular?)
-            # Usually z is vertical depth in formulas (gamma*z). 
             y_fail = y_surf - z
             
             ax_t.plot(x, y_surf, 'k-', linewidth=2, label="Ground Surface")
@@ -140,7 +140,9 @@ def app():
         st.header("Rotational Slip Analysis")
         st.info("Analyzes circular failure surfaces. Choose the method below.")
         
-        method = st.radio("**Calculation Method:**", ["A. Mass Procedure (Undrained / ϕ=0)", "B. Method of Slices"], horizontal=True)
+        method = st.radio("**Calculation Method:**", 
+                          ["A. Mass Procedure (Undrained / ϕ=0)", "B. Method of Slices"], 
+                          horizontal=True, key="rot_method_select") # Added Key
         st.markdown("---")
         
         # --- A. MASS PROCEDURE ---
@@ -149,36 +151,31 @@ def app():
             
             with col_r1:
                 st.subheader("1. Geometry & Loads")
-                H_slope = st.number_input("Slope Height (H) [m]", 1.0, 50.0, 8.5)
-                beta_slope = st.number_input("Slope Angle [deg]", 0.0, 90.0, 45.0)
+                H_slope = st.number_input("Slope Height (H) [m]", 1.0, 50.0, 8.5, key="mass_H")
+                beta_slope = st.number_input("Slope Angle [deg]", 0.0, 90.0, 45.0, key="mass_beta")
                 
                 st.markdown("**Failure Circle**")
-                R = st.number_input("Radius (R) [m]", 5.0, 50.0, 12.1)
-                dist_d = st.number_input("Moment Arm (d) [m]", 0.0, 20.0, 4.5, help="Horizontal distance from Center O to Centroid of soil mass")
+                R = st.number_input("Radius (R) [m]", 5.0, 50.0, 12.1, key="mass_R")
+                dist_d = st.number_input("Moment Arm (d) [m]", 0.0, 20.0, 4.5, help="Horizontal distance from Center O to Centroid of soil mass", key="mass_d")
                 
                 st.subheader("2. Soil Properties")
-                gamma_clay = st.number_input("Unit Weight (γ) [kN/m³]", 10.0, 25.0, 19.0)
-                Cu = st.number_input("Undrained Shear Strength (Cu) [kPa]", 10.0, 200.0, 65.0)
+                gamma_clay = st.number_input("Unit Weight (γ) [kN/m³]", 10.0, 25.0, 19.0, key="mass_gamma")
+                Cu = st.number_input("Undrained Shear Strength (Cu) [kPa]", 10.0, 200.0, 65.0, key="mass_cu")
                 
-                # Auto-calculate suggested W or let user override
-                # Area approx for display
-                # W = Area * gamma
                 st.caption("Weight Calculation:")
-                area_approx = st.number_input("Area of Sliding Mass [m²]", 1.0, 500.0, 70.0)
+                area_approx = st.number_input("Area of Sliding Mass [m²]", 1.0, 500.0, 70.0, key="mass_area")
                 W_calc = area_approx * gamma_clay
                 st.write(f"Weight (W) = {W_calc:.1f} kN/m")
                 
-                calc_rot = st.button("Calculate FS (Mass Procedure)", type="primary")
+                # FIX: Added unique key
+                calc_rot = st.button("Calculate FS (Mass Procedure)", type="primary", key="btn_calc_mass")
 
             with col_r2:
                 st.subheader("Failure Diagram")
                 
-                # Calculate Arc Length (approx based on R and geometry)
-                # For visualization, we draw a generic arc matching the user input R
                 fig_c, ax_c = plt.subplots(figsize=(8, 6))
                 
                 # Draw Slope
-                # Toe at (0,0). Top at (H/tan(beta), H)
                 toe_x, toe_y = 0, 0
                 crest_x = H_slope / math.tan(math.radians(beta_slope))
                 crest_y = H_slope
@@ -189,21 +186,10 @@ def app():
                 ax_c.plot(ground_x, ground_y, 'k-', linewidth=2.5, label="Ground Surface")
                 
                 # Draw Failure Circle
-                # Center O needs to be located.
-                # User gave 'd' (horiz dist from O to Centroid). 
-                # Let's assume O is at (d, y_center). 
-                # We need O such that arc passes through Toe (0,0).
-                # x_o^2 + y_o^2 = R^2.
-                # This is under-constrained without knowing O coordinates. 
-                # For Visual: Place O at (crest_x/2 - 2, H + R*0.8) arbitrarily to look like the sketch
+                o_x = -2.0 
+                o_y = math.sqrt(R**2 - o_x**2) 
                 
-                o_x = -2.0 # Slightly left of toe
-                o_y = math.sqrt(R**2 - o_x**2) # Height to make arc pass toe
-                
-                # Draw Arc from Toe to Crest+
-                # Angles
                 theta_toe = math.degrees(math.atan2(0 - o_y, 0 - o_x))
-                # End angle? approx
                 theta_end = -30 
                 
                 arc = patches.Arc((o_x, o_y), 2*R, 2*R, theta1=theta_toe, theta2=theta_end, color='red', linestyle='--', linewidth=2, label="Failure Surface")
@@ -214,38 +200,28 @@ def app():
                 ax_c.text(o_x, o_y + 1, "O", ha='center', fontweight='bold')
                 
                 # Draw Moment Arm d
-                # Centroid approx at x = d from O? No, d is horizontal distance.
-                # Centroid X = o_x + d
                 centroid_x = o_x + dist_d
-                centroid_y = H_slope / 2 # Approx
+                centroid_y = H_slope / 2 
                 
                 ax_c.plot(centroid_x, centroid_y, 'go', label="Centroid (W)")
                 ax_c.arrow(centroid_x, centroid_y, 0, -3, head_width=0.5, color='purple', width=0.1)
                 ax_c.text(centroid_x + 0.5, centroid_y - 2, "W", color='purple', fontweight='bold')
                 
                 # Dimension Lines
-                # R
                 ax_c.plot([o_x, 0], [o_y, 0], 'b:', linewidth=1)
                 ax_c.text(o_x/2, o_y/2, f"R={R}m", color='blue', rotation=60)
                 
-                # d
                 ax_c.plot([o_x, centroid_x], [o_y, o_y], 'k:', linewidth=1)
                 ax_c.annotate(f"d={dist_d}m", xy=(o_x, o_y), xytext=(centroid_x, o_y), arrowprops=dict(arrowstyle='<->'))
                 
-                # Arc Angle Calculation
-                # L_arc = R * theta_rad
-                # We need theta_rad. 
-                # Let's approximate L_arc from the arc drawing for visual, but use formula for calc.
-                # Actually, L_arc is usually derived or given. 
-                # Let's calculate theta using the intersection with top surface.
-                # Intersection at y=H. x_int = o_x + sqrt(R^2 - (H-o_y)^2)
+                # Arc Calc
                 try:
                     x_int = o_x + math.sqrt(R**2 - (crest_y - o_y)**2)
                     theta_rad = math.atan2(crest_y - o_y, x_int - o_x) - math.atan2(0 - o_y, 0 - o_x)
                     theta_deg = math.degrees(abs(theta_rad))
                     L_arc_calc = (theta_deg / 360) * 2 * math.pi * R
                 except:
-                    L_arc_calc = 20.0 # Fallback
+                    L_arc_calc = 20.0 
                 
                 ax_c.text(2, 2, f"L_arc ≈ {L_arc_calc:.1f}m", color='red')
 
@@ -257,10 +233,6 @@ def app():
                 st.pyplot(fig_c)
                 
                 if calc_rot:
-                    # FS = Resisting / Driving
-                    # Resisting = Cu * L_arc * R
-                    # Driving = W * d
-                    
                     M_res = Cu * L_arc_calc * R
                     M_drv = W_calc * dist_d
                     
@@ -285,8 +257,8 @@ def app():
             
             with col_s1:
                 st.subheader("Global Parameters")
-                c_sl = st.number_input("Cohesion (c') [kPa]", 0.0, 100.0, 5.0)
-                phi_sl = st.number_input("Friction Angle (ϕ') [deg]", 0.0, 45.0, 30.0)
+                c_sl = st.number_input("Cohesion (c') [kPa]", 0.0, 100.0, 5.0, key="slice_c")
+                phi_sl = st.number_input("Friction Angle (ϕ') [deg]", 0.0, 45.0, 30.0, key="slice_phi")
                 
                 st.markdown("### Slice Data Table")
                 st.info("Edit the table below to add slices.")
@@ -298,9 +270,10 @@ def app():
                     {"Slice": 3, "Weight (kN)": 200, "Base Angle α (deg)": 35, "Base Length l (m)": 2.8, "u (kPa)": 10},
                 ])
                 
-                edited_df = st.data_editor(default_data, num_rows="dynamic")
+                edited_df = st.data_editor(default_data, num_rows="dynamic", key="slice_editor")
                 
-                calc_slices = st.button("Calculate FS (Ordinary Method)", type="primary")
+                # FIX: Added unique key
+                calc_slices = st.button("Calculate FS (Ordinary Method)", type="primary", key="btn_calc_slices")
 
             with col_s2:
                 if calc_slices:
@@ -321,8 +294,7 @@ def app():
                         # Normal Force N' = W cos alpha - u l
                         N_prime = (W * math.cos(alpha)) - (u * l)
                         
-                        # Shear Strength (Resisting)
-                        # T_f = c'l + N' tan phi
+                        # Shear Strength
                         T_f = (c_sl * l) + (N_prime * math.tan(phi_rad))
                         
                         # Driving Force
@@ -346,7 +318,6 @@ def app():
                         st.write(f"**Total Resisting:** {sum_resisting:.1f} kN")
                         st.write(f"**Total Driving:** {sum_driving:.1f} kN")
                         
-                        # Show breakdown
                         st.dataframe(pd.DataFrame(details))
                         
                     else:
@@ -363,16 +334,17 @@ def app():
         
         with col_c1:
             st.subheader("Forces")
-            Pa = st.number_input("Active Thrust (Pa) [kN]", 0.0, 5000.0, 500.0)
-            Pp = st.number_input("Passive Resistance (Pp) [kN]", 0.0, 5000.0, 200.0)
-            W_block = st.number_input("Weight of Central Block [kN]", 0.0, 10000.0, 2000.0)
+            Pa = st.number_input("Active Thrust (Pa) [kN]", 0.0, 5000.0, 500.0, key="block_Pa")
+            Pp = st.number_input("Passive Resistance (Pp) [kN]", 0.0, 5000.0, 200.0, key="block_Pp")
+            W_block = st.number_input("Weight of Central Block [kN]", 0.0, 10000.0, 2000.0, key="block_W")
             
             st.subheader("Weak Layer")
-            c_base = st.number_input("Base Cohesion (c') [kPa]", 0.0, 100.0, 5.0)
-            phi_base = st.number_input("Base Friction (ϕ') [deg]", 0.0, 45.0, 20.0)
-            L_base = st.number_input("Length of Base (L) [m]", 1.0, 100.0, 20.0)
+            c_base = st.number_input("Base Cohesion (c') [kPa]", 0.0, 100.0, 5.0, key="block_c")
+            phi_base = st.number_input("Base Friction (ϕ') [deg]", 0.0, 45.0, 20.0, key="block_phi")
+            L_base = st.number_input("Length of Base (L) [m]", 1.0, 100.0, 20.0, key="block_L")
             
-            calc_blk = st.button("Calculate FS", type="primary")
+            # FIX: Added unique key
+            calc_blk = st.button("Calculate FS", type="primary", key="btn_calc_block")
 
         with col_c2:
             st.subheader("Block Diagram")
@@ -383,15 +355,12 @@ def app():
             ax_b.add_patch(rect)
             
             # Arrows
-            # Pa (Driving) - Pushes Right
             ax_b.arrow(-2, 1.5, 1.5, 0, head_width=0.3, color='red', width=0.05)
             ax_b.text(-2.5, 1.5, "Pa", color='red', fontweight='bold', va='center')
             
-            # Pp (Resisting) - Pushes Left
             ax_b.arrow(12, 1.5, -1.5, 0, head_width=0.3, color='green', width=0.05)
             ax_b.text(12.5, 1.5, "Pp", color='green', fontweight='bold', va='center')
             
-            # Base Resistance
             ax_b.text(5, -0.5, f"Weak Layer\n(c'={c_base}, ϕ'={phi_base})", ha='center')
             
             ax_b.set_xlim(-4, 14)
@@ -400,9 +369,7 @@ def app():
             st.pyplot(fig_b)
             
             if calc_blk:
-                # T_base = c L + W tan phi
                 resisting_base = (c_base * L_base) + (W_block * math.tan(math.radians(phi_base)))
-                
                 total_resisting = Pp + resisting_base
                 total_driving = Pa
                 
