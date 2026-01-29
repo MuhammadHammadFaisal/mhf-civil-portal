@@ -256,3 +256,20 @@ def app():
             if len(test_data) < 2:
                 st.error("Please ensure 2 tests are defined.")
             else:
+                res = solve_parameters(test_data)
+                
+                c_res, c_log = st.columns(2)
+                
+                with c_res:
+                    st.success(f"**Parameters Found:**")
+                    st.metric("Cohesion ($c'$)", f"{res['c']:.2f} kPa")
+                    st.metric("Friction Angle ($\phi'$)", f"{res['phi']:.2f} °")
+                
+                with c_log:
+                    with st.expander("Show Derivation"):
+                        for line in res['log']:
+                             st.write(line)
+                        st.latex(r"\sigma'_1 = \sigma'_3 \tan^2(45 + \phi'/2) + 2c'\tan(45 + \phi'/2)")
+
+if __name__ == "__main__":
+    app()
