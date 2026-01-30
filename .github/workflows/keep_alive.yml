@@ -1,0 +1,25 @@
+name: Keep Streamlit Alive
+
+on:
+  schedule:
+    # Runs at 8:00 AM UTC every day
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Update date file to keep repo active
+        run: |
+          date > last_update.txt
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add last_update.txt
+          git commit -m "Keep alive update"
+          git push
