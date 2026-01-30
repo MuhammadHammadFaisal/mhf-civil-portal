@@ -50,10 +50,43 @@ st.markdown("""
     width: 100% !important;
 }
 
-/* --- 3. HIDE THE ICON/ARROW --- */
-/* This removes the little image next to the text */
+/* --- 3. HIDE THE ICON/ARROW ON LINKS --- */
 [data-testid="stPageLink-NavLink"] svg {
     display: none !important;
+}
+
+/* --- 4. EXPANDER / DROPDOWN STYLING --- */
+/* Style the outer box of the expander */
+[data-testid="stExpander"] details {
+    background-color: #f8f9fa !important;  /* Match Card Color */
+    border: 1px solid #dee2e6 !important;  /* Match Card Border */
+    border-radius: 10px !important;        /* Rounded Corners */
+    color: #212529 !important;             /* Dark Text Color */
+}
+
+/* Style the clickable header (Summary) */
+[data-testid="stExpander"] summary {
+    font-weight: 600 !important;
+    color: #212529 !important;
+    padding: 15px !important;              /* Add padding */
+}
+
+/* Hover effect for the expander */
+[data-testid="stExpander"] summary:hover {
+    background-color: #eef4f1 !important;
+    color: #000 !important;
+    border-radius: 10px !important;
+}
+
+/* Fix the content inside the expander */
+[data-testid="stExpander"] div[role="group"] {
+    padding: 15px !important;
+    color: #212529 !important;             /* Ensure text inside is readable */
+}
+
+/* Make the SVG arrow in the expander dark so it's visible on light bg */
+[data-testid="stExpander"] svg {
+    fill: #212529 !important;
 }
 
 </style>
@@ -64,7 +97,6 @@ st.markdown("""
 # ==================================================
 def get_active_modules():
     modules = []
-
     if os.path.exists("pages"):
         for file in os.listdir("pages"):
             if file.endswith(".py") and file != "__init__.py":
@@ -79,22 +111,18 @@ def get_active_modules():
                             modules.append((file, name.title()))
                 except Exception:
                     pass
-
     return sorted(modules, key=lambda x: x[1])
 
 # ==================================================
 # MAIN APPLICATION
 # ==================================================
 def main():
-
-    # --------------------------------------------------
-    # HEADER
-    # --------------------------------------------------
     col_logo, col_text = st.columns([1, 3], vertical_alignment="center")
 
     with col_logo:
-        # Ensure you have this file, or comment this line out if testing without the image
-        st.image("assets/logo.png", use_container_width=True)
+        # Comment this out if you don't have the image file yet
+        # st.image("assets/logo.png", use_container_width=True)
+        st.write("") 
 
     with col_text:
         st.markdown("""
@@ -108,10 +136,10 @@ def main():
         """, unsafe_allow_html=True)
 
     st.markdown("")
-    st.markdown("") # Extra space instead of a line
+    st.markdown("") 
 
     # --------------------------------------------------
-    # MODULES SECTION
+    # MODULES
     # --------------------------------------------------
     st.subheader("Course Modules")
     st.markdown("")
@@ -120,19 +148,13 @@ def main():
 
     if modules:
         cols = st.columns(3)
-
         for i, (file, title) in enumerate(modules):
             with cols[i % 3]:
-                st.page_link(
-                    f"pages/{file}",
-                    label=title,
-                    use_container_width=True
-                )
-                # Removed the extra markdown div here to clean up space
+                st.page_link(f"pages/{file}", label=title, use_container_width=True)
                 st.markdown("") 
 
     # --------------------------------------------------
-    # PURPOSE / MISSION (No Separation Line)
+    # PURPOSE
     # --------------------------------------------------
     st.markdown("")
     st.markdown("")
@@ -145,11 +167,12 @@ def main():
     """)
 
     # --------------------------------------------------
-    # FEEDBACK (No Separation Line)
+    # FEEDBACK (The Dropdown)
     # --------------------------------------------------
     st.markdown("")
     st.markdown("")
 
+    # This expander will now look like a card
     with st.expander("Report an Issue or Suggest an Improvement"):
         st.write(
             "If you identify an incorrect result, unclear assumption, or missing topic, "
@@ -162,7 +185,7 @@ def main():
         )
 
     # --------------------------------------------------
-    # ABOUT (No Separation Line)
+    # ABOUT
     # --------------------------------------------------
     st.markdown("")
     st.markdown("")
@@ -181,7 +204,6 @@ def main():
     # --------------------------------------------------
     # FOOTER
     # --------------------------------------------------
-    # Kept one line at the bottom for closure
     st.markdown("---") 
     st.markdown("""
     <div style="text-align:center; color:#777; font-size:12px;">
@@ -189,6 +211,5 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-# ==================================================
 if __name__ == "__main__":
     main()
