@@ -62,7 +62,6 @@ st.markdown("""
 }
 
 /* --- 4. GENERAL LINK BUTTON STYLING --- */
-/* OPTIONAL: Makes the 'Open Feedback' and 'LinkedIn' buttons look cleaner */
 [data-testid="stLinkButton"] > a {
     border-radius: 8px !important;
 }
@@ -104,8 +103,8 @@ def main():
     col_logo, col_text = st.columns([1, 3], vertical_alignment="center")
 
     with col_logo:
-        # st.image("assets/logo.png", use_container_width=True)
-        st.write("") 
+        # FIXED: Uncommented this line so the logo appears
+        st.image("assets/logo.png", use_container_width=True)
 
     with col_text:
         st.markdown("""
@@ -147,7 +146,7 @@ def main():
     st.markdown("")
     st.markdown("")
     
-    st.subheader("Purpose") # The link icon here is now hidden via CSS
+    st.subheader("Purpose")
 
     st.markdown("""
     MHF Civil provides transparent numerical solutions to standard civil engineering problems.
@@ -156,7 +155,7 @@ def main():
     """)
 
     # --------------------------------------------------
-    # FEEDBACK (Moved out of Dropdown)
+    # FEEDBACK (Header format)
     # --------------------------------------------------
     st.markdown("")
     st.markdown("")
