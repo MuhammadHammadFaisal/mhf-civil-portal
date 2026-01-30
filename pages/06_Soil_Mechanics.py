@@ -7,6 +7,7 @@ from topics import consolidation
 from topics import shear_strength
 from topics import lateral_earth_pressure
 from topics import Stability_of_Slopes
+
 # 1. PAGE CONFIG
 st.set_page_config(
     page_title="Soil Mechanics", 
@@ -17,7 +18,7 @@ st.set_page_config(
 def app():
     # --- PROFESSIONAL HEADER ---
     # Column Ratio [1, 5] keeps logo compact
-    col_logo, col_text = st.columns([1, 4])
+    col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
         # [STYLE UPGRADE] 
@@ -35,7 +36,7 @@ def app():
             """, 
             unsafe_allow_html=True
         )
-        st.image("assets/logo.png", width=200) 
+        st.image("assets/logo.png", width=150) 
 
     with col_text:
         # [ALIGNMENT FIX]
@@ -52,7 +53,7 @@ def app():
             unsafe_allow_html=True
         )
 
-    st.markdown("---")
+    # REMOVED: st.markdown("---") 
 
     # --- TOPIC SELECTION MENU ---
     # Wrapped in a container to separate navigation from the header
