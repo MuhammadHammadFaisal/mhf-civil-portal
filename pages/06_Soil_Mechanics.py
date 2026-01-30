@@ -16,14 +16,36 @@ st.set_page_config(
 )
 
 def app():
+    # ==================================================
+    # [NEW] CUSTOM CSS FOR DROPDOWN
+    # ==================================================
+    st.markdown("""
+    <style>
+    /* 1. Target the Dropdown's Main Box */
+    div[data-baseweb="select"] > div {
+        background-color: #262730 !important; /* Dark Grey (Subtle Contrast) */
+        border: 1px solid #4c4c52 !important; /* Slight border definition */
+        color: white !important;              /* Ensure text is white */
+        border-radius: 8px !important;        /* Rounded corners */
+    }
+
+    /* 2. Target the SVG Arrow inside the dropdown to make it white */
+    div[data-baseweb="select"] svg {
+        fill: white !important;
+    }
+    
+    /* 3. Optional: Change hover effect */
+    div[data-baseweb="select"] > div:hover {
+        border-color: #ff4b4b !important;     /* Highlight on hover */
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # --- PROFESSIONAL HEADER ---
-    # Column Ratio [1, 5] keeps logo compact
     col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
-        # [STYLE UPGRADE] 
-        # Since the logo has a white background, we frame it like an "App Icon"
-        # with a subtle border and shadow so it looks intentional.
+        # Logo Styling
         st.markdown(
             """
             <style>
@@ -36,11 +58,11 @@ def app():
             """, 
             unsafe_allow_html=True
         )
+        # Ensure you have the image or comment this out
         st.image("assets/logo.png", width=150) 
 
     with col_text:
-        # [ALIGNMENT FIX]
-        # Added 'padding-top: 15px' to push text down so it centers with the logo
+        # Header Text
         st.markdown(
             """
             <div style="padding-top: 15px; padding-left: 10px;">
@@ -53,10 +75,8 @@ def app():
             unsafe_allow_html=True
         )
 
-    # REMOVED: st.markdown("---") 
-
     # --- TOPIC SELECTION MENU ---
-    # Wrapped in a container to separate navigation from the header
+    # Wrapped in a container with a border
     with st.container(border=True):
         topic = st.selectbox(
             "Select Calculation Module:", 
