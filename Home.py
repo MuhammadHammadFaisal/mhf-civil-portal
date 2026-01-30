@@ -22,7 +22,7 @@ st.markdown("""
     border: 1px solid #dee2e6 !important;
     border-radius: 10px !important;
     padding: 18px !important;
-    text-align: left !important;
+    text-align: center !important;
     box-shadow: none !important;
     transition: background-color 0.15s ease !important;
 }
@@ -174,4 +174,5 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
