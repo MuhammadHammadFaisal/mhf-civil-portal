@@ -17,7 +17,7 @@ st.markdown("""
 <style>
 
 /* Module Cards */
-[data-testid="stPageLink-NavLink"] {
+{
     background-color: #f8f9fa !important;
     border: 1px solid #dee2e6 !important;
     border-radius: 10px !important;
@@ -27,13 +27,13 @@ st.markdown("""
     transition: background-color 0.15s ease !important;
 }
 
-[data-testid="stPageLink-NavLink"]:hover {
+{
     background-color: #eef4f1 !important;
     border-color: #ced4da !important;
 }
 
 /* Module Title */
-[data-testid="stPageLink-NavLink"] p {
+{
     color: #212529 !important;
     font-size: 17px !important;
     font-weight: 600 !important;
@@ -174,5 +174,6 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
 
