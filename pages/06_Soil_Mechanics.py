@@ -17,26 +17,32 @@ st.set_page_config(
 
 def app():
     # ==================================================
-    # [NEW] CUSTOM CSS FOR DROPDOWN
+    # CUSTOM CSS (Fixed Dropdown Visibility)
     # ==================================================
     st.markdown("""
     <style>
     /* 1. Target the Dropdown's Main Box */
+    /* We use a lighter grey (#3b3f4d) so it pops out from the black background */
     div[data-baseweb="select"] > div {
-        background-color: #262730 !important; /* Dark Grey (Subtle Contrast) */
-        border: 1px solid #4c4c52 !important; /* Slight border definition */
-        color: white !important;              /* Ensure text is white */
-        border-radius: 8px !important;        /* Rounded corners */
+        background-color: #3b3f4d !important; 
+        border: 2px solid #5a5f70 !important;  /* Lighter border for contrast */
+        color: white !important;
+        border-radius: 8px !important;
     }
 
-    /* 2. Target the SVG Arrow inside the dropdown to make it white */
+    /* 2. Target the SVG Arrow inside the dropdown */
     div[data-baseweb="select"] svg {
         fill: white !important;
     }
     
-    /* 3. Optional: Change hover effect */
-    div[data-baseweb="select"] > div:hover {
-        border-color: #ff4b4b !important;     /* Highlight on hover */
+    /* 3. Text color inside the dropdown options */
+    div[data-baseweb="select"] span {
+        color: white !important;
+    }
+    
+    /* 4. Dropdown Menu Items (The list that opens up) */
+    ul[data-baseweb="menu"] {
+        background-color: #3b3f4d !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -45,7 +51,6 @@ def app():
     col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
-        # Logo Styling
         st.markdown(
             """
             <style>
@@ -58,11 +63,9 @@ def app():
             """, 
             unsafe_allow_html=True
         )
-        # Ensure you have the image or comment this out
         st.image("assets/logo.png", width=150) 
 
     with col_text:
-        # Header Text
         st.markdown(
             """
             <div style="padding-top: 15px; padding-left: 10px;">
@@ -75,8 +78,13 @@ def app():
             unsafe_allow_html=True
         )
 
+    # ==================================================
+    # [NEW] SPACING FIX
+    # This adds 40px of vertical empty space
+    # ==================================================
+    st.markdown("<div style='margin-bottom: 40px;'></div>", unsafe_allow_html=True)
+
     # --- TOPIC SELECTION MENU ---
-    # Wrapped in a container with a border
     with st.container(border=True):
         topic = st.selectbox(
             "Select Calculation Module:", 
