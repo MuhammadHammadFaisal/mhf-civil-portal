@@ -35,7 +35,7 @@ def app():
             """, 
             unsafe_allow_html=True
         )
-        st.image("assets/logo.png", width=150) 
+        st.image("assets/logo.png", width=200) 
 
     with col_text:
         # [ALIGNMENT FIX]
