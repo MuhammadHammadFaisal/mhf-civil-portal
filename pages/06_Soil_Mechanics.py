@@ -17,32 +17,44 @@ st.set_page_config(
 
 def app():
     # ==================================================
-    # CUSTOM CSS (Fixed Dropdown Visibility)
+    # CUSTOM CSS (Fixed Dropdown & Menu Colors)
     # ==================================================
     st.markdown("""
     <style>
-    /* 1. Target the Dropdown's Main Box */
-    /* We use a lighter grey (#3b3f4d) so it pops out from the black background */
+    /* 1. The Main Clickable Box (Closed State) */
     div[data-baseweb="select"] > div {
-        background-color: #3b3f4d !important; 
-        border: 2px solid #5a5f70 !important;  /* Lighter border for contrast */
+        background-color: #3b3f4d !important; /* Lighter Grey */
+        border: 2px solid #5a5f70 !important; 
         color: white !important;
         border-radius: 8px !important;
     }
 
-    /* 2. Target the SVG Arrow inside the dropdown */
-    div[data-baseweb="select"] svg {
-        fill: white !important;
+    /* 2. The Dropdown Menu List (Open State) - This fixes the blending issue */
+    ul[data-baseweb="menu"] {
+        background-color: #262730 !important;  /* Dark Grey Background */
+        border: 1px solid #5a5f70 !important;  /* Border to separate from page */
+        padding: 10px !important;
+    }
+
+    /* 3. The Individual Options inside the list */
+    li[data-baseweb="option"] {
+        color: white !important;              /* Text color */
+    }
+
+    /* 4. Hover Effect for Options */
+    li[data-baseweb="option"]:hover {
+        background-color: #ff4b4b !important; /* Red highlight on hover */
+        color: white !important;
     }
     
-    /* 3. Text color inside the dropdown options */
+    /* 5. Force the selected text to be white */
     div[data-baseweb="select"] span {
         color: white !important;
     }
     
-    /* 4. Dropdown Menu Items (The list that opens up) */
-    ul[data-baseweb="menu"] {
-        background-color: #3b3f4d !important;
+    /* 6. Fix the Arrow Icon color */
+    div[data-baseweb="select"] svg {
+        fill: white !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -79,25 +91,24 @@ def app():
         )
 
     # ==================================================
-    # [NEW] SPACING FIX
-    # This adds 40px of vertical empty space
+    # SPACING FIX (40px gap)
     # ==================================================
     st.markdown("<div style='margin-bottom: 40px;'></div>", unsafe_allow_html=True)
 
     # --- TOPIC SELECTION MENU ---
-    with st.container(border=True):
-        topic = st.selectbox(
-            "Select Calculation Module:", 
-            [
-                "Phase Relationships",
-                "Effective Stress",
-                "Flow of Water in Soils",
-                "Consolidation Theory",
-                "Shear Strenght of Soils",
-                "Lateral Earth Pressure",
-                "Stability of Slopes"
-            ]
-        )
+    # Removed the border around the container to make it cleaner
+    topic = st.selectbox(
+        "Select Calculation Module:", 
+        [
+            "Phase Relationships",
+            "Effective Stress",
+            "Flow of Water in Soils",
+            "Consolidation Theory",
+            "Shear Strenght of Soils",
+            "Lateral Earth Pressure",
+            "Stability of Slopes"
+        ]
+    )
 
     # --- ROUTER LOGIC ---
     if topic == "Phase Relationships":
