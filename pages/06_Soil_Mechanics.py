@@ -17,7 +17,7 @@ st.set_page_config(
 def app():
     # --- PROFESSIONAL HEADER ---
     # Column Ratio [1, 5] keeps logo compact
-    col_logo, col_text = st.columns([1, 5])
+    col_logo, col_text = st.columns([1, 4])
 
     with col_logo:
         # [STYLE UPGRADE] 
