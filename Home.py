@@ -11,34 +11,49 @@ st.set_page_config(
 )
 
 # ==================================================
-# MINIMAL ACADEMIC CSS
+# CUSTOM CSS (Updated)
 # ==================================================
 st.markdown("""
 <style>
 
-/* Module Cards */
-{
+/* --- 1. CARD CONTAINER --- */
+[data-testid="stPageLink-NavLink"] {
     background-color: #f8f9fa !important;
     border: 1px solid #dee2e6 !important;
     border-radius: 10px !important;
     padding: 18px !important;
-    text-align: center !important;
     box-shadow: none !important;
     transition: background-color 0.15s ease !important;
+    
+    /* Flexbox settings to center everything */
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
 }
 
-{
+/* Hover Effect */
+[data-testid="stPageLink-NavLink"]:hover {
     background-color: #eef4f1 !important;
     border-color: #ced4da !important;
 }
 
-/* Module Title */
-{
+/* --- 2. TEXT STYLING --- */
+[data-testid="stPageLink-NavLink"] p {
     color: #212529 !important;
     font-size: 17px !important;
     font-weight: 600 !important;
     margin: 0 !important;
     line-height: 1.4 !important;
+    
+    /* Force text to center */
+    text-align: center !important;
+    width: 100% !important;
+}
+
+/* --- 3. HIDE THE ICON/ARROW --- */
+/* This removes the little image next to the text */
+[data-testid="stPageLink-NavLink"] svg {
+    display: none !important;
 }
 
 </style>
@@ -78,6 +93,7 @@ def main():
     col_logo, col_text = st.columns([1, 3], vertical_alignment="center")
 
     with col_logo:
+        # Ensure you have this file, or comment this line out if testing without the image
         st.image("assets/logo.png", use_container_width=True)
 
     with col_text:
@@ -92,6 +108,7 @@ def main():
         """, unsafe_allow_html=True)
 
     st.markdown("")
+    st.markdown("") # Extra space instead of a line
 
     # --------------------------------------------------
     # MODULES SECTION
@@ -111,29 +128,28 @@ def main():
                     label=title,
                     use_container_width=True
                 )
-                st.markdown(
-                    "<div style='color:#666; font-size:13px; margin-top:-6px; margin-bottom:22px;'>"
-                    
-                    "</div>",
-                    unsafe_allow_html=True
-                )
+                # Removed the extra markdown div here to clean up space
+                st.markdown("") 
 
     # --------------------------------------------------
-    # PURPOSE / MISSION
+    # PURPOSE / MISSION (No Separation Line)
     # --------------------------------------------------
-    st.markdown("---")
+    st.markdown("")
+    st.markdown("")
+    
     st.markdown("""
     ### Purpose
-
     MHF Civil provides transparent numerical solutions to standard civil engineering problems.
     Each module follows established theory, clearly states assumptions, and presents intermediate
     steps to support learning, verification, and exam preparation.
     """)
 
     # --------------------------------------------------
-    # FEEDBACK
+    # FEEDBACK (No Separation Line)
     # --------------------------------------------------
-    st.markdown("---")
+    st.markdown("")
+    st.markdown("")
+
     with st.expander("Report an Issue or Suggest an Improvement"):
         st.write(
             "If you identify an incorrect result, unclear assumption, or missing topic, "
@@ -146,14 +162,15 @@ def main():
         )
 
     # --------------------------------------------------
-    # ABOUT
+    # ABOUT (No Separation Line)
     # --------------------------------------------------
-    st.markdown("---")
+    st.markdown("")
+    st.markdown("")
+    
     st.subheader("About")
 
     st.markdown("""
-    **Developed by Muhammad Hammad Faisal**  
-    Final-Year Civil Engineering Student, Middle East Technical University (METU)
+    **Developed by Muhammad Hammad Faisal** Final-Year Civil Engineering Student, Middle East Technical University (METU)
     """)
 
     st.link_button(
@@ -164,7 +181,8 @@ def main():
     # --------------------------------------------------
     # FOOTER
     # --------------------------------------------------
-    st.markdown("---")
+    # Kept one line at the bottom for closure
+    st.markdown("---") 
     st.markdown("""
     <div style="text-align:center; color:#777; font-size:12px;">
         © 2026 MHF Civil · Version 1.2.0 · Ankara, Turkey
@@ -174,6 +192,3 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
-
-
-
