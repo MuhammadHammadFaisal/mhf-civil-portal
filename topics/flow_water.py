@@ -37,94 +37,30 @@ def format_scientific(val):
         return f"{val:.4f}"
     return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
 
-def get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth):
-    """
-    CORRECTED Sheet Pile Flow Net based on soil mechanics principles.
-    
-    Key observations from hand sketch:
-    1. Flow lines (blue) start horizontal upstream, curve DOWN around pile, exit horizontal downstream
-    2. Equipotentials (red dashed) are nearly vertical far away, curve around pile tip
-    3. Flow concentrates at PILE TIP (bottom of pile)
-    4. Pattern is symmetric-ish but biased by head difference
-    """
-    
-    # Pile tip location (critical point)
-    pile_tip_x = pile_x
-    pile_tip_y = -pile_depth
-    
-    # Create complex coordinates
-    z = x + 1j * y
-    z_tip = pile_tip_x + 1j * pile_tip_y
-    
-    # Distance from pile tip
-    z_from_tip = z - z_tip
-    
-    # Avoid singularity
-    epsilon = 0.01
-    z_from_tip = np.where(np.abs(z_from_tip) < epsilon, epsilon * (1 + 1j), z_from_tip)
-    
-    with np.errstate(all="ignore"):
-        # COMPONENT 1: Uniform horizontal flow (baseline seepage)
-        # This creates the horizontal flow from left to right
-        flow_velocity = (h_up - h_down) / 24.0  # Normalized velocity
-        W_uniform = flow_velocity * z
-        
-        # COMPONENT 2: Source at pile tip (creates flow diverging from tip)
-        # Water flows OUT from underneath the pile
-        source_strength = pile_depth * flow_velocity * 8.0
-        W_source = source_strength * np.log(z_from_tip + 0j)
-        
-        # COMPONENT 3: Dipole to create asymmetry and proper flow pattern
-        # This makes flow go AROUND the pile (up and down)
-        dipole_strength = pile_depth**1.5 * flow_velocity * 6.0
-        W_dipole = dipole_strength / z_from_tip
-        
-        # COMPONENT 4: Image system for impervious base
-        # Reflection from bottom boundary
-        z_from_base = z - (pile_tip_x + 1j * (-soil_depth))
-        z_from_base = np.where(np.abs(z_from_base) < epsilon, epsilon * (1 + 1j), z_from_base)
-        W_base = -source_strength * 0.3 * np.log(z_from_base + 0j)
-        
-        # Combine all components
-        W = W_uniform + W_source + W_dipole + W_base
-        
-        return W
-
-import numpy as np
+# ============================================================
+# FLOW NET CALCULATION LOGIC
+# ============================================================
 
 def get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth):
     """
     CORRECTED: Uses Conformal Mapping (Inverse Sine) for flow around a vertical barrier.
     """
+    # Safety check
+    d = max(pile_depth, 0.1)
+
     # 1. Center coordinates on the pile
     z = (x - pile_x) + 1j * y
     
-    # 2. Conformal Map: z = i * d * sinh(w)  ->  w = arcsinh(z / (i*d))
+    # 2. Conformal Map: w = i * arcsin(z/d)
     # This maps the sheet pile geometry to a semi-infinite strip.
-    # We use a slightly modified version for the half-space: W = -i * arcsin(z/d)
+    z_norm = z / d
     
-    # Normalize z by pile depth
-    z_norm = z / pile_depth
-    
-    # Apply the mapping (Result is W = Phi + i*Psi)
-    # The '1j' rotation aligns the potential so the surface is an equipotential
-    # and the pile is a streamline.
-    w_raw = 1j * np.arcsin(z_norm)
+    with np.errstate(all='ignore'):
+        # The '1j' rotation aligns the potential so the surface is an equipotential
+        # and the pile is a streamline.
+        w_raw = 1j * np.arcsin(z_norm)
     
     # 3. Scale to match Head Boundary Conditions
-    # The raw arcsin map gives Phi values from -pi/2 (left) to +pi/2 (right).
-    # We need to map this range [-pi/2, pi/2] to [h_up, h_down].
-    
-    phi_raw = np.real(w_raw)
-    psi_raw = np.imag(w_raw)
-    
-    # Normalize Phi to 0..1 range (0 at left/upstream, 1 at right/downstream)
-    # Note: arcsin branch cuts can be tricky; we take the real part carefully.
-    # The raw real part is actually 0 on the surface and varies elsewhere, 
-    # let's use the property that flow is driven by the potential difference.
-    
-    # For visualization consistency, we construct W directly:
-    # Scale factor ensures the head drop corresponds to the physical heads
     amplitude = (h_up - h_down) / np.pi
     average_head = (h_up + h_down) / 2.0
     
@@ -138,18 +74,14 @@ def get_complex_potential_dam(x, y, dam_width, h_up, h_down):
     CORRECTED: Uses Conformal Mapping (Inverse Sine) for flow under a flat plate.
     """
     z = x + 1j * y
-    b = dam_width / 2.0
-    
-    # Avoid division by zero
-    if b < 0.01: b = 0.01
+    b = max(dam_width / 2.0, 0.1)
         
-    # Conformal Map: z = b * sin(w) -> w = arcsin(z/b)
-    # For a flat dam, the base (-b to b) is a streamline (Psi=const).
-    # The surface (|x|>b) is an equipotential (Phi=const).
-    w_raw = np.arcsin(z / b)
+    # Conformal Map: w = arcsin(z/b)
+    # For a flat dam, the base (-b to b) is a streamline.
+    with np.errstate(all='ignore'):
+        w_raw = np.arcsin(z / b)
     
     # Scale to match heads
-    # Raw Phi is -pi/2 (left) to pi/2 (right)
     amplitude = (h_up - h_down) / np.pi
     average_head = (h_up + h_down) / 2.0
     
@@ -160,7 +92,7 @@ def get_complex_potential_dam(x, y, dam_width, h_up, h_down):
 
 def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width, h_up, h_down, soil_depth):
     """
-    Main function to get complex potential.
+    Main router function to get complex potential.
     """
     # Adjust for very shallow depth or numerical stability
     y = np.minimum(y, -0.01) 
@@ -172,22 +104,53 @@ def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width, h_up, h_dow
         return get_complex_potential_dam(x, y, dam_width, h_up, h_down)
     
     elif mode == "Combined (Dam + Pile)":
-        # NOTE: Exact analytical solution for Dam + Pile is extremely complex (Schwarz-Christoffel).
-        # We approximate it by treating the system as a deeper sheet pile, 
-        # as the pile is usually the dominant cutoff feature.
-        # Effective depth approx = Pile Depth + (Dam Width / 4)
-        
+        # Approximate combined effect by increasing effective pile depth
         effective_depth = pile_depth + (dam_width * 0.25)
         return get_complex_potential_sheet_pile(x, y, effective_depth, pile_x, h_up, h_down, soil_depth)
     
     return 0 + 0j
+
+def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d):
+    """
+    Calculates pore pressure (u) at a specific point (px, py).
+    """
+    if py > 0:
+        return None  # Above ground surface
+
+    gamma_w = 9.81  # kN/m³
+
+    # 1. Get complex potential at the specific point
+    w_pt = get_complex_potential(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
+    
+    # 2. Extract the Total Head (Phi)
+    # In our conformal map, the Real part (Phi) is directly the Total Head (h)
+    h_total = np.real(w_pt)
+
+    # Handle numerical edges (NaN or Inf)
+    if not np.isfinite(h_total):
+        return None
+
+    # 3. Calculate Pore Pressure
+    # Bernoulli/Terzaghi principle: Total Head = Elevation Head + Pressure Head
+    # h_total = y + (u / gamma_w)
+    # Therefore: u = (h_total - y) * gamma_w
+    
+    pressure_head = h_total - py
+    u = pressure_head * gamma_w
+
+    return {"u": u, "h_total": h_total, "pressure_head": pressure_head}
+
 # ============================================================
 # MAIN APP
 # ============================================================
 
 def app():
-    st.set_page_config(page_title="Soil Mechanics Analysis", layout="wide")
-    
+    # If this is a page in a multi-page app, this config might be ignored or warn, 
+    # but we leave it as per your original code.
+    try:
+        st.set_page_config(page_title="Soil Mechanics Analysis", layout="wide")
+    except:
+        pass
 
     st.subheader("Flow of Water & Seepage Analysis")
     
@@ -654,38 +617,4 @@ def app():
                 ** Red Dashed Lines (EQUIPOTENTIALS):**
                 - These connect points with the **same hydraulic head** (pressure + elevation)
                 - Nearly **vertical** far from the pile
-                - **Bend around the pile tip** where flow concentrates
-                - Each line represents an equal drop in head = {(h_up - h_down) / Nd:.2f}m
-                
-                ### **Critical Engineering Points:**
-                
-                1. **Pile Tip = Highest Risk Zone:**
-                   - Maximum hydraulic gradient occurs here
-                   - Potential for **piping failure** (soil erosion)
-                   - Pore pressures are highest at exit point
-                
-                2. **Seepage Quantity:**
-                   $$q = k \\times \\Delta h \\times \\frac{{N_f}}{{N_d}}$$
-                   Where k = soil permeability coefficient
-                
-                3. **Flow Path Length:**
-                   - Deeper pile = Longer flow path = Less seepage
-                   - Each meter of pile depth significantly reduces flow
-                
-                4. **Orthogonality Check:**
-                   - Flow lines should intersect equipotentials at **90°**
-                   - Creates approximately **square mesh elements**
-                   - Validates the flow net accuracy
-                
-                ### **Design Implications:**
-                
-                - If gradient at pile tip > critical gradient → **Piping risk**
-                - Pile depth determines effectiveness of cutoff
-                - Exit gradient = {(h_up - h_down) / pile_d:.2f} (approximate)
-                
-                 **Note:** This is a simplified 2D analysis. Real-world designs require 3D modeling and safety factors.
-                """)
-
-
-if __name__ == "__main__":
-    app()
+                - **Bend around the pile
