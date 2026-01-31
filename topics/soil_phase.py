@@ -154,7 +154,7 @@ def app():
                 Gs = raw_Gs if raw_Gs is not None else 2.7
                 w = raw_w if raw_w is not None else 0.2
 
-            # Guard against crazy values for plotting
+            
             if e > 5: e = 5
             if e < 0: e = 0.1
 
@@ -164,7 +164,6 @@ def app():
             Va = Vv - Vw
             
             Ms = Gs 
-            # Mw calculation for display (not logic)
             Mw = w * Ms if (w is not None and Gs is not None) else Vw * 1.0 
 
             fig, ax = plt.subplots(figsize=(5, 3.5))
@@ -262,10 +261,9 @@ def app():
 
         with top_col2:
             st.markdown("### Input Monitor")
-            # PASS THE FIGURE OBJECT, NOT SAVE TO FILE
             fig_preview = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=False)
             st.pyplot(fig_preview)
-            plt.close(fig_preview) # Good practice to close figure
+            plt.close(fig_preview) 
 
         
         solve_btn = st.button("Solve Numeric Problem", type="primary", use_container_width=True)
@@ -320,7 +318,7 @@ def app():
     # MODE B: SYMBOLIC / FORMULA FINDER
     # ==========================================
     elif "Symbolic" in mode:
-        st.subheader("Formula Finder 🔍")
+        st.subheader("Formula Finder ")
         st.caption("Select the variables you **KNOW** to find the formula for the variable you **WANT**.")
 
         col1, col2 = st.columns(2)
