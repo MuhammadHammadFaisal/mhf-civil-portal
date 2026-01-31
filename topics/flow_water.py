@@ -145,8 +145,7 @@ def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, s
 # ============================================================
 
 def app():
-    # If this is a page in a multi-page app, this config might be ignored or warn, 
-    # but we leave it as per your original code.
+
     try:
         st.set_page_config(page_title="Soil Mechanics Analysis", layout="wide")
     except:
