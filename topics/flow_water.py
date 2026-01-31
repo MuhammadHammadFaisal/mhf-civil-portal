@@ -617,4 +617,37 @@ def app():
                 ** Red Dashed Lines (EQUIPOTENTIALS):**
                 - These connect points with the **same hydraulic head** (pressure + elevation)
                 - Nearly **vertical** far from the pile
-                - **Bend around the pile
+                - **Bend around the pile tip** where flow concentrates
+                - Each line represents an equal drop in head = {(h_up - h_down) / Nd:.2f}m
+                
+                ### **Critical Engineering Points:**
+                
+                1. **Pile Tip = Highest Risk Zone:**
+                   - Maximum hydraulic gradient occurs here
+                   - Potential for **piping failure** (soil erosion)
+                   - Pore pressures are highest at exit point
+                
+                2. **Seepage Quantity:**
+                   $$q = k \\times \\Delta h \\times \\frac{{N_f}}{{N_d}}$$
+                   Where k = soil permeability coefficient
+                
+                3. **Flow Path Length:**
+                   - Deeper pile = Longer flow path = Less seepage
+                   - Each meter of pile depth significantly reduces flow
+                
+                4. **Orthogonality Check:**
+                   - Flow lines should intersect equipotentials at **90°**
+                   - Creates approximately **square mesh elements**
+                   - Validates the flow net accuracy
+                
+                ### **Design Implications:**
+                
+                - If gradient at pile tip > critical gradient → **Piping risk**
+                - Pile depth determines effectiveness of cutoff
+                - Exit gradient = {(h_up - h_down) / max(pile_d, 0.1):.2f} (approximate)
+                
+                 **Note:** This is a simplified 2D analysis. Real-world designs require 3D modeling and safety factors.
+                """)
+
+if __name__ == "__main__":
+    app()
