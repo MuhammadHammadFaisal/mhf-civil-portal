@@ -8,8 +8,6 @@ def app():
     # =================================================================
     # 1. HEADER & MODE
     # =================================================================
-    st.header("Shear Strength Analysis (Mohr-Coulomb)")
-    st.markdown("---")
 
     calc_mode = st.radio(
         "**Calculation Goal:**",
