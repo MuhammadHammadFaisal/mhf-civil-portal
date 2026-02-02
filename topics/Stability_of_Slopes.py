@@ -124,8 +124,7 @@ def app():
     # TAB 2: ROTATIONAL (CIRCULAR)
     # ---------------------------------------------------------
     with tab_rot:
-        st.header("Rotational Slip Analysis")
-        st.info("Analyzes circular failure surfaces. Choose the method below.")
+
         
         method = st.radio("**Calculation Method:**", 
                           ["A. Mass Procedure (Undrained / ϕ=0)", "B. Method of Slices"], 
@@ -283,9 +282,7 @@ def app():
     # TAB 3: COMPOUND (BLOCK & WEDGE)
     # ---------------------------------------------------------
     with tab_comp:
-        st.header("Compound Slide Analysis")
-        st.info("Analysis of a Block Failure: Active Wedge + Central Block + Passive Wedge.")
-        
+
         col_c1, col_c2 = st.columns([0.4, 0.6], gap="medium")
         
         with col_c1:
