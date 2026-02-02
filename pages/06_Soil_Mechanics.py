@@ -87,7 +87,7 @@ def app():
 
     # --- TOPIC SELECTION MENU ---
     topic = st.selectbox(
-        "Select Calculation Module:", 
+        "Select Chapter:", 
         [
             "Phase Relationships",
             "Effective Stress",
