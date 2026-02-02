@@ -7,7 +7,7 @@ import numpy as np
 # =========================================================
 # APP CONFIG
 # =========================================================
-
+st.set_page_config(page_title="Advanced Soil Stress Analysis", layout="wide")
 
 GAMMA_W = 9.81  
 
