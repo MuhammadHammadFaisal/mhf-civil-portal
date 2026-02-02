@@ -90,12 +90,12 @@ def app():
             excavation_depth = st.number_input("Excavation Depth (Left) (m)", 0.0, wall_height, 4.5, step=0.5)
             st.markdown("---")
             st.subheader("2. Soil Properties")
-            st.caption("⬅️ Left Side (Passive)")
+            st.caption(" Left Side (Passive)")
             left_wt = st.number_input("Left WT Depth (m)", 0.0, 20.0, 1.5)
             def_left = [{'H': 1.5, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
             left_layers = render_layers_input("L", "Passive Layers", def_left)
             st.markdown("---")
-            st.caption("➡️ Right Side (Active)")
+            st.caption(" Right Side (Active)")
             right_q = st.number_input("Surcharge q (kPa)", 0.0, 100.0, 50.0)
             right_wt = st.number_input("Right WT Depth (m)", 0.0, 20.0, 6.0)
             def_right = [{'H': 6.0, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
