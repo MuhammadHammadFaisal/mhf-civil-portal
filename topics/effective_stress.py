@@ -7,7 +7,7 @@ import numpy as np
 # =========================================================
 # APP CONFIG
 # =========================================================
-st.set_page_config(page_title="Advanced Soil Stress Analysis", layout="wide")
+
 
 GAMMA_W = 9.81  
 
@@ -76,7 +76,10 @@ def app():
                         cols[3].text_input("γ_dry", value="N/A", disabled=True, key=f"gd_dis{i}")
 
                     layers.append({
+                        "id": i+1,
                         "type": soil_type,
+                        "top": layer_top,
+                        "bot": layer_bot,
                         "H": thickness,
                         "g_sat": g_sat_input,
                         "g_dry": g_dry_input,
@@ -132,112 +135,118 @@ def app():
         st.markdown("---")
         if st.button("Calculate Stress Profiles", type="primary"):
 
-            # Depth points
-            z_points_set = {0.0, total_depth}
-            cur = 0
-            for l in layers:
-                cur += l['H']
-                z_points_set.add(round(cur, 3))
-
-            if 0 < water_depth < total_depth:
-                z_points_set.add(water_depth)
-
-            cap_top = water_depth - hc
-            if 0 < cap_top < total_depth:
-                z_points_set.add(cap_top)
-
-            for d in range(1, int(total_depth) + 1):
-                z_points_set.add(float(d))
-
-            sorted_z = sorted(list(z_points_set))
-
             # ===============================
-            # CORE FUNCTION (FIXED)
+            # CORE FUNCTION: LAYER-BY-LAYER LOGIC
             # ===============================
             def calculate_profile(mode_name, load_q):
                 results = []
                 math_logs = []
+                
+                # Start at surface
                 sigma_prev = load_q
-                z_prev = 0.0
-
-                for i, z in enumerate(sorted_z):
-
-                    # ----- FIX: ALWAYS DEFINE u_calc_text -----
-                    u_calc_text = "0"
-
-                    # Hydrostatic + capillary pore pressure
-                    if z > water_depth:
-                        u_h = (z - water_depth) * GAMMA_W
-                        u_calc_text = f"({z} - {water_depth}) \\times 9.81"
-                    elif z > (water_depth - hc):
-                        u_h = -(water_depth - z) * GAMMA_W
-                        u_calc_text = f"-({water_depth} - {z}) \\times 9.81"
-                    else:
-                        u_h = 0.0
-
-                    # Total stress increment
-                    if i > 0:
-                        dz = z - z_prev
-                        z_mid = (z + z_prev) / 2
-
-                        d_search = 0
-                        active_l = layers[-1]
-                        for l in layers:
-                            d_search += l['H']
-                            if z_mid <= d_search:
-                                active_l = l
-                                break
-
+                
+                # Iterate through each layer explicitly
+                for layer in layers:
+                    
+                    # 1. Define key points WITHIN this layer only
+                    # Always include Top and Bottom of this specific layer
+                    z_in_layer = {layer['top'], layer['bot']}
+                    
+                    # Add Integers, Water Table, Capillary Rise ONLY if they fall strictly inside this layer
+                    # (Strictly inside prevents duplicates at boundaries)
+                    
+                    # Integers
+                    for d in range(int(layer['top']), int(layer['bot']) + 1):
+                        if layer['top'] < d < layer['bot']:
+                            z_in_layer.add(float(d))
+                            
+                    # Water Table
+                    if layer['top'] < water_depth < layer['bot']:
+                        z_in_layer.add(water_depth)
+                        
+                    # Capillary Top
+                    cap_top = water_depth - hc
+                    if layer['top'] < cap_top < layer['bot']:
+                        z_in_layer.add(cap_top)
+                        
+                    # Sort points for calculation
+                    sorted_z = sorted(list(z_in_layer))
+                    
+                    # --- CALCULATION LOOP FOR THIS LAYER ---
+                    z_internal_prev = layer['top']
+                    
+                    for i, z in enumerate(sorted_z):
+                        # Skip the very first point if it's 0 (Surface), 
+                        # but we need to calculate boundaries for deeper layers.
+                        
+                        dz = z - z_internal_prev
+                        z_mid = (z + z_internal_prev) / 2
+                        
+                        # Determine Unit Weight for this interval
+                        # Check against Effective Water Table (WT - Capillary Rise)
                         eff_wt_boundary = water_depth - hc
+                        
                         if z_mid > eff_wt_boundary:
-                            gam = active_l['g_sat']
+                            gam = layer['g_sat']
                             g_sym = "\\gamma_{sat}"
                         else:
-                            gam = active_l['g_dry']
+                            gam = layer['g_dry']
                             g_sym = "\\gamma_{dry}"
-
+                            
+                        # Calculate Total Stress Increment
                         sigma = sigma_prev + (gam * dz)
-                        math_logs.append(f"**Interval {z_prev}m to {z}m:** {active_l['type']} (${g_sym}={gam}$)")
-                        math_logs.append(f"$\\sigma = {sigma_prev:.2f} + ({gam} \\times {dz:.2f}) = {sigma:.2f}$")
-                    else:
-                        sigma = load_q
-                        math_logs.append(f"**Surface (z=0):** Load = {load_q} kPa")
+                        
+                        # Logging (only if we moved)
+                        if dz > 0.0001:
+                            math_logs.append(f"**Layer {layer['id']} ({layer['type']}): {z_internal_prev:.2f}m to {z:.2f}m** (${g_sym}={gam}$)")
+                            math_logs.append(f"$\\sigma = {sigma_prev:.2f} + ({gam} \\times {dz:.2f}) = {sigma:.2f}$")
 
-                    # Clay excess pore pressure (Short Term)
-                    u_excess = 0.0
-                    check_z = z if z < total_depth else z - 0.01
-
-                    d_check = 0
-                    is_clay = False
-                    for l in layers:
-                        d_check += l['H']
-                        if check_z <= d_check:
-                            if l['type'] == 'Clay':
-                                is_clay = True
-                            break
-
-                    u_calc_add = ""
-                    if mode_name == "Short Term" and load_q > 0 and is_clay:
-                        u_excess = load_q
-                        u_calc_add = f" + {load_q} (Excess)"
-
-                    u_tot = u_h + u_excess
-                    sig_eff = sigma - u_tot
-
-                    math_logs.append(f"**@ z={z}m:**")
-                    math_logs.append(f"$u = {u_calc_text}{u_calc_add} = {u_tot:.2f}$")
-                    math_logs.append(f"$\\sigma' = {sigma:.2f} - {u_tot:.2f} = \\mathbf{{{sig_eff:.2f}}}$")
-                    math_logs.append("---")
-
-                    results.append({
-                        "Depth (z)": z,
-                        "Total Stress (σ)": sigma,
-                        "Pore Pressure (u)": u_tot,
-                        "Eff. Stress (σ')": sig_eff
-                    })
-
-                    sigma_prev = sigma
-                    z_prev = z
+                        # --- PORE PRESSURE (u) ---
+                        # Hydrostatic + Capillary
+                        u_calc_text = "0"
+                        if z > water_depth:
+                            u_h = (z - water_depth) * GAMMA_W
+                            u_calc_text = f"({z:.2f} - {water_depth}) \\times 9.81"
+                        elif z > (water_depth - hc):
+                            u_h = -(water_depth - z) * GAMMA_W
+                            u_calc_text = f"-({water_depth} - {z:.2f}) \\times 9.81"
+                        else:
+                            u_h = 0.0
+                            
+                        # Excess Pore Pressure (Short Term)
+                        # Now uses the CURRENT layer type explicitly
+                        u_excess = 0.0
+                        u_calc_add = ""
+                        
+                        if mode_name == "Short Term" and load_q > 0 and layer['type'] == 'Clay':
+                            u_excess = load_q
+                            u_calc_add = f" + {load_q} (Excess)"
+                            
+                        u_tot = u_h + u_excess
+                        sig_eff = sigma - u_tot
+                        
+                        # Log Output for key points
+                        math_logs.append(f"**@ z={z:.2f}m ({layer['type']}):**")
+                        math_logs.append(f"$u = {u_calc_text}{u_calc_add} = {u_tot:.2f}$")
+                        math_logs.append(f"$\\sigma' = {sigma:.2f} - {u_tot:.2f} = \\mathbf{{{sig_eff:.2f}}}$")
+                        math_logs.append("---")
+                        
+                        # Determine position tag (Top/Bottom/Mid)
+                        pos_tag = ""
+                        if abs(z - layer['top']) < 0.001: pos_tag = " (Top)"
+                        elif abs(z - layer['bot']) < 0.001: pos_tag = " (Bottom)"
+                        
+                        results.append({
+                            "Depth (z)": z,
+                            "Soil Type": f"{layer['type']}{pos_tag}",
+                            "Total Stress (σ)": sigma,
+                            "Pore Pressure (u)": u_tot,
+                            "Eff. Stress (σ')": sig_eff
+                        })
+                        
+                        # Update for next step in this layer
+                        sigma_prev = sigma
+                        z_internal_prev = z
 
                 return pd.DataFrame(results), math_logs
 
@@ -266,13 +275,14 @@ def app():
                                       ["Initial", "Long Term", "Short Term"]):
                 with col:
                     st.subheader(title)
-                    st.dataframe(df.style.format("{:.2f}"))
+                    # Use styling to highlight rows
+                    st.dataframe(df.style.format({"Depth (z)": "{:.2f}", "Total Stress (σ)": "{:.2f}", "Pore Pressure (u)": "{:.2f}", "Eff. Stress (σ')": "{:.2f}"}))
                     fig, ax = plt.subplots(figsize=(5, 6))
                     plot_results(df, title, ax)
                     st.pyplot(fig)
 
-# =====================================================
-    # TAB 2 — HEAVE CHECK (PROFESSIONAL VISUALS)
+    # =====================================================
+    # TAB 2 — HEAVE CHECK
     # =====================================================
     with tab2:
         st.subheader("Heave & Piping Analysis")
