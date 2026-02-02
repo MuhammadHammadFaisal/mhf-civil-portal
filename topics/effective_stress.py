@@ -16,7 +16,6 @@ GAMMA_W = 9.81
 # MAIN APP
 # =========================================================
 def app():
-    st.title("Advanced Effective Stress Analysis")
     st.markdown("---")
 
     tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
@@ -36,13 +35,13 @@ def app():
             st.markdown("### A. Global Parameters")
             c1, c2, c3 = st.columns(3)
             with c1:
-                water_depth = st.number_input("Water Table Depth (m)", value=3.0, step=0.5)
+                water_depth = st.number_input("Water Table Depth (m)", value=3.0, step=0.1)
             with c2:
                 hc = st.number_input("Capillary Rise (m)", value=0.0, step=0.1)
             with c3:
-                surcharge = st.number_input("Surcharge q (kPa)", value=50.0, step=5.0)
+                surcharge = st.number_input("Surcharge q (kPa)", value=50.0, step=1.0)
 
-            st.markdown("### B. Stratigraphy")
+            st.markdown("### B. Soil Properties")
             num_layers = st.number_input("Number of Layers", 1, 5, 2)
             layers = []
             colors = {"Sand": "#E6D690", "Clay": "#B0A494"}
