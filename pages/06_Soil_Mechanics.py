@@ -16,12 +16,10 @@ st.set_page_config(
 )
 
 def app():
-    # ==================================================
-    # CUSTOM CSS (Fixed Dropdown & Menu Colors)
-    # ==================================================
+    # CUSTOM CSS
     st.markdown("""
     <style>
-    /* 1. The Main Clickable Box (Closed State) */
+    /* Main dropdown box */
     div[data-baseweb="select"] > div {
         background-color: #3b3f4d !important; /* Lighter Grey */
         border: 2px solid #5a5f70 !important; 
@@ -29,25 +27,25 @@ def app():
         border-radius: 8px !important;
     }
 
-    /* 2. The Dropdown Menu List (Open State) - This fixes the blending issue */
+   /* Dropdown menu background */
     ul[data-baseweb="menu"] {
         background-color: #262730 !important;  /* Dark Grey Background */
         border: 1px solid #5a5f70 !important;  /* Border to separate from page */
         padding: 10px !important;
     }
 
-    /* 3. The Individual Options inside the list */
+    /* Menu options */
     li[data-baseweb="option"] {
         color: white !important;              /* Text color */
     }
 
-    /* 4. Hover Effect for Options */
+    /* Hover state */
     li[data-baseweb="option"]:hover {
         background-color: #ff4b4b !important; /* Red highlight on hover */
         color: white !important;
     }
     
-    /* 5. Force the selected text to be white */
+    /* 6. Fix the Arrow Icon color */
     div[data-baseweb="select"] span {
         color: white !important;
     }
@@ -59,7 +57,7 @@ def app():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- PROFESSIONAL HEADER ---
+
     col_logo, col_text = st.columns([1, 5])
 
     with col_logo:
@@ -75,7 +73,7 @@ def app():
             """, 
             unsafe_allow_html=True
         )
-        st.image("assets/logo.png", width=150) 
+        st.image("assets/logo.png", width=150)
 
     with col_text:
         st.markdown(
@@ -90,9 +88,6 @@ def app():
             unsafe_allow_html=True
         )
 
-    # ==================================================
-    # SPACING FIX (40px gap)
-    # ==================================================
     st.markdown("<div style='margin-bottom: 40px;'></div>", unsafe_allow_html=True)
 
     # --- TOPIC SELECTION MENU ---
@@ -104,13 +99,13 @@ def app():
             "Effective Stress",
             "Flow of Water in Soils",
             "Consolidation Theory",
-            "Shear Strenght of Soils",
+            "Shear Strength of Soils",
             "Lateral Earth Pressure",
             "Stability of Slopes"
         ]
     )
 
-    # --- ROUTER LOGIC ---
+
     if topic == "Phase Relationships":
         soil_phase.app()
 
@@ -123,7 +118,7 @@ def app():
     elif topic == "Consolidation Theory":
         consolidation.app()
         
-    elif topic == "Shear Strenght of Soils":
+    elif topic == "Shear Strength of Soil":
         shear_strength.app()
         
     elif topic == "Lateral Earth Pressure":
