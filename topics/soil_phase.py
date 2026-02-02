@@ -143,19 +143,24 @@ def app():
         with col1:
             st.markdown("### Inputs")
 
+            # Option 1: Keep your layout but add unique 'key' arguments (Recommended)
             st.markdown(r"**$w$ (Water Content)**")
-            w = st.number_input("", 0.0, step=0.01)
+            w = st.number_input("", 0.0, step=0.01, key="w_input") 
+
             st.markdown(r"**$G_s$ (Specific Gravity)**")
-            Gs = st.number_input("", 0.0, step=0.01)
+            Gs = st.number_input("", 0.0, step=0.01, key="Gs_input")
+
             st.markdown(r"**$e$ (Void Ratio)**")
-            e = st.number_input("", 0.0, step=0.01)
+            e = st.number_input("", 0.0, step=0.01, key="e_input")
+
             st.markdown(r"**$S_r$ (Saturation)**")
-            Sr = st.number_input("", 0.0, 1.0, step=0.01)
+            Sr = st.number_input("", 0.0, 1.0, step=0.01, key="Sr_input")
 
             st.markdown(r"**$\gamma_{bulk}$ (kN/m³)**")
-            gb = st.number_input("", 0.0, step=0.1)
+            gb = st.number_input("", 0.0, step=0.1, key="gb_input")
+
             st.markdown(r"**$\gamma_{dry}$ (kN/m³)**")
-            gd = st.number_input("", 0.0, step=0.1)
+            gd = st.number_input("", 0.0, step=0.1, key="gd_input")
 
             if w > 0: solver.set_param("w", w)
             if Gs > 0: solver.set_param("Gs", Gs)
