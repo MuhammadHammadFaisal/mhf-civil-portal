@@ -56,6 +56,7 @@ def app():
                     
            
                     if known('n') and not known('e'):
+
                     if known('n') and not known('e') and p['n'] < 1:
                         p['e'] = p['n'] / (1 - p['n'])
                         sub = r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}'
@@ -190,7 +191,7 @@ def app():
                 Gs = raw_Gs if raw_Gs is not None else 2.7
                 w = raw_w if raw_w is not None else 0.1
             else:
-@@ -255,50 +299,52 @@ def app():
+@@ -255,50 +298,52 @@ def app():
             fig_preview = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=False)
             st.pyplot(fig_preview)
             plt.close(fig_preview) 
@@ -243,7 +244,7 @@ def app():
                     Dr = (e_max - e_curr) / (e_max - e_min)
                     st.latex(r"D_r = \frac{e_{max} - e}{e_{max} - e_{min}} = " + f"{Dr*100:.1f}\\%")
                 else:
-@@ -321,70 +367,72 @@ def app():
+@@ -321,70 +366,72 @@ def app():
                     "gamma_dry (Dry Unit Wt)", "gamma_sat (Saturated Unit Wt)"
                 ],
                 default=["Gs (Specific Gravity)", "e (Void Ratio)"]
