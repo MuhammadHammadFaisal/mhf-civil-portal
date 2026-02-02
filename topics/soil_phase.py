@@ -28,7 +28,6 @@ def app():
                 self.log = []
                 self.inputs = []
 
-                # Mapping for display in LaTeX logs
                 self.latex_map = {
                     'w': 'w', 'Gs': 'G_s', 'e': 'e', 'n': 'n', 'Sr': 'S_r',
                     'rho_bulk': r'\rho_{bulk}', 'rho_dry': r'\rho_{dry}',
@@ -169,24 +168,29 @@ def app():
                         self.add_log('gamma_sat', r'\gamma_{dry} + n \gamma_w', sub, p['gamma_sat'])
                         changed = True
 
-                    # 5. Missing Gs Cases
+                    # --- NEW: Solve for Gs (Specific Gravity) ---
+                    # Case: Given Gamma_dry and e -> Find Gs
                     if known('gamma_dry') and known('e') and not known('Gs'):
                         p['Gs'] = (p['gamma_dry'] * (1 + p['e'])) / self.gamma_w
                         sub = r'\frac{' + f"{p['gamma_dry']:.2f}(1 + {p['e']:.3f})" + r'}{9.81}'
                         self.add_log('Gs', r'\frac{\gamma_{dry}(1+e)}{\gamma_w}', sub, p['Gs'])
                         changed = True
+
+                    # Case: Given Gamma_sat and e -> Find Gs
                     if known('gamma_sat') and known('e') and not known('Gs'):
                         p['Gs'] = ((p['gamma_sat'] * (1 + p['e'])) / self.gamma_w) - p['e']
                         sub = r'\frac{' + f"{p['gamma_sat']:.2f}(1 + {p['e']:.3f})" + r'}{9.81} - ' + f"{p['e']:.3f}"
                         self.add_log('Gs', r'\frac{\gamma_{sat}(1+e)}{\gamma_w} - e', sub, p['Gs'])
                         changed = True
+                        
+                    # Case: Given Gamma_bulk, w, and e -> Find Gs
                     if known('gamma_bulk') and known('w') and known('e') and not known('Gs'):
                         p['Gs'] = (p['gamma_bulk'] * (1 + p['e'])) / (self.gamma_w * (1 + p['w']))
                         sub = r'\frac{' + f"{p['gamma_bulk']:.2f}(1 + {p['e']:.3f})" + r'}{9.81(1 + ' + f"{p['w']:.3f})" + r'}'
                         self.add_log('Gs', r'\frac{\gamma_{bulk}(1+e)}{\gamma_w(1+w)}', sub, p['Gs'])
                         changed = True
 
-                    # 6. Saturation
+                    # 5. Saturation
                     if known('gamma_sat') and not known('gamma_sub'):
                         p['gamma_sub'] = p['gamma_sat'] - self.gamma_w
                         sub = f"{p['gamma_sat']:.2f} - 9.81"
@@ -223,6 +227,7 @@ def app():
                 Gs = raw_Gs if raw_Gs is not None else 2.7
                 w = raw_w if raw_w is not None else 0.2
 
+            
             if e > 5: e = 5
             if e < 0: e = 0.1
 
@@ -304,7 +309,7 @@ def app():
         with top_col1:
             st.markdown("### 1. Inputs")
             
-            condition = st.radio("Soil State:", ["Partially Saturated", "Fully Saturated (Sᵣ=1)", "Dry (Sᵣ=0)"])
+            condition = st.radio("Soil State:", ["Partially Saturated", "Fully Saturated (Sr=1)", "Dry (Sr=0)"])
             if "Fully" in condition: solver.set_param('Sr', 1.0)
             elif "Dry" in condition: solver.set_param('Sr', 0.0)
 
@@ -317,11 +322,10 @@ def app():
                 Sr_in = st.number_input("Saturation (Sᵣ)", 0.0, 1.0, step=0.01)
                 
             with c2:
-                # PROFESSIONAL UNICODE SUBSCRIPTS
-                gamma_b_in = st.number_input("Bulk Unit Wt (γᵦᵤₗₖ)", 0.0, step=0.1)
-                gamma_d_in = st.number_input("Dry Unit Wt (γ₄ᵣᵧ)", 0.0, step=0.1)
-                rho_b_in = st.number_input("Bulk Density (ρᵦᵤₗₖ)", 0.0, step=0.01)
-                rho_d_in = st.number_input("Dry Density (ρ₄ᵣᵧ)", 0.0, step=0.01)
+                gamma_b_in = st.number_input("Bulk Unit Wt (γ_bulk)", 0.0, step=0.1)
+                gamma_d_in = st.number_input("Dry Unit Wt (γ_dry)", 0.0, step=0.1)
+                rho_b_in = st.number_input("Bulk Density (ρ_bulk)", 0.0, step=0.01)
+                rho_d_in = st.number_input("Dry Density (ρ_dry)", 0.0, step=0.01)
 
             if w_in > 0: solver.set_param('w', w_in)
             if Gs_in > 0: solver.set_param('Gs', Gs_in)
@@ -379,13 +383,13 @@ def app():
         st.markdown("---")
         st.markdown("")
         with st.container(border=True):
-            st.subheader("Relative Density ($D_r$) Calculator")
+            st.subheader("Relative Density (Dᵣ) Calculator")
             rc1, rc2, rc3 = st.columns(3)
             with rc1: e_curr = st.number_input("Current e", 0.0, step=0.01, key="dr_e")
             with rc2: e_max = st.number_input("Max e", 0.0, step=0.01, key="dr_emax")
             with rc3: e_min = st.number_input("Min e", 0.0, step=0.01, key="dr_emin")
             
-            if st.button("Calculate Dr"):
+            if st.button("Calculate Dᵣ"):
                 if e_max > e_min:
                     Dr = (e_max - e_curr) / (e_max - e_min)
                     st.latex(r"D_r = \frac{e_{max} - e}{e_{max} - e_{min}} = " + f"{Dr*100:.1f}\\%")
@@ -401,7 +405,6 @@ def app():
 
         col1, col2 = st.columns(2)
         with col1:
-            # 100% PROFESSIONAL UNICODE
             known_vars = st.multiselect(
                 "I have these variables (Inputs):",
                 options=[
@@ -410,13 +413,12 @@ def app():
                     "e (Void Ratio)", 
                     "n (Porosity)", 
                     "Sᵣ (Saturation)", 
-                    "γᵦᵤₗₖ (Bulk Unit Wt)", 
-                    "γ₄ᵣᵧ (Dry Unit Wt)",   
-                    "γₛₐₜ (Saturated Unit Wt)" 
+                    "γ_bulk (Bulk Unit Wt)", 
+                    "γ_dry (Dry Unit Wt)",   
+                    "γ_sat (Saturated Unit Wt)" 
                 ],
                 default=["Gₛ (Specific Gravity)", "e (Void Ratio)"]
             )
-            # Logic splits by space -> "Gₛ", "γᵦᵤₗₖ", etc.
             cleaned_knowns = set([k.split(" ")[0] for k in known_vars])
 
         with col2:
@@ -424,56 +426,58 @@ def app():
                 "I want to find (Target):",
                 options=[
                     "Gₛ (Specific Gravity)",
-                    "γ₄ᵣᵧ (Dry Unit Wt)", 
-                    "γᵦᵤₗₖ (Bulk Unit Wt)",
-                    "γₛₐₜ (Saturated Unit Wt)", 
+                    "γ_dry (Dry Unit Wt)", 
+                    "γ_bulk (Bulk Unit Wt)",
+                    "γ_sat (Saturated Unit Wt)", 
                     "γ' (Submerged Unit Wt)",   
-                    "e (Void Ratio)", "n (Porosity)", "Sᵣ (Saturation)", "w (Water Content)"
+                    "e (Void Ratio)", 
+                    "n (Porosity)", 
+                    "Sᵣ (Saturation)", 
+                    "w (Water Content)"
                 ]
             )
             target = target_var_raw.split(" ")[0]
 
-        # UPDATED DICTIONARY using the Unicode keys
         formulas = {
             'Gₛ': [
-                ({'γ₄ᵣᵧ', 'e'}, r"G_s = \frac{\gamma_{dry}(1+e)}{\gamma_w}", "Back-calculated from Dry Unit Weight."),
-                ({'γₛₐₜ', 'e'}, r"G_s = \frac{\gamma_{sat}(1+e)}{\gamma_w} - e", "Back-calculated from Saturated Unit Weight."),
+                ({'γ_dry', 'e'}, r"G_s = \frac{\gamma_{dry}(1+e)}{\gamma_w}", "Back-calculated from Dry Unit Weight."),
+                ({'γ_sat', 'e'}, r"G_s = \frac{\gamma_{sat}(1+e)}{\gamma_w} - e", "Back-calculated from Saturated Unit Weight."),
                 ({'w', 'Sᵣ', 'e'}, r"G_s = \frac{S_r e}{w}", "From the fundamental relationship Se = wGs.")
             ],
-            'γ₄ᵣᵧ': [
+            'γ_dry': [
                 ({'Gₛ', 'e'}, r"\gamma_{dry} = \frac{G_s \gamma_w}{1 + e}", "Basic definition using Void Ratio."),
-                ({'γᵦᵤₗₖ', 'w'}, r"\gamma_{dry} = \frac{\gamma_{bulk}}{1 + w}", "Derived from Bulk Density and Water Content."),
+                ({'γ_bulk', 'w'}, r"\gamma_{dry} = \frac{\gamma_{bulk}}{1 + w}", "Derived from Bulk Density and Water Content."),
                 ({'Gₛ', 'n'}, r"\gamma_{dry} = G_s \gamma_w (1 - n)", "Using Porosity instead of Void Ratio.")
             ],
-            'γᵦᵤₗₖ': [
+            'γ_bulk': [
                 ({'Gₛ', 'e', 'w'}, r"\gamma_{bulk} = \frac{G_s \gamma_w (1 + w)}{1 + e}", "The general relationship for unit weight."),
                 ({'Gₛ', 'e', 'Sᵣ'}, r"\gamma_{bulk} = \frac{(G_s + S_r e)\gamma_w}{1 + e}", "Using Saturation instead of Water Content."),
-                ({'γ₄ᵣᵧ', 'w'}, r"\gamma_{bulk} = \gamma_{dry}(1 + w)", "From dry unit weight and water content.")
+                ({'γ_dry', 'w'}, r"\gamma_{bulk} = \gamma_{dry}(1 + w)", "From dry unit weight and water content.")
             ],
-            'γₛₐₜ': [
+            'γ_sat': [
                 ({'Gₛ', 'e'}, r"\gamma_{sat} = \frac{(G_s + e)\gamma_w}{1 + e}", "Assumes Sr = 1 (Fully Saturated)."),
-                ({'γ₄ᵣᵧ', 'n'}, r"\gamma_{sat} = \gamma_{dry} + n \gamma_w", "Relation between saturated and dry states.")
+                ({'γ_dry', 'n'}, r"\gamma_{sat} = \gamma_{dry} + n \gamma_w", "Relation between saturated and dry states.")
             ],
             "γ'": [
-                ({'γₛₐₜ'}, r"\gamma' = \gamma_{sat} - \gamma_w", "Archimedes' principle for submerged soil."),
+                ({'γ_sat'}, r"\gamma' = \gamma_{sat} - \gamma_w", "Archimedes' principle for submerged soil."),
                 ({'Gₛ', 'e'}, r"\gamma' = \frac{(G_s - 1)\gamma_w}{1 + e}", "Standard submerged weight formula.")
             ],
             'e': [
                 ({'n'}, r"e = \frac{n}{1 - n}", "Conversion from Porosity."),
                 ({'w', 'Gₛ', 'Sᵣ'}, r"e = \frac{w G_s}{S_r}", "From the fundamental relationship Se = wGs."),
-                ({'γ₄ᵣᵧ', 'Gₛ'}, r"e = \frac{G_s \gamma_w}{\gamma_{dry}} - 1", "Back-calculated from Dry Unit Weight."),
-                ({'γₛₐₜ', 'Gₛ'}, r"e = \frac{G_s \gamma_w - \gamma_{sat}}{\gamma_{sat} - \gamma_w}", "Back-calculated from Saturated Unit Weight.")
+                ({'γ_dry', 'Gₛ'}, r"e = \frac{G_s \gamma_w}{\gamma_{dry}} - 1", "Back-calculated from Dry Unit Weight."),
+                ({'γ_sat', 'Gₛ'}, r"e = \frac{G_s \gamma_w - \gamma_{sat}}{\gamma_{sat} - \gamma_w}", "Back-calculated from Saturated Unit Weight.")
             ],
             'n': [
                 ({'e'}, r"n = \frac{e}{1 + e}", "Conversion from Void Ratio."),
-                ({'γₛₐₜ', 'γ₄ᵣᵧ'}, r"n = \frac{\gamma_{sat} - \gamma_{dry}}{\gamma_w}", "Difference between Sat and Dry states.")
+                ({'γ_sat', 'γ_dry'}, r"n = \frac{\gamma_{sat} - \gamma_{dry}}{\gamma_w}", "Difference between Sat and Dry states.")
             ],
             'Sᵣ': [
                 ({'w', 'Gₛ', 'e'}, r"S_r = \frac{w G_s}{e}", "Rearranged from Se = wGs.")
             ],
             'w': [
                 ({'Sᵣ', 'e', 'Gₛ'}, r"w = \frac{S_r e}{G_s}", "Rearranged from Se = wGs."),
-                ({'γᵦᵤₗₖ', 'γ₄ᵣᵧ'}, r"w = \frac{\gamma_{bulk}}{\gamma_{dry}} - 1", "From bulk and dry unit weights.")
+                ({'γ_bulk', 'γ_dry'}, r"w = \frac{\gamma_{bulk}}{\gamma_{dry}} - 1", "From bulk and dry unit weights.")
             ]
         }
 
@@ -492,6 +496,5 @@ def app():
             if target in formulas:
                 st.markdown("**To find this variable, you typically need combinations like:**")
                 for reqs, _, _ in formulas[target]:
-                    # Pretty print the requirements from the unicode keys
                     pretty_reqs = ", ".join(list(reqs))
                     st.markdown(f"- {pretty_reqs}")
