@@ -1,299 +1,287 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import numpy as np
 
 # =========================================================
-# HELPER FUNCTIONS
+# APP CONFIG
 # =========================================================
-GAMMA_W = 9.81
+st.set_page_config(page_title="Soil Stress Analysis", layout="wide")
 
-def render_layers_input(prefix, label, default_layers):
-    """Renders the input fields for soil layers."""
-    st.markdown(f"**{label}**")
-    num = st.number_input(f"No. of Layers ({prefix})", 1, 5, len(default_layers), key=f"{prefix}_num")
-    layers = []
-    current_z = 0.0
-    
-    for i in range(int(num)):
-        with st.expander(f"Layer {i+1} ({prefix})", expanded=False):
-            def_h = default_layers[i]['H'] if i < len(default_layers) else 3.0
-            type_key = f"{prefix}_type_{i}"
-            soil_type = st.selectbox("Soil Type", ["Sand", "Clay", "Custom"], key=type_key)
-            
-            if soil_type == "Sand":
-                d_g, d_p, d_c = 18.0, 35.0, 0.0
-            elif soil_type == "Clay":
-                d_g, d_p, d_c = 20.0, 25.0, 20.0
-            else:
-                d_g = default_layers[i]['g'] if i < len(default_layers) else 19.0
-                d_p = default_layers[i]['p'] if i < len(default_layers) else 30.0
-                d_c = default_layers[i]['c'] if i < len(default_layers) else 5.0
-
-            h = st.number_input(f"H (m)", 0.1, 20.0, def_h, key=f"{prefix}_h_{i}")
-            c1, c2 = st.columns(2)
-            gamma = c1.number_input(f"γ (kN/m³)", 10.0, 25.0, d_g, key=f"{prefix}_g_{i}_{soil_type}")
-            phi = c2.number_input(f"ϕ' (deg)", 0.0, 45.0, d_p, key=f"{prefix}_p_{i}_{soil_type}")
-            c = st.number_input(f"c' (kPa)", 0.0, 100.0, d_c, key=f"{prefix}_c_{i}_{soil_type}")
-            
-            layers.append({"id": i+1, "H": h, "gamma": gamma, "phi": phi, "c": c, "top": current_z, "bottom": current_z + h, "type": soil_type})
-            current_z += h
-    return layers
-
-def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
-    """Calculates lateral stress at a specific depth (Rankine)."""
-    active_layer = layers[-1]
-    for l in layers:
-        if z_local < l['bottom']: active_layer = l; break
-        if z_local == l['bottom']: active_layer = l; break
-    
-    sig_v = surcharge
-    for l in layers:
-        if z_local > l['bottom']: sig_v += l['H'] * l['gamma']
-        else: sig_v += (z_local - l['top']) * l['gamma']; break
-    
-    u = (z_local - wt_depth) * GAMMA_W if z_local > wt_depth else 0.0
-    sig_v_eff = sig_v - u
-    
-    phi_r = np.radians(active_layer['phi'])
-    c_val = active_layer['c']
-    
-    if mode == "Active":
-        K = (1 - np.sin(phi_r)) / (1 + np.sin(phi_r))
-        sig_lat_eff = (sig_v_eff * K) - (2 * c_val * np.sqrt(K))
-    else: 
-        K = (1 + np.sin(phi_r)) / (1 - np.sin(phi_r))
-        sig_lat_eff = (sig_v_eff * K) + (2 * c_val * np.sqrt(K))
-        
-    if sig_lat_eff < 0: sig_lat_eff = 0
-    sig_lat_tot = sig_lat_eff + u
-    return sig_lat_tot, u, K, active_layer['id']
+GAMMA_W = 9.81  
 
 # =========================================================
 # MAIN APP
 # =========================================================
 def app():
-    
-    tab_rankine, tab_coulomb = st.tabs(["1. Rankine's Theory (Wall Profile)", "2. Coulomb's Wedge Theory"])
+    st.title("Effective Stress Analysis")
+    st.markdown("---")
 
-    # ---------------------------------------------------------
-    # TAB 1: RANKINE (Standard)
-    # ---------------------------------------------------------
-    with tab_rankine:
+    # Use a container to keep the layout clean (Left = Inputs, Right = Profile)
+    col_input, col_viz = st.columns([1, 1.2])
 
-        col_input, col_viz = st.columns([0.4, 0.6], gap="medium")
-
-        with col_input:
-            st.subheader("1. Wall Geometry")
-            wall_height = st.number_input("Total Wall Height (m)", 1.0, 30.0, 9.0, step=0.5)
-            excavation_depth = st.number_input("Excavation Depth (Left) (m)", 0.0, wall_height, 4.5, step=0.5)
-            st.markdown("---")
-            st.subheader("2. Soil Properties")
-            st.caption(" Left Side (Passive)")
-            left_wt = st.number_input("Left WT Depth (m)", 0.0, 20.0, 1.5)
-            def_left = [{'H': 1.5, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
-            left_layers = render_layers_input("L", "Passive Layers", def_left)
-            st.markdown("---")
-            st.caption(" Right Side (Active)")
-            right_q = st.number_input("Surcharge q (kPa)", 0.0, 100.0, 50.0)
-            right_wt = st.number_input("Right WT Depth (m)", 0.0, 20.0, 6.0)
-            def_right = [{'H': 6.0, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
-            right_layers = render_layers_input("R", "Active Layers", def_right)
-            st.markdown("---")
-            calc_trigger = st.button("Calculate Pressure Profile", type="primary", use_container_width=True)
-
-        with col_viz:
-            st.subheader("Soil Profile Preview")
-            fig_profile, ax_p = plt.subplots(figsize=(8, 6))
-            wall_width = 1.0
-            rect_wall = patches.Rectangle((-wall_width/2, 0), wall_width, wall_height, facecolor='lightgrey', edgecolor='black', hatch='//')
-            ax_p.add_patch(rect_wall)
-            Y_top, Y_exc = wall_height, wall_height - excavation_depth 
-            
-            # Draw Right
-            current_y = Y_top
-            for l in right_layers:
-                h = l['H']
-                color = '#E6D690' if l['type'] == "Sand" else ('#B0A494' if l['type'] == "Clay" else '#C1B088')
-                rect = patches.Rectangle((wall_width/2, current_y - h), 6, h, facecolor=color, edgecolor='gray', alpha=0.6)
-                ax_p.add_patch(rect)
-                ax_p.text(wall_width/2 + 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
-                current_y -= h
-            # Draw Left
-            current_y = Y_exc
-            for l in left_layers:
-                h = l['H']
-                color = '#E6D690' if l['type'] == "Sand" else ('#B0A494' if l['type'] == "Clay" else '#C1B088')
-                rect = patches.Rectangle((-wall_width/2 - 6, current_y - h), 6, h, facecolor=color, edgecolor='gray', alpha=0.6)
-                ax_p.add_patch(rect)
-                ax_p.text(-wall_width/2 - 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
-                current_y -= h
-            
-            # Annotations
-            if right_q > 0:
-                for x in np.linspace(wall_width/2 + 0.5, wall_width/2 + 5.5, 6):
-                    ax_p.arrow(x, Y_top + 1.0, 0, -0.8, head_width=0.2, fc='red', ec='red')
-                ax_p.text(wall_width/2 + 3, Y_top + 1.2, f"q = {right_q}", color='red', ha='center', fontweight='bold')
-            ax_p.plot([wall_width/2, wall_width/2 + 6], [Y_top, Y_top], 'k-', linewidth=2) 
-            ax_p.plot([-wall_width/2 - 6, -wall_width/2], [Y_exc, Y_exc], 'k-', linewidth=2) 
-            ax_p.set_xlim(-8, 8); ax_p.set_ylim(-2, wall_height + 3); ax_p.set_aspect('equal'); ax_p.axis('off')
-            st.pyplot(fig_profile)
-
-            if calc_trigger:
-                st.markdown("---")
-                st.subheader("Pressure Graph")
-                fig_stress, ax_s = plt.subplots(figsize=(8, 6))
-                y_steps = np.linspace(0, wall_height, 100)
-                p_right = [calculate_stress(y, right_layers, right_wt, right_q, "Active")[0] for y in y_steps]
-                y_steps_l = np.linspace(0, wall_height - excavation_depth, 100)
-                p_left = [calculate_stress(y, left_layers, left_wt, 0, "Passive")[0] for y in y_steps_l]
-                ax_s.plot(p_right, y_steps, 'r-', label="Active (Right)"); ax_s.fill_betweenx(y_steps, 0, p_right, color='red', alpha=0.1)
-                global_depth_l = y_steps_l + excavation_depth
-                ax_s.plot(p_left, global_depth_l, 'g-', label="Passive (Left)"); ax_s.fill_betweenx(global_depth_l, 0, p_left, color='green', alpha=0.1)
-                ax_s.invert_yaxis(); ax_s.set_ylabel("Depth (m)"); ax_s.set_xlabel("Pressure (kPa)"); ax_s.grid(True, linestyle='--'); ax_s.legend()
-                st.pyplot(fig_stress)
-
-        if calc_trigger:
-            st.markdown("---")
-            st.subheader("Stress Table")
-            table_data = []
-            for z in range(0, int(wall_height) + 1):
-                row = {"Depth (m)": float(z)}
-                r_sig, r_u, r_K, r_L = calculate_stress(float(z), right_layers, right_wt, right_q, "Active")
-                row["[R] Layer"], row["[R] Stress"], row["[R] Ka"] = r_L, r_sig, r_K
-                local_z_left = z - excavation_depth
-                if local_z_left >= 0:
-                    l_sig, l_u, l_K, l_L = calculate_stress(local_z_left, left_layers, left_wt, 0, "Passive")
-                    row["[L] Layer"], row["[L] Stress"], row["[L] Kp"] = l_L, l_sig, l_K
-                else:
-                    row["[L] Layer"], row["[L] Stress"], row["[L] Kp"] = "-", 0.0, 0.0
-                table_data.append(row)
-            df = pd.DataFrame(table_data)
-            st.dataframe(df.style.format({"Depth (m)": "{:.1f}", "[R] Stress": "{:.2f}", "[R] Ka": "{:.3f}", "[L] Stress": "{:.2f}", "[L] Kp": "{:.3f}"}))
-
-    # ---------------------------------------------------------
-    # TAB 2: COULOMB (MATCHING HANDWRITTEN DIAGRAM)
-    # ---------------------------------------------------------
-    with tab_coulomb:
-        st.header("Coulomb's Wedge Theory")
+    # =====================================================
+    # LEFT COLUMN: MANDATORY INPUTS
+    # =====================================================
+    with col_input:
+        st.subheader("1. Soil Profile Inputs")
         
-        col_c_in, col_c_viz = st.columns([0.4, 0.6], gap="medium")
+        # --- A. Global Parameters ---
+        with st.container(border=True):
+            st.markdown("**Global Conditions**")
+            c1, c2 = st.columns(2)
+            with c1:
+                water_depth = st.number_input("Water Table Depth (m)", value=3.0, step=0.5)
+                surcharge = st.number_input("Surcharge q (kPa)", value=0.0, step=5.0)
+            with c2:
+                hc = st.number_input("Capillary Rise (m)", value=0.0, step=0.1)
 
-        with col_c_in:
-            st.subheader("1. Wall & Geometry")
-            H_c = st.number_input("Wall Height (H) [m]", 1.0, 20.0, 6.0)
-            alpha = st.number_input("Wall Batter (α) [deg]", 0.0, 30.0, 10.0, help="Angle from vertical")
-            beta_c = st.number_input("Backfill Slope (β) [deg]", 0.0, 30.0, 15.0)
-            st.markdown("---")
-            st.subheader("2. Soil & Interface")
-            c_soil_type = st.selectbox("Soil Type", ["Sand", "Custom"], key="c_soil_type")
-            if c_soil_type == "Sand": d_phi, d_delta, d_gam = 32.0, 20.0, 18.0
-            else: d_phi, d_delta, d_gam = 30.0, 15.0, 19.0
-            phi_c = st.number_input("Friction Angle (ϕ') [deg]", 20.0, 45.0, d_phi)
-            delta = st.number_input("Wall Friction (δ) [deg]", 0.0, 30.0, d_delta)
-            gamma_c = st.number_input("Unit Weight (γ) [kN/m³]", 10.0, 25.0, d_gam)
-            st.markdown("---")
-            c_calc_btn = st.button("Calculate Wedge Forces", type="primary", use_container_width=True)
+        # --- B. Stratigraphy ---
+        st.write("")
+        st.markdown("**Soil Stratigraphy (Mandatory)**")
+        num_layers = st.number_input("Number of Layers", 1, 5, 2)
+        layers = []
+        colors = {"Sand": "#E6D690", "Clay": "#B0A494"}
+        
+        # Validation Flag
+        all_inputs_valid = True
 
-        with col_c_viz:
-            st.subheader("Failure Wedge Diagram (FBD)")
+        depth_tracker = 0.0
+
+        for i in range(int(num_layers)):
+            with st.expander(f"Layer {i+1} (Top: {depth_tracker:.1f}m)", expanded=True):
+                # Row 1: Type and Thickness
+                r1_c1, r1_c2 = st.columns(2)
+                soil_type = r1_c1.selectbox("Soil Type", ["Sand", "Clay"], key=f"t{i}")
+                thickness = r1_c2.number_input("Thickness (m)", 0.1, 50.0, 4.0, step=0.5, key=f"h{i}")
+
+                layer_top = depth_tracker
+                layer_bot = depth_tracker + thickness
+                eff_wt = water_depth - hc
+                
+                # Determine which unit weights are required based on Water Table
+                needs_dry = layer_top < eff_wt  # Part of layer is above water/capillary
+                needs_sat = layer_bot > eff_wt  # Part of layer is below water/capillary
+
+                # Row 2: Unit Weights (Defaults set to 0.0 to force input)
+                r2_c1, r2_c2 = st.columns(2)
+                
+                g_sat_val = 0.0
+                g_dry_val = 0.0
+
+                # Input for Saturated Unit Weight
+                if needs_sat:
+                    g_sat_val = r2_c1.number_input(f"γ_sat (kN/m³) [Required]", min_value=0.0, value=0.0, step=0.1, key=f"gs{i}")
+                    if g_sat_val == 0.0:
+                        r2_c1.error("⚠ Required")
+                        all_inputs_valid = False
+                else:
+                    r2_c1.text_input("γ_sat", value="N/A", disabled=True, key=f"gs_d{i}")
+
+                # Input for Dry Unit Weight
+                if needs_dry:
+                    g_dry_val = r2_c2.number_input(f"γ_dry (kN/m³) [Required]", min_value=0.0, value=0.0, step=0.1, key=f"gd{i}")
+                    if g_dry_val == 0.0:
+                        r2_c2.error("⚠ Required")
+                        all_inputs_valid = False
+                else:
+                    r2_c2.text_input("γ_dry", value="N/A", disabled=True, key=f"gd_d{i}")
+
+                layers.append({
+                    "id": i+1,
+                    "type": soil_type,
+                    "top": layer_top,
+                    "bot": layer_bot,
+                    "H": thickness,
+                    "g_sat": g_sat_val,
+                    "g_dry": g_dry_val,
+                    "color": colors[soil_type]
+                })
+
+                depth_tracker += thickness
+
+        total_depth = depth_tracker
+
+    # =====================================================
+    # RIGHT COLUMN: VISUAL PROFILE
+    # =====================================================
+    with col_viz:
+        st.subheader("2. Soil Profile Visualization")
+        
+        fig, ax = plt.subplots(figsize=(6, 6))
+        
+        # Draw Layers
+        for lay in layers:
+            # Main Box
+            rect = patches.Rectangle((0, lay['top']), 6, lay['H'], 
+                                     facecolor=lay['color'], edgecolor='black', linewidth=1.5)
+            ax.add_patch(rect)
             
-            # Constants & Geometry
-            phi_r, del_r = np.radians(phi_c), np.radians(delta)
-            alp_r, bet_r = np.radians(alpha), np.radians(beta_c)
-            top_x = H_c * np.tan(alp_r)
-            rho_approx = 45 + (phi_c/2) # Approx failure plane for viz
-            rho_rad = np.radians(rho_approx)
+            # Label: Center of Layer
+            mid_y = lay['top'] + lay['H']/2
+            ax.text(3, mid_y, f"{lay['type']}", ha='center', va='center', fontweight='bold', fontsize=10)
             
-            # Intersection C
-            if rho_rad > bet_r:
-                wedge_x = (H_c - top_x * np.tan(bet_r)) / (np.tan(rho_rad) - np.tan(bet_r))
-                wedge_y = wedge_x * np.tan(rho_rad)
-            else:
-                wedge_x, wedge_y = top_x + 5, top_x + 5 # Fallback
+            # Label: Depth Marker (Bottom line)
+            ax.text(-0.6, lay['bot'], f"{lay['bot']:.1f}m", va='center', ha='right', fontsize=9)
 
-            # --- PLOT ---
-            fig_w, ax_w = plt.subplots(figsize=(8, 8))
+        # Draw Surcharge
+        if surcharge > 0:
+            for x in np.linspace(0.5, 5.5, 10):
+                ax.arrow(x, -0.7, 0, 0.6, head_width=0.15, fc='red', ec='red')
+            ax.text(3, -0.9, f"q = {surcharge} kPa", color='red', ha='center', fontweight='bold')
+
+        # Draw Water Table
+        ax.axhline(water_depth, color='blue', linestyle='--', linewidth=2)
+        ax.text(6.1, water_depth, "▽ WT", color='blue', va='center', fontweight='bold')
+        ax.text(-0.6, water_depth, f"{water_depth}m", color='blue', va='center', ha='right')
+
+        # Draw Capillary Zone
+        if hc > 0:
+            cap_top = water_depth - hc
+            rect_cap = patches.Rectangle((0, cap_top), 6, hc, hatch='///', fill=False, edgecolor='blue', alpha=0.5)
+            ax.add_patch(rect_cap)
+            ax.text(6.1, cap_top, f"Capillary ({hc}m)", color='blue', fontsize=8, va='center')
+
+        # Formatting
+        ax.set_ylim(total_depth * 1.1, -2)
+        ax.set_xlim(0, 6)
+        ax.axis('off') # Turn off standard axis, we drew our own depth markers
+        
+        # Ground Line
+        ax.plot([0, 6], [0, 0], 'k-', linewidth=2)
+        ax.text(-0.6, 0, "0.0m", va='center', ha='right', fontsize=9)
+
+        st.pyplot(fig)
+
+    # =====================================================
+    # CALCULATION SECTION (BELOW COLUMNS)
+    # =====================================================
+    st.markdown("---")
+    
+    calc_col1, calc_col2 = st.columns([1, 3])
+    
+    with calc_col1:
+        # BUTTON IS DISABLED IF INPUTS ARE INVALID
+        if all_inputs_valid:
+            trigger = st.button("Calculate Stress Profile", type="primary", use_container_width=True)
+        else:
+            st.warning("Please fill in all required unit weights above.")
+            trigger = False
+
+    if trigger and all_inputs_valid:
+        
+        # --- CORE CALCULATION LOGIC (LAYER-BY-LAYER) ---
+        def calculate_profile(mode_name, load_q):
+            results = []
+            sigma_prev = load_q
             
-            # A. GEOMETRY
-            # Wall
-            wall_poly = [[0, 0], [top_x, H_c], [top_x - 1.5, H_c], [-1.5, 0]]
-            ax_w.add_patch(patches.Polygon(wall_poly, facecolor='lightgrey', edgecolor='black', hatch='//'))
-            # Wedge
-            soil_poly = [[0, 0], [top_x, H_c], [wedge_x, wedge_y]]
-            ax_w.add_patch(patches.Polygon(soil_poly, facecolor='#FFE0B2', alpha=0.5, edgecolor='none'))
-            # Ground & Failure Lines
-            ax_w.plot([top_x, wedge_x + 2], [H_c, H_c + (wedge_x + 2 - top_x)*np.tan(bet_r)], 'k-', linewidth=2)
-            ax_w.plot([0, wedge_x], [0, wedge_y], 'r--', linewidth=2)
+            # Iterate strictly layer by layer
+            for layer in layers:
+                
+                # Define key points: Top, Mid-points (integers), Bottom
+                # We force calculations at specific Zs to capture the profile
+                z_in_layer = {layer['top'], layer['bot']}
+                
+                # Add integer depths inside the layer
+                for d in range(int(layer['top']), int(layer['bot']) + 1):
+                    if layer['top'] < d < layer['bot']:
+                        z_in_layer.add(float(d))
+                
+                # Add Water Table / Capillary if inside
+                if layer['top'] < water_depth < layer['bot']: z_in_layer.add(water_depth)
+                cap_top = water_depth - hc
+                if layer['top'] < cap_top < layer['bot']: z_in_layer.add(cap_top)
+                
+                sorted_z = sorted(list(z_in_layer))
+                z_internal_prev = layer['top']
+                
+                for z in sorted_z:
+                    # Skip z if it matches the previous (e.g. at Top)
+                    if z == z_internal_prev and z != layer['top']:
+                        continue
+                        
+                    dz = z - z_internal_prev
+                    z_mid = (z + z_internal_prev) / 2
+                    
+                    # 1. Determine Unit Weight (Above vs Below Effective WT)
+                    eff_wt_boundary = water_depth - hc
+                    if z_mid > eff_wt_boundary:
+                        gam = layer['g_sat']
+                    else:
+                        gam = layer['g_dry']
+                        
+                    # 2. Calculate Total Stress Increment
+                    sigma = sigma_prev + (gam * dz)
+                    
+                    # 3. Calculate Pore Pressure
+                    u_h = 0.0
+                    if z > water_depth:
+                        u_h = (z - water_depth) * GAMMA_W
+                    elif z > (water_depth - hc):
+                        u_h = -(water_depth - z) * GAMMA_W
+                    
+                    # Excess Pore Pressure (Short Term Logic)
+                    u_excess = 0.0
+                    if mode_name == "Short Term" and load_q > 0 and layer['type'] == "Clay":
+                        u_excess = load_q
+                        
+                    u_tot = u_h + u_excess
+                    sig_eff = sigma - u_tot
+                    
+                    # Labeling for Table
+                    pos_label = ""
+                    if abs(z - layer['top']) < 0.001: pos_label = " (Top)"
+                    elif abs(z - layer['bot']) < 0.001: pos_label = " (Bottom)"
+                    
+                    results.append({
+                        "Depth (m)": z,
+                        "Soil Type": f"{layer['type']}{pos_label}",
+                        "Total Stress (σ)": sigma,
+                        "Pore Water (u)": u_tot,
+                        "Effective (σ')": sig_eff
+                    })
+                    
+                    # Update trackers
+                    sigma_prev = sigma
+                    z_internal_prev = z
+                    
+            return pd.DataFrame(results)
+
+        # Run Calculations
+        df_init = calculate_profile("Initial", 0.0)
+        df_short = calculate_profile("Short Term", surcharge)
+        df_long = calculate_profile("Long Term", surcharge)
+
+        # Display Results
+        with st.container():
+            st.subheader("Calculation Results")
+            t1, t2, t3 = st.tabs(["Initial State", "Short Term (Immediate)", "Long Term (Consolidated)"])
             
-            # B. ANNOTATIONS (Normals & Angles) - To match handwritten sketch
-            # 1. Wall Normal (at mid height)
-            mid_wall_x, mid_wall_y = top_x/2, H_c/2
-            # Wall slope is (H_c / top_x). Normal slope is -top_x/H_c
-            dx_wn, dy_wn = 1.5, 1.5 * (top_x/H_c) # Perpendicular direction away from soil
-            ax_w.plot([mid_wall_x, mid_wall_x - dx_wn], [mid_wall_y, mid_wall_y + dy_wn], 'k--', linewidth=1, alpha=0.7) # Normal line
-            
-            # 2. Failure Plane Normal
-            mid_fail_x, mid_fail_y = wedge_x/2, wedge_y/2
-            # Plane slope is tan(rho). Normal slope is -1/tan(rho)
-            dx_fn, dy_fn = -1.5 * np.sin(rho_rad), 1.5 * np.cos(rho_rad) # Pointing up-left
-            ax_w.plot([mid_fail_x, mid_fail_x + dx_fn], [mid_fail_y, mid_fail_y + dy_fn], 'k--', linewidth=1, alpha=0.7)
+            def show_tab(df, title):
+                # Custom Styling for the table to highlight changes
+                st.dataframe(
+                    df.style.format("{:.2f}")
+                    .background_gradient(subset=["Effective (σ')"], cmap="Blues"),
+                    use_container_width=True
+                )
+                
+                # Plotting Results
+                fig, ax = plt.subplots(figsize=(8, 5))
+                ax.plot(df["Total Stress (σ)"], df["Depth (m)"], 'b-o', label="Total σ")
+                ax.plot(df["Pore Water (u)"], df["Depth (m)"], 'r--x', label="Pore u")
+                ax.plot(df["Effective (σ')"], df["Depth (m)"], 'k-s', linewidth=2, label="Effective σ'")
+                ax.invert_yaxis()
+                ax.set_xlabel("Stress (kPa)")
+                ax.set_ylabel("Depth (m)")
+                ax.grid(True, linestyle=':', alpha=0.6)
+                ax.legend()
+                ax.set_title(f"Stress Profile: {title}")
+                st.pyplot(fig)
 
-            # C. FORCES (If Calculated)
-            if c_calc_btn:
-                # Calc
-                term1 = np.sqrt(np.sin(phi_r + del_r) * np.sin(phi_r - bet_r))
-                term2 = np.sqrt(np.cos(alp_r + del_r) * np.cos(alp_r - bet_r))
-                denom = (np.cos(alp_r)**2) * np.cos(alp_r + del_r) * (1 + (term1/term2))**2
-                Ka_c = (np.cos(phi_r - alp_r)**2) / denom
-                Pa = 0.5 * gamma_c * (H_c**2) * Ka_c
-
-                # 1. Weight (W)
-                cx, cy = (0+top_x+wedge_x)/3, (0+H_c+wedge_y)/3
-                ax_w.arrow(cx, cy, 0, -2.0, head_width=0.2, color='purple', width=0.05, zorder=10)
-                ax_w.text(cx + 0.3, cy - 1.0, "W", color='purple', fontweight='bold', fontsize=12)
-
-                # 2. Wall Reaction (P) - Force of Wall ON Soil (FBD of Wedge)
-                # Acts at angle delta ABOVE the normal
-                # Normal angle (from horizontal) = 180 - (90 - alpha) = 90 + alpha.
-                # Force P angle = (90 + alpha) + (90 - delta)? No.
-                # Wall face angle = 90 - alpha. Normal is (90-alpha)+90 = 180-alpha.
-                # P acts at angle delta from Normal, opposing sliding (sliding is down).
-                # So P points UP relative to normal. 
-                # Visual check: It should point Up and Right.
-                px, py = top_x/3, H_c/3 # Lower third
-                ax_w.arrow(px, py, 1.5, 1.0, head_width=0.2, color='red', width=0.05, zorder=10)
-                ax_w.text(px + 1.6, py + 1.0, "P", color='red', fontweight='bold', fontsize=12)
-                # Delta Arc
-                ax_w.text(px + 0.3, py + 0.8, f"δ={delta}°", fontsize=8)
-
-                # 3. Soil Reaction (R) - Force of Soil ON Soil
-                # Acts at angle phi from Normal to failure plane.
-                # Normal is 90 + rho. R is 90 + rho + phi?
-                # Resists sliding down. So R points Up-Left.
-                rx, ry = wedge_x/3, wedge_y/3
-                ax_w.arrow(rx, ry, -0.8, 1.5, head_width=0.2, color='green', width=0.05, zorder=10)
-                ax_w.text(rx - 0.8, ry + 1.5, "R", color='green', fontweight='bold', fontsize=12)
-                # Phi Arc
-                ax_w.text(rx - 0.3, ry + 0.8, f"ϕ={phi_c}°", fontsize=8)
-
-            ax_w.set_aspect('equal')
-            ax_w.set_xlim(-3, wedge_x + 2)
-            ax_w.set_ylim(-1, max(H_c, wedge_y) + 2)
-            ax_w.axis('off')
-            ax_w.set_title("Free Body Diagram of Wedge", fontweight='bold')
-            st.pyplot(fig_w)
-            
-            # --- CALCULATION PANEL ---
-            if c_calc_btn:
-                with st.expander("📝 Detailed Calculation Steps", expanded=True):
-                    st.markdown(r"**1. Coulomb Coefficient ($K_a$):**")
-                    st.latex(r"K_a = \frac{\cos^2(\phi - \alpha)}{\cos^2\alpha \cos(\alpha + \delta) \left[ 1 + \sqrt{\frac{\sin(\phi + \delta) \sin(\phi - \beta)}{\cos(\alpha + \delta) \cos(\alpha - \beta)}} \right]^2}")
-                    st.write(f"Substituting values: **$K_a = {Ka_c:.4f}$**")
-                    st.markdown(r"**2. Total Active Force ($P_a$):**")
-                    st.latex(r"P_a = \frac{1}{2} \gamma H^2 K_a")
-                    st.success(f"**Result: $P_a = {Pa:.2f}$ kN/m**")
+            with t1: show_tab(df_init, "Initial")
+            with t2: show_tab(df_short, "Short Term (Clay Undrained)")
+            with t3: show_tab(df_long, "Long Term (Fully Drained)")
 
 if __name__ == "__main__":
     app()
