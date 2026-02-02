@@ -83,8 +83,7 @@ def app():
     # TAB 1: RANKINE (Standard)
     # ---------------------------------------------------------
     with tab_rankine:
-        st.header("Rankine Analysis")
-        st.info("Configure the wall and soil layers on the left.")
+
         col_input, col_viz = st.columns([0.4, 0.6], gap="medium")
 
         with col_input:
