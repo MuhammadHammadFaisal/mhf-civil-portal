@@ -81,7 +81,6 @@ def app():
             <div style="padding-top: 15px; padding-left: 10px;">
                 <h1 style='font-size: 45px; margin-bottom: 5px; line-height: 1.0;'>Soil Mechanics</h1>
                 <p style='color: #888; font-size: 18px; font-weight: 300; margin: 0;'>
-                    Phase Relationships, Effective Stress & Flow Analysis
                 </p>
             </div>
             """, 
