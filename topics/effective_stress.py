@@ -16,7 +16,7 @@ GAMMA_W = 9.81
 # MAIN APP
 # =========================================================
 def app():
-    st.markdown("---")
+
 
     tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
 
