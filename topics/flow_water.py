@@ -1,72 +1,187 @@
 import streamlit as st
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import numpy as np
 
 # ============================================================
-# HELPER
+# MAINTENANCE BANNER
+# ============================================================
+def show_maintenance_banner():
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, #ff6b6b 0%, #ffa500 100%); 
+                padding: 15px; 
+                border-radius: 10px; 
+                border: 3px solid #cc0000;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; text-align: center;">
+             UNDER MAINTENANCE 
+        </h2>
+        <p style="color: white; margin: 10px 0 0 0; text-align: center; font-size: 16px;">
+            Flow net calculations are currently being calibrated and improved.<br>
+            Results may not be accurate. Please use with caution.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================================
+# HELPER FUNCTIONS
 # ============================================================
 
 def format_scientific(val):
     if val == 0:
         return "0"
-    exp = int(np.floor(np.log10(abs(val))))
-    man = val / (10 ** exp)
-    if -3 < exp < 4:
+    exponent = int(np.floor(np.log10(abs(val))))
+    mantissa = val / (10**exponent)
+    if -3 < exponent < 4:
         return f"{val:.4f}"
-    return f"{man:.2f} \\times 10^{{{exp}}}"
+    return f"{mantissa:.2f} \\times 10^{{{exponent}}}"
 
-# ============================================================
-# LAPLACE SOLVER FOR FLOW NET (φ ONLY)
-# ============================================================
+def get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth):
+    """
+    CORRECTED Sheet Pile Flow Net based on soil mechanics principles.
+    
+    Key observations from hand sketch:
+    1. Flow lines (blue) start horizontal upstream, curve DOWN around pile, exit horizontal downstream
+    2. Equipotentials (red dashed) are nearly vertical far away, curve around pile tip
+    3. Flow concentrates at PILE TIP (bottom of pile)
+    4. Pattern is symmetric-ish but biased by head difference
+    """
+    
+    # Pile tip location (critical point)
+    pile_tip_x = pile_x
+    pile_tip_y = -pile_depth
+    
+    # Create complex coordinates
+    z = x + 1j * y
+    z_tip = pile_tip_x + 1j * pile_tip_y
+    
+    # Distance from pile tip
+    z_from_tip = z - z_tip
+    
+    # Avoid singularity
+    epsilon = 0.01
+    z_from_tip = np.where(np.abs(z_from_tip) < epsilon, epsilon * (1 + 1j), z_from_tip)
+    
+    with np.errstate(all="ignore"):
+        # COMPONENT 1: Uniform horizontal flow (baseline seepage)
+        # This creates the horizontal flow from left to right
+        flow_velocity = (h_up - h_down) / 24.0  # Normalized velocity
+        W_uniform = flow_velocity * z
+        
+        # COMPONENT 2: Source at pile tip (creates flow diverging from tip)
+        # Water flows OUT from underneath the pile
+        source_strength = pile_depth * flow_velocity * 8.0
+        W_source = source_strength * np.log(z_from_tip + 0j)
+        
+        # COMPONENT 3: Dipole to create asymmetry and proper flow pattern
+        # This makes flow go AROUND the pile (up and down)
+        dipole_strength = pile_depth**1.5 * flow_velocity * 6.0
+        W_dipole = dipole_strength / z_from_tip
+        
+        # COMPONENT 4: Image system for impervious base
+        # Reflection from bottom boundary
+        z_from_base = z - (pile_tip_x + 1j * (-soil_depth))
+        z_from_base = np.where(np.abs(z_from_base) < epsilon, epsilon * (1 + 1j), z_from_base)
+        W_base = -source_strength * 0.3 * np.log(z_from_base + 0j)
+        
+        # Combine all components
+        W = W_uniform + W_source + W_dipole + W_base
+        
+        return W
 
-def solve_laplace_phi(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up, h_down, mode):
-    x = np.linspace(-lx / 2, lx / 2, nx)
-    y = np.linspace(-ly, 0, ny)
+def get_complex_potential_dam(x, y, dam_width, h_up, h_down):
+    """
+    Flow under concrete dam - uses conformal mapping.
+    """
+    b = max(dam_width / 2, 0.1)
+    z = x + 1j * y
+    
+    with np.errstate(all="ignore"):
+        # Normalize
+        zeta = z / b
+        
+        # Conformal transformation for flow under rectangular dam
+        # Schwarz-Christoffel approximation
+        w = b * (zeta + np.sqrt(zeta**2 - 1 + 0j))
+        
+        # Scale by head difference
+        flow_scale = (h_up - h_down) / 20.0
+        W = flow_scale * w
+        
+        return W
 
-    phi = np.full((ny, nx), (h_up + h_down) / 2)
+def get_complex_potential(x, y, mode, pile_depth, pile_x, dam_width, h_up, h_down, soil_depth):
+    """
+    Main function to get complex potential based on mode.
+    Returns W = Phi + i*Psi
+    """
+    
+    if mode == "Sheet Pile Only":
+        return get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth)
+    
+    elif mode == "Concrete Dam Only":
+        return get_complex_potential_dam(x, y, dam_width, h_up, h_down)
+    
+    elif mode == "Combined (Dam + Pile)":
+        # Superpose both effects
+        W_pile = get_complex_potential_sheet_pile(x, y, pile_depth, pile_x, h_up, h_down, soil_depth)
+        W_dam = get_complex_potential_dam(x, y, dam_width, h_up, h_down)
+        return 0.6 * W_pile + 0.4 * W_dam
+    
+    return 0 + 0j
 
-    def ix(v): return np.abs(x - v).argmin()
-    def iy(v): return np.abs(y - v).argmin()
-
-    pile_ix = ix(pile_x)
-    pile_iy = iy(-pile_d)
-
-    dam_l = ix(-dam_w / 2)
-    dam_r = ix(dam_w / 2)
-
-    for _ in range(5000):
-        phi[1:-1, 1:-1] = 0.25 * (
-            phi[2:, 1:-1] + phi[:-2, 1:-1] +
-            phi[1:-1, 2:] + phi[1:-1, :-2]
-        )
-
-        # Surface heads
-        phi[-1, :dam_l] = h_up
-        phi[-1, dam_r + 1:] = h_down
-
-        if "Dam" in mode:
-            phi[-1, dam_l:dam_r + 1] = phi[-2, dam_l:dam_r + 1]
-
-        if "Pile" in mode:
-            phi[pile_iy:, pile_ix] = phi[pile_iy:, pile_ix - 1]
-
-        phi[0, :] = phi[1, :]
-        phi[:, 0] = phi[:, 1]
-        phi[:, -1] = phi[:, -2]
-
-    return x, y, phi
+def calculate_pore_pressure(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d):
+    """
+    Calculate pore pressure at point (px, py) based on flow net.
+    """
+    
+    if py > 0:
+        return None  # Above ground surface
+    
+    gamma_w = 9.81  # kN/m³
+    
+    # Get complex potential at point
+    w_pt = get_complex_potential(px, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
+    phi_pt = np.real(w_pt)
+    
+    # Get boundary values
+    w_up = get_complex_potential(-15.0, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
+    w_down = get_complex_potential(15.0, py, mode, pile_d, pile_x, dam_w, h_up, h_down, soil_d)
+    
+    phi_up = np.real(w_up)
+    phi_down = np.real(w_down)
+    
+    # Handle numerical issues
+    if not np.isfinite(phi_pt) or not np.isfinite(phi_up) or not np.isfinite(phi_down):
+        return None
+    
+    # Interpolate total head
+    if abs(phi_up - phi_down) < 1e-6:
+        h_total = (h_up + h_down) / 2
+    else:
+        ratio = (phi_pt - phi_down) / (phi_up - phi_down)
+        ratio = np.clip(ratio, 0, 1)
+        h_total = h_down + ratio * (h_up - h_down)
+    
+    # Calculate pore pressure
+    pressure_head = h_total - py
+    u = pressure_head * gamma_w
+    
+    return {"u": u, "h_total": h_total, "pressure_head": pressure_head}
 
 # ============================================================
 # MAIN APP
 # ============================================================
 
 def app():
-    st.set_page_config(layout="wide")
-    st.title("Soil Mechanics – Seepage & Flow Nets")
+    st.set_page_config(page_title="Soil Mechanics Analysis", layout="wide")
+    
 
-    tab1, tab2, tab3 = st.tabs(["1D Seepage", "Permeability", "Flow Nets"])
-
+    st.subheader("Flow of Water & Seepage Analysis")
+    
+    tab1, tab2 = st.tabs(["1D Seepage", "Permeability"])
+    
     # =================================================================
     # TAB 1: 1D SEEPAGE (Effective Stress)
     # =================================================================
@@ -320,62 +435,6 @@ def app():
                 ax2.plot([1.5, 3], [4, 4], 'k--', lw=0.5); ax2.plot([1.5, 3], [6, 6], 'k--', lw=0.5)
 
             st.pyplot(fig2)
-
-    # ========================================================
-    # TAB 3 – FLOW NETS (FIXED)
-    # ========================================================
-    with tab3:
-        st.subheader("2D Flow Net (Correct Physics)")
-
-        mode = st.radio(
-            "Structure Type",
-            ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"]
-        )
-
-        h_up = st.number_input("Upstream Head [m]", value=10.0)
-        h_down = st.number_input("Downstream Head [m]", value=2.0)
-        soil_d = st.number_input("Impervious Layer Depth [m]", value=12.0)
-
-        dam_w = pile_d = pile_x = 0.0
-        if "Dam" in mode:
-            dam_w = st.number_input("Dam Width [m]", value=6.0)
-        if "Pile" in mode:
-            pile_d = st.number_input("Pile Depth [m]", value=6.0)
-            pile_x = st.number_input("Pile X [m]", value=0.0)
-
-        Nf = st.slider("Flow Line Density", 3, 12, 5)
-        Nd = st.slider("Equipotential Drops", 6, 24, 12)
-
-        x, y, phi = solve_laplace_phi(
-            160, 80, 120, soil_d,
-            pile_d, pile_x, dam_w,
-            h_up, h_down, mode
-        )
-
-        X, Y = np.meshgrid(x, y)
-        dphidy, dphidx = np.gradient(phi, y, x)
-        vx, vy = -dphidx, -dphidy
-
-        fig, ax = plt.subplots(figsize=(11, 7))
-        ax.set_aspect("equal")
-
-        ax.streamplot(X, Y, vx, vy, density=Nf, color="blue", linewidth=2)
-        ax.contour(X, Y, phi, levels=np.linspace(h_down, h_up, Nd + 1),
-                   colors="red", linestyles="--")
-
-        if "Pile" in mode:
-            ax.plot([pile_x, pile_x], [0, -pile_d], "k-", lw=6)
-        if "Dam" in mode:
-            ax.add_patch(patches.Rectangle((-dam_w / 2, 0),
-                                           dam_w, h_up / 2,
-                                           facecolor="gray"))
-
-        ax.axhline(0, color="brown", lw=3)
-        ax.axhline(-soil_d, color="black", lw=4)
-        ax.set_xlim(-15, 15)
-        ax.set_ylim(-soil_d - 1, h_up + 1)
-
-        st.pyplot(fig)
 
 if __name__ == "__main__":
     app()
