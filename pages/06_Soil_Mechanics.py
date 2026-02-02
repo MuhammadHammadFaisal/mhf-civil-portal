@@ -1,6 +1,5 @@
 import streamlit as st
 # IMPORT MODULES
-# Ensure these files exist in your 'topics' folder
 from topics import soil_phase
 from topics import effective_stress
 from topics import flow_water
@@ -55,8 +54,8 @@ def app():
     div[data-baseweb="select"] svg {
         fill: white !important;
     }
-    
-    /* Image styling */
+
+    /* Image Styling */
     div[data-testid="stImage"] > img {
         border-radius: 15px;
         border: 2px solid #444;
@@ -65,19 +64,20 @@ def app():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- HEADER SECTION WITH VERTICAL ALIGNMENT ---
-    # Added vertical_alignment="center" to align logo and text perfectly
+    # --- HEADER SECTION ---
+    # 1. Use vertical_alignment="center" to keep image and text aligned
     col_logo, col_text = st.columns([1, 5], vertical_alignment="center")
 
     with col_logo:
         st.image("assets/logo.png", width=150)
 
     with col_text:
-        # Removed padding-top so the centering works naturally
+        # 2. Increased font-size to 80px to match logo height
+        # Removed padding-top so centering works naturally
         st.markdown(
             """
             <div style="padding-left: 10px;">
-                <h1 style='font-size: 45px; margin: 0; line-height: 1.0;'>Soil Mechanics</h1>
+                <h1 style='font-size: 80px; margin: 0; line-height: 1.0;'>Soil Mechanics</h1>
             </div>
             """, 
             unsafe_allow_html=True
@@ -111,7 +111,7 @@ def app():
     elif topic == "Consolidation Theory":
         consolidation.app()
         
-    # Fixed typo here: "Soils" instead of "Soil" to match the list above
+    # Corrected typo: "Soils" to match list
     elif topic == "Shear Strength of Soils":
         shear_strength.app()
         
