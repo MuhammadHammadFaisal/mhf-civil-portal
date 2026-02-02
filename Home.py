@@ -103,7 +103,6 @@ def main():
     col_logo, col_text = st.columns([1, 3], vertical_alignment="center")
 
     with col_logo:
-        # FIXED: Uncommented this line so the logo appears
         st.image("assets/logo.png", use_container_width=True)
 
     with col_text:
@@ -117,7 +116,7 @@ def main():
         </p>
         """, unsafe_allow_html=True)
 
-    st.markdown("")
+   
     st.markdown("") 
 
     # --------------------------------------------------
@@ -131,7 +130,7 @@ def main():
     if modules:
         cols = st.columns(3)
 
-        for i, (file, title) in enumerate(modules):
+        for idx, (file, title) in enumerate(modules):
             with cols[i % 3]:
                 st.page_link(
                     f"pages/{file}",
@@ -143,7 +142,7 @@ def main():
     # --------------------------------------------------
     # PURPOSE
     # --------------------------------------------------
-    st.markdown("")
+
     st.markdown("")
     
     st.subheader("Purpose")
@@ -157,7 +156,7 @@ def main():
     # --------------------------------------------------
     # FEEDBACK (Header format)
     # --------------------------------------------------
-    st.markdown("")
+  
     st.markdown("")
 
     st.subheader("Feedback")
@@ -176,13 +175,14 @@ def main():
     # --------------------------------------------------
     # ABOUT
     # --------------------------------------------------
-    st.markdown("")
+
     st.markdown("")
     
     st.subheader("About")
 
     st.markdown("""
-    **Developed by Muhammad Hammad Faisal** Final-Year Civil Engineering Student, Middle East Technical University (METU)
+    **Developed by Muhammad Hammad Faisal**  
+    Final-Year Civil Engineering Student, METU
     """)
 
     st.link_button(
@@ -196,10 +196,11 @@ def main():
     st.markdown("---") 
     st.markdown("""
     <div style="text-align:center; color:#777; font-size:12px;">
-        © 2026 MHF Civil · Version 1.2.0 · Ankara, Turkey
+        © 2026 MHF Civil · Ankara, Turkey
     </div>
     """, unsafe_allow_html=True)
 
 # ==================================================
 if __name__ == "__main__":
     main()
+
