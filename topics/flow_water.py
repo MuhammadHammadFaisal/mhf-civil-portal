@@ -23,13 +23,11 @@ def format_scientific(val):
 def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up, h_down, mode):
     """
     Solves the Laplace equation for Stream Function (Psi) and Head (Phi).
-    FIX: Enforces strict boundary conditions so flow lines start/end at the soil surface.
+    Enforces strict boundary conditions so flow lines start/end at the soil surface.
     """
     # 1. Create Grid
     x = np.linspace(-lx/2, lx/2, nx)
     y = np.linspace(-ly, 0, ny)
-    dx = x[1] - x[0]
-    dy = y[1] - y[0]
     
     # 2. Identify Indices for Structures
     def get_x_idx(val): return np.abs(x - val).argmin()
@@ -47,58 +45,45 @@ def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up
     # Psi (Stream Function): 0 = Bottom, 1 = Structure/Surface
     psi = np.zeros((ny, nx))
     
-    # Initial Guess: Linear distribution from bottom (0) to top (1)
+    # Initial Guess: Linear distribution
     for i in range(ny):
         psi[i, :] = i / (ny - 1)
 
     # 4. Iterative Solver (SOR Method)
     iterations = 3000  # High iteration count for convergence
     for k in range(iterations):
-        # Calculate average of neighbors (Laplace Equation)
+        # Laplace Equation
         psi_new = 0.25 * (psi[0:-2, 1:-1] + psi[2:, 1:-1] + psi[1:-1, 0:-2] + psi[1:-1, 2:])
         psi[1:-1, 1:-1] = psi_new
         
-        # --- BOUNDARY CONDITIONS (The Critical Fix) ---
+        # --- BOUNDARY CONDITIONS ---
         
         # A. Impervious Bottom (Last Flow Line) -> Psi = 0
         psi[0, :] = 0.0
         
         # B. Structure Boundary (First Flow Line) -> Psi = 1.0
         if "Pile" in mode:
-            # The Sheet Pile is a vertical line. Psi = 1.0 along it.
-            # We apply this from the tip up to the surface.
             psi[pile_iy_tip:, pile_ix] = 1.0
             
         if "Dam" in mode:
-            # The Dam Base is a horizontal line. Psi = 1.0 along it.
             psi[-1, dam_left_ix:dam_right_ix+1] = 1.0
 
-        # C. Soil Surface (Entry/Exit)
-        # The soil surface (where not covered by a dam) is an Equipotential Line.
-        # Streamlines must be PERPENDICULAR to Equipotentials.
-        # Therefore, flow enters Vertically: d(Psi)/dy = 0 at y=0.
-        # We enforce this by making the top row equal to the row below it (Neumann BC).
-        
-        # Mask for the top row: Apply relaxation everywhere EXCEPT the dam base
-        # (If sheet pile only, the pile is a single point at the top, so we relax around it)
+        # C. Soil Surface (Entry/Exit) - Relaxation
         if "Dam" in mode:
             # Left of dam
             psi[-1, :dam_left_ix] = psi[-2, :dam_left_ix]
             # Right of dam
             psi[-1, dam_right_ix+1:] = psi[-2, dam_right_ix+1:]
         else:
-            # No dam: Relax whole top surface (except the exact pile point which is fixed to 1.0)
+            # No dam: Relax whole top surface (except the exact pile point)
             psi[-1, :pile_ix] = psi[-2, :pile_ix]
             psi[-1, pile_ix+1:] = psi[-2, pile_ix+1:]
 
-        # D. Left/Right Boundaries (Infinite Soil approximation)
-        # Flow is horizontal far away: d(Psi)/dx = 0
+        # D. Left/Right Boundaries
         psi[:, 0] = psi[:, 1]
         psi[:, -1] = psi[:, -2]
 
-    # 5. Solve for Head (Phi) - Similar relaxation
-    # Phi represents Total Head.
-    # Boundary: Surface = h_up (Left) / h_down (Right)
+    # 5. Solve for Head (Phi)
     phi = np.full((ny, nx), (h_up + h_down)/2)
     
     # Establish Fixed Head Zones
@@ -116,22 +101,13 @@ def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up
         phi[-1, :mid_ix] = h_up
         phi[-1, end_ix+1:] = h_down
         
-        # Impervious Boundaries (Neumann: dPhi/dn = 0)
+        # Impervious Boundaries
         phi[0, :] = phi[1, :]       # Bottom
         phi[:, 0] = phi[:, 1]       # Far Left
         phi[:, -1] = phi[:, -2]     # Far Right
-        
-        # Structure Imperviousness
-        if "Pile" in mode:
-            # No flow across pile -> Phi gradient is zero across pile? 
-            # Actually, Phi is discontinuous. The solver handles the jump naturally 
-            # if we don't smooth across the pile index.
-            # We force the pile index to act as a barrier by not updating it?
-            # For this simple visualizer, standard relaxation works acceptable 
-            # as long as we clamp the surface heads.
-            pass
 
     return x, y, phi, psi
+
 # ============================================================
 # MAIN APP
 # ============================================================
@@ -148,7 +124,7 @@ def app():
     tab1, tab2, tab3 = st.tabs(["1D Seepage", "Permeability", "Flow Nets"])
     
     # =================================================================
-    # TAB 1: 1D SEEPAGE (Effective Stress)
+    # TAB 1: 1D SEEPAGE
     # =================================================================
     with tab1:
         st.caption("Determine Effective Stress at Point A. (Datum is at the Bottom of Soil)")
@@ -393,102 +369,102 @@ def app():
 
             st.pyplot(fig2)
 
-   # ============================================================
-            # TAB 3 CONTENT
-            # ============================================================
+    # ============================================================
+    # TAB 3 CONTENT
+    # ============================================================
+    with tab3:
+        st.markdown("### 2D Flow Net Analysis")
+        st.caption("**Principles:** Streamlines (Blue) start at upstream surface, loop under structure, end at downstream surface.")
+        
+        col_in, col_gr = st.columns([1, 1.4])
+
+        with col_in:
+            mode = st.radio("Structure Type", ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"])
             
-            def render_tab3():
-                st.markdown("### 2D Flow Net Analysis")
-                st.caption("**Principles:** Streamlines (Blue) start at upstream surface, loop under structure, end at downstream surface.")
+            st.markdown("---")
+            h_up = st.number_input("Upstream Head [m]", value=10.0)
+            h_down = st.number_input("Downstream Head [m]", value=2.0)
+            soil_d = st.number_input("Impervious Layer Depth [m]", value=12.0)
+
+            st.markdown("---")
+            dam_w, pile_d, pile_x = 0.0, 0.0, 0.0
+            
+            if "Dam" in mode:
+                dam_w = st.number_input("Dam Width [m]", value=6.0)
+            if "Pile" in mode:
+                pile_d = st.number_input("Pile Depth [m]", value=6.0)
+                pile_x = st.number_input("Pile X Position [m]", value=0.0)
+
+            st.markdown("---")
+            Nf = st.slider("Number of Flow Channels (Nf)", 3, 10, 4)
+            Nd = st.slider("Number of Equipotential Drops (Nd)", 6, 20, 12)
+            
+            # Pore Pressure Input
+            st.markdown("---")
+            st.markdown("**Check Pore Pressure**")
+            px = st.number_input("X Coord [m]", value=1.5)
+            py = st.number_input("Y Coord [m]", value=-4.0, max_value=0.0)
+
+        with col_gr:
+            # Run Solver
+            nx, ny = 70, 50 # Grid Resolution
+            lx = 24.0 # Domain Width
+            x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
+            X, Y = np.meshgrid(x, y)
+            
+            # Plotting
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.set_aspect('equal')
+            ax.set_facecolor('#fdf6e3')
+            
+            # 1. Plot STREAMLINES (Blue)
+            # We explicitly include 0.0 (Bottom) and 1.0 (Structure) in the levels
+            levels_psi = np.linspace(0, 1.0, Nf + 1)
+            ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2)
+            
+            # 2. Plot EQUIPOTENTIALS (Red)
+            levels_phi = np.linspace(h_down, h_up, Nd + 1)
+            ax.contour(X, Y, phi, levels=levels_phi, colors='red', linestyles='--', linewidths=1)
+            
+            # 3. Draw Geometry
+            ax.axhline(0, color='saddlebrown', lw=3) # Ground
+            ax.axhline(-soil_d, color='black', lw=3) # Bedrock
+            
+            if "Dam" in mode:
+                rect = patches.Rectangle((-dam_w/2, 0), dam_w, h_up/2, facecolor='gray', hatch='//', edgecolor='k')
+                ax.add_patch(rect)
+            if "Pile" in mode:
+                ax.plot([pile_x, pile_x], [0, -pile_d], 'k-', lw=5) # Pile
+                ax.plot([pile_x, pile_x], [0, -pile_d], 'y--', lw=1)
                 
-                col_in, col_gr = st.columns([1, 1.4])
+            # Water
+            ax.fill_between([-12, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.3)
+            ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), 12], 0, h_down, color='lightblue', alpha=0.3)
             
-                with col_in:
-                    mode = st.radio("Structure Type", ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"])
-                    
-                    st.markdown("---")
-                    h_up = st.number_input("Upstream Head [m]", value=10.0)
-                    h_down = st.number_input("Downstream Head [m]", value=2.0)
-                    soil_d = st.number_input("Impervious Layer Depth [m]", value=12.0)
-            
-                    st.markdown("---")
-                    dam_w, pile_d, pile_x = 0.0, 0.0, 0.0
-                    
-                    if "Dam" in mode:
-                        dam_w = st.number_input("Dam Width [m]", value=6.0)
-                    if "Pile" in mode:
-                        pile_d = st.number_input("Pile Depth [m]", value=6.0)
-                        pile_x = st.number_input("Pile X Position [m]", value=0.0)
-            
-                    st.markdown("---")
-                    Nf = st.slider("Number of Flow Channels (Nf)", 3, 10, 4)
-                    Nd = st.slider("Number of Equipotential Drops (Nd)", 6, 20, 12)
-                    
-                    # Pore Pressure Input
-                    st.markdown("---")
-                    st.markdown("**Check Pore Pressure**")
-                    px = st.number_input("X Coord [m]", value=1.5)
-                    py = st.number_input("Y Coord [m]", value=-4.0, max_value=0.0)
-            
-                with col_gr:
-                    # Run Solver
-                    nx, ny = 70, 50 # Grid Resolution
-                    lx = 24.0 # Domain Width
-                    x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
-                    X, Y = np.meshgrid(x, y)
-                    
-                    # Plotting
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    ax.set_aspect('equal')
-                    ax.set_facecolor('#fdf6e3')
-                    
-                    # 1. Plot STREAMLINES (Blue)
-                    # We explicitly include 0.0 (Bottom) and 1.0 (Structure) in the levels
-                    levels_psi = np.linspace(0, 1.0, Nf + 1)
-                    ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2)
-                    
-                    # 2. Plot EQUIPOTENTIALS (Red)
-                    levels_phi = np.linspace(h_down, h_up, Nd + 1)
-                    ax.contour(X, Y, phi, levels=levels_phi, colors='red', linestyles='--', linewidths=1)
-                    
-                    # 3. Draw Geometry
-                    ax.axhline(0, color='saddlebrown', lw=3) # Ground
-                    ax.axhline(-soil_d, color='black', lw=3) # Bedrock
-                    
-                    if "Dam" in mode:
-                        rect = patches.Rectangle((-dam_w/2, 0), dam_w, h_up/2, facecolor='gray', hatch='//', edgecolor='k')
-                        ax.add_patch(rect)
-                    if "Pile" in mode:
-                        ax.plot([pile_x, pile_x], [0, -pile_d], 'k-', lw=5) # Pile
-                        ax.plot([pile_x, pile_x], [0, -pile_d], 'y--', lw=1)
-                        
-                    # Water
-                    ax.fill_between([-12, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.3)
-                    ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), 12], 0, h_down, color='lightblue', alpha=0.3)
-                    
-                    # Pore Pressure Calculation Point
-                    # Interpolate Phi at (px, py)
-                    try:
-                        # Simple nearest neighbor for robustness
-                        ix = np.abs(x - px).argmin()
-                        iy = np.abs(y - py).argmin()
-                        h_val = phi[iy, ix]
-                        u_val = (h_val - py) * 9.81
-                        
-                        # Check if point is in soil
-                        valid = True
-                        if "Pile" in mode and abs(px - pile_x) < 0.2 and py > -pile_d: valid = False
-                        
-                        if valid and py <= 0:
-                            ax.scatter(px, py, c='red', s=100, edgecolors='white', zorder=10)
-                            st.success(f"**Pore Pressure at ({px}, {py}):** {u_val:.2f} kPa")
-                        else:
-                            st.warning("Point is inside structure or above ground.")
-                    except:
-                        pass
-                        
-                    ax.set_ylim(-soil_d - 1, h_up + 1)
-                    ax.set_xlim(-12, 12)
-                    st.pyplot(fig)
+            # Pore Pressure Calculation Point
+            # Interpolate Phi at (px, py)
+            try:
+                # Simple nearest neighbor for robustness
+                ix = np.abs(x - px).argmin()
+                iy = np.abs(y - py).argmin()
+                h_val = phi[iy, ix]
+                u_val = (h_val - py) * 9.81
+                
+                # Check if point is in soil
+                valid = True
+                if "Pile" in mode and abs(px - pile_x) < 0.2 and py > -pile_d: valid = False
+                
+                if valid and py <= 0:
+                    ax.scatter(px, py, c='red', s=100, edgecolors='white', zorder=10)
+                    st.success(f"**Pore Pressure at ({px}, {py}):** {u_val:.2f} kPa")
+                else:
+                    st.warning("Point is inside structure or above ground.")
+            except:
+                pass
+                
+            ax.set_ylim(-soil_d - 1, h_up + 1)
+            ax.set_xlim(-12, 12)
+            st.pyplot(fig)
+
 if __name__ == "__main__":
     app()
