@@ -394,101 +394,101 @@ def app():
             st.pyplot(fig2)
 
    # ============================================================
-# TAB 3 CONTENT
-# ============================================================
-
-def render_tab3():
-    st.markdown("### 2D Flow Net Analysis")
-    st.caption("**Principles:** Streamlines (Blue) start at upstream surface, loop under structure, end at downstream surface.")
-    
-    col_in, col_gr = st.columns([1, 1.4])
-
-    with col_in:
-        mode = st.radio("Structure Type", ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"])
-        
-        st.markdown("---")
-        h_up = st.number_input("Upstream Head [m]", value=10.0)
-        h_down = st.number_input("Downstream Head [m]", value=2.0)
-        soil_d = st.number_input("Impervious Layer Depth [m]", value=12.0)
-
-        st.markdown("---")
-        dam_w, pile_d, pile_x = 0.0, 0.0, 0.0
-        
-        if "Dam" in mode:
-            dam_w = st.number_input("Dam Width [m]", value=6.0)
-        if "Pile" in mode:
-            pile_d = st.number_input("Pile Depth [m]", value=6.0)
-            pile_x = st.number_input("Pile X Position [m]", value=0.0)
-
-        st.markdown("---")
-        Nf = st.slider("Number of Flow Channels (Nf)", 3, 10, 4)
-        Nd = st.slider("Number of Equipotential Drops (Nd)", 6, 20, 12)
-        
-        # Pore Pressure Input
-        st.markdown("---")
-        st.markdown("**Check Pore Pressure**")
-        px = st.number_input("X Coord [m]", value=1.5)
-        py = st.number_input("Y Coord [m]", value=-4.0, max_value=0.0)
-
-    with col_gr:
-        # Run Solver
-        nx, ny = 70, 50 # Grid Resolution
-        lx = 24.0 # Domain Width
-        x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
-        X, Y = np.meshgrid(x, y)
-        
-        # Plotting
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.set_aspect('equal')
-        ax.set_facecolor('#fdf6e3')
-        
-        # 1. Plot STREAMLINES (Blue)
-        # We explicitly include 0.0 (Bottom) and 1.0 (Structure) in the levels
-        levels_psi = np.linspace(0, 1.0, Nf + 1)
-        ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2)
-        
-        # 2. Plot EQUIPOTENTIALS (Red)
-        levels_phi = np.linspace(h_down, h_up, Nd + 1)
-        ax.contour(X, Y, phi, levels=levels_phi, colors='red', linestyles='--', linewidths=1)
-        
-        # 3. Draw Geometry
-        ax.axhline(0, color='saddlebrown', lw=3) # Ground
-        ax.axhline(-soil_d, color='black', lw=3) # Bedrock
-        
-        if "Dam" in mode:
-            rect = patches.Rectangle((-dam_w/2, 0), dam_w, h_up/2, facecolor='gray', hatch='//', edgecolor='k')
-            ax.add_patch(rect)
-        if "Pile" in mode:
-            ax.plot([pile_x, pile_x], [0, -pile_d], 'k-', lw=5) # Pile
-            ax.plot([pile_x, pile_x], [0, -pile_d], 'y--', lw=1)
+            # TAB 3 CONTENT
+            # ============================================================
             
-        # Water
-        ax.fill_between([-12, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.3)
-        ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), 12], 0, h_down, color='lightblue', alpha=0.3)
-        
-        # Pore Pressure Calculation Point
-        # Interpolate Phi at (px, py)
-        try:
-            # Simple nearest neighbor for robustness
-            ix = np.abs(x - px).argmin()
-            iy = np.abs(y - py).argmin()
-            h_val = phi[iy, ix]
-            u_val = (h_val - py) * 9.81
+            def render_tab3():
+                st.markdown("### 2D Flow Net Analysis")
+                st.caption("**Principles:** Streamlines (Blue) start at upstream surface, loop under structure, end at downstream surface.")
+                
+                col_in, col_gr = st.columns([1, 1.4])
             
-            # Check if point is in soil
-            valid = True
-            if "Pile" in mode and abs(px - pile_x) < 0.2 and py > -pile_d: valid = False
+                with col_in:
+                    mode = st.radio("Structure Type", ["Sheet Pile Only", "Concrete Dam Only", "Combined (Dam + Pile)"])
+                    
+                    st.markdown("---")
+                    h_up = st.number_input("Upstream Head [m]", value=10.0)
+                    h_down = st.number_input("Downstream Head [m]", value=2.0)
+                    soil_d = st.number_input("Impervious Layer Depth [m]", value=12.0)
             
-            if valid and py <= 0:
-                ax.scatter(px, py, c='red', s=100, edgecolors='white', zorder=10)
-                st.success(f"**Pore Pressure at ({px}, {py}):** {u_val:.2f} kPa")
-            else:
-                st.warning("Point is inside structure or above ground.")
-        except:
-            pass
+                    st.markdown("---")
+                    dam_w, pile_d, pile_x = 0.0, 0.0, 0.0
+                    
+                    if "Dam" in mode:
+                        dam_w = st.number_input("Dam Width [m]", value=6.0)
+                    if "Pile" in mode:
+                        pile_d = st.number_input("Pile Depth [m]", value=6.0)
+                        pile_x = st.number_input("Pile X Position [m]", value=0.0)
             
-        ax.set_ylim(-soil_d - 1, h_up + 1)
-        ax.set_xlim(-12, 12)
-        st.pyplot(fig)
+                    st.markdown("---")
+                    Nf = st.slider("Number of Flow Channels (Nf)", 3, 10, 4)
+                    Nd = st.slider("Number of Equipotential Drops (Nd)", 6, 20, 12)
+                    
+                    # Pore Pressure Input
+                    st.markdown("---")
+                    st.markdown("**Check Pore Pressure**")
+                    px = st.number_input("X Coord [m]", value=1.5)
+                    py = st.number_input("Y Coord [m]", value=-4.0, max_value=0.0)
+            
+                with col_gr:
+                    # Run Solver
+                    nx, ny = 70, 50 # Grid Resolution
+                    lx = 24.0 # Domain Width
+                    x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
+                    X, Y = np.meshgrid(x, y)
+                    
+                    # Plotting
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    ax.set_aspect('equal')
+                    ax.set_facecolor('#fdf6e3')
+                    
+                    # 1. Plot STREAMLINES (Blue)
+                    # We explicitly include 0.0 (Bottom) and 1.0 (Structure) in the levels
+                    levels_psi = np.linspace(0, 1.0, Nf + 1)
+                    ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2)
+                    
+                    # 2. Plot EQUIPOTENTIALS (Red)
+                    levels_phi = np.linspace(h_down, h_up, Nd + 1)
+                    ax.contour(X, Y, phi, levels=levels_phi, colors='red', linestyles='--', linewidths=1)
+                    
+                    # 3. Draw Geometry
+                    ax.axhline(0, color='saddlebrown', lw=3) # Ground
+                    ax.axhline(-soil_d, color='black', lw=3) # Bedrock
+                    
+                    if "Dam" in mode:
+                        rect = patches.Rectangle((-dam_w/2, 0), dam_w, h_up/2, facecolor='gray', hatch='//', edgecolor='k')
+                        ax.add_patch(rect)
+                    if "Pile" in mode:
+                        ax.plot([pile_x, pile_x], [0, -pile_d], 'k-', lw=5) # Pile
+                        ax.plot([pile_x, pile_x], [0, -pile_d], 'y--', lw=1)
+                        
+                    # Water
+                    ax.fill_between([-12, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.3)
+                    ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), 12], 0, h_down, color='lightblue', alpha=0.3)
+                    
+                    # Pore Pressure Calculation Point
+                    # Interpolate Phi at (px, py)
+                    try:
+                        # Simple nearest neighbor for robustness
+                        ix = np.abs(x - px).argmin()
+                        iy = np.abs(y - py).argmin()
+                        h_val = phi[iy, ix]
+                        u_val = (h_val - py) * 9.81
+                        
+                        # Check if point is in soil
+                        valid = True
+                        if "Pile" in mode and abs(px - pile_x) < 0.2 and py > -pile_d: valid = False
+                        
+                        if valid and py <= 0:
+                            ax.scatter(px, py, c='red', s=100, edgecolors='white', zorder=10)
+                            st.success(f"**Pore Pressure at ({px}, {py}):** {u_val:.2f} kPa")
+                        else:
+                            st.warning("Point is inside structure or above ground.")
+                    except:
+                        pass
+                        
+                    ax.set_ylim(-soil_d - 1, h_up + 1)
+                    ax.set_xlim(-12, 12)
+                    st.pyplot(fig)
 if __name__ == "__main__":
     app()
