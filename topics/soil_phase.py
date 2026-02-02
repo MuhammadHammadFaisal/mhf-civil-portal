@@ -322,10 +322,12 @@ def app():
                 Sr_in = st.number_input("Saturation (Sᵣ)", 0.0, 1.0, step=0.01)
                 
             with c2:
-                gamma_b_in = st.number_input("Bulk Unit Wt (γ_bulk)", 0.0, step=0.1)
-                gamma_d_in = st.number_input("Dry Unit Wt (γ_dry)", 0.0, step=0.1)
-                rho_b_in = st.number_input("Bulk Density (ρ_bulk)", 0.0, step=0.01)
-                rho_d_in = st.number_input("Dry Density (ρ_dry)", 0.0, step=0.01)
+                st.markdown("**Unit Weights**")
+                gamma_b_in = st.number_input("γ_bulk (kN/m³)", 0.0, step=0.1, key="gamma_bulk")
+                gamma_d_in = st.number_input("γ_dry (kN/m³)", 0.0, step=0.1, key="gamma_dry")
+                st.markdown("**Densities**")
+                rho_b_in = st.number_input("ρ_bulk (g/cm³)", 0.0, step=0.01, key="rho_bulk")
+                rho_d_in = st.number_input("ρ_dry (g/cm³)", 0.0, step=0.01, key="rho_dry")
 
             if w_in > 0: solver.set_param('w', w_in)
             if Gs_in > 0: solver.set_param('Gs', Gs_in)
@@ -362,13 +364,13 @@ def app():
                     if p['Gs'] is not None: st.latex(f"G_s = {p['Gs']:.3f}")
                     if p['e'] is not None: st.latex(f"e = {p['e']:.4f}")
                     if p['Sr'] is not None: st.latex(f"S_r = {p['Sr']:.4f}")
-                    if p['gamma_bulk']: st.latex(r"\gamma_{bulk} = " + f"{p['gamma_bulk']:.2f}")
-                    if p['gamma_dry']: st.latex(r"\gamma_{dry} = " + f"{p['gamma_dry']:.2f}")
-                    if p['rho_bulk']: st.latex(r"\rho_{bulk} = " + f"{p['rho_bulk']:.2f}")
-                    if p['rho_dry']: st.latex(r"\rho_{dry} = " + f"{p['rho_dry']:.2f}")
+                    if p['gamma_bulk']: st.latex(r"\gamma_{bulk} = " + f"{p['gamma_bulk']:.2f}" + r" \text{ kN/m}^3")
+                    if p['gamma_dry']: st.latex(r"\gamma_{dry} = " + f"{p['gamma_dry']:.2f}" + r" \text{ kN/m}^3")
+                    if p['rho_bulk']: st.latex(r"\rho_{bulk} = " + f"{p['rho_bulk']:.2f}" + r" \text{ g/cm}^3")
+                    if p['rho_dry']: st.latex(r"\rho_{dry} = " + f"{p['rho_dry']:.2f}" + r" \text{ g/cm}^3")
                     
-                    if p['gamma_sat']: st.latex(r"\gamma_{sat} = " + f"{p['gamma_sat']:.2f}")
-                    if p['gamma_sub']: st.latex(r"\gamma' = " + f"{p['gamma_sub']:.2f}")
+                    if p['gamma_sat']: st.latex(r"\gamma_{sat} = " + f"{p['gamma_sat']:.2f}" + r" \text{ kN/m}^3")
+                    if p['gamma_sub']: st.latex(r"\gamma' = " + f"{p['gamma_sub']:.2f}" + r" \text{ kN/m}^3")
 
                 with bot_col2:
                     fig_final = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=True)
