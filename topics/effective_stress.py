@@ -7,7 +7,7 @@ import numpy as np
 # =========================================================
 # APP CONFIG
 # =========================================================
-st.set_page_config(page_title="Advanced Soil Stress Analysis", layout="wide")
+
 
 GAMMA_W = 9.81  
 
@@ -16,7 +16,6 @@ GAMMA_W = 9.81
 # MAIN APP
 # =========================================================
 def app():
-    st.title("Advanced Effective Stress Analysis")
     st.markdown("---")
 
     tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
@@ -42,7 +41,7 @@ def app():
             with c3:
                 surcharge = st.number_input("Surcharge q (kPa)", value=50.0, step=5.0)
 
-            st.markdown("### B. Stratigraphy")
+            st.markdown("### B. Soil Properties ")
             num_layers = st.number_input("Number of Layers", 1, 5, 2)
             layers = []
             colors = {"Sand": "#E6D690", "Clay": "#B0A494"}
