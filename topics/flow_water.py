@@ -20,9 +20,7 @@ def format_scientific(val):
 
 def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up, h_down, mode):
     """
-    Solves Laplace equation.
-    Uses a WIDE simulation domain to ensure physics are correct,
-    then we crop the view later.
+    Solves Laplace equation with strict boundary conditions.
     """
     # 1. Create Grid
     x = np.linspace(-lx/2, lx/2, nx)
@@ -43,35 +41,37 @@ def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up
     # Psi: 0=Bottom, 1=Structure/Surface
     psi = np.zeros((ny, nx))
     
-    # Linear initial guess
+    # Linear initial guess (0 at bottom, 1 at top)
     for i in range(ny):
         psi[i, :] = i / (ny - 1)
 
     # 4. Iterative Solver
-    iterations = 5000 
+    iterations = 6000 # High iterations for smoothness
     for k in range(iterations):
+        # Laplace Average
         psi_new = 0.25 * (psi[0:-2, 1:-1] + psi[2:, 1:-1] + psi[1:-1, 0:-2] + psi[1:-1, 2:])
         psi[1:-1, 1:-1] = psi_new
         
         # --- BOUNDARY CONDITIONS ---
         
-        # A. Impervious Bottom -> Psi = 0
+        # A. Impervious Bottom -> Psi = 0 (Last Flow Line)
         psi[0, :] = 0.0
         
-        # B. Structure Boundary -> Psi = 1.0
+        # B. Structure Boundary -> Psi = 1.0 (First Flow Line)
         if "Pile" in mode:
             psi[pile_iy_tip:, pile_ix] = 1.0
             
         if "Dam" in mode:
             psi[-1, dam_left_ix:dam_right_ix+1] = 1.0
 
-        # C. Soil Surface (Neumann: Vertical Entry/Exit)
-        # We copy the row below to the top row (dPsi/dy = 0)
-        # This forces streamlines to hit surface at 90 degrees
+        # C. Soil Surface (Entry/Exit)
+        # Force vertical entry (Neumann BC: dPsi/dy = 0)
+        # We allow the surface to relax based on the row below it
         if "Dam" in mode:
             psi[-1, :dam_left_ix] = psi[-2, :dam_left_ix]
             psi[-1, dam_right_ix+1:] = psi[-2, dam_right_ix+1:]
         else:
+            # For pile, relax surface everywhere except the pile thickness itself
             psi[-1, :pile_ix] = psi[-2, :pile_ix]
             psi[-1, pile_ix+1:] = psi[-2, pile_ix+1:]
 
@@ -82,20 +82,22 @@ def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up
     # 5. Solve for Head (Phi)
     phi = np.full((ny, nx), (h_up + h_down)/2)
     
-    # Fixed Heads
-    phi[-1, : (dam_left_ix if "Dam" in mode else pile_ix)] = h_up
-    phi[-1, (dam_right_ix if "Dam" in mode else pile_ix)+1 :] = h_down
+    # Fixed Heads Zones
+    mid_ix = pile_ix if "Pile" in mode and "Dam" not in mode else dam_left_ix
+    end_ix = pile_ix if "Pile" in mode and "Dam" not in mode else dam_right_ix
     
+    phi[-1, :mid_ix] = h_up
+    phi[-1, end_ix+1:] = h_down
+
     for k in range(iterations):
         phi_new = 0.25 * (phi[0:-2, 1:-1] + phi[2:, 1:-1] + phi[1:-1, 0:-2] + phi[1:-1, 2:])
         phi[1:-1, 1:-1] = phi_new
         
-        mid_ix = pile_ix if "Pile" in mode and "Dam" not in mode else dam_left_ix
-        end_ix = pile_ix if "Pile" in mode and "Dam" not in mode else dam_right_ix
-        
+        # Re-enforce Fixed Heads
         phi[-1, :mid_ix] = h_up
         phi[-1, end_ix+1:] = h_down
         
+        # Impervious Boundaries (Neumann)
         phi[0, :] = phi[1, :]
         phi[:, 0] = phi[:, 1]
         phi[:, -1] = phi[:, -2]
@@ -111,7 +113,6 @@ def app():
     st.subheader("Flow of Water & Seepage Analysis")
     
     tab1, tab2, tab3 = st.tabs(["1D Seepage", "Permeability", "Flow Nets"])
-    
     # =================================================================
     # TAB 1: 1D SEEPAGE (Effective Stress)
     # =================================================================
@@ -367,7 +368,7 @@ def app():
             st.pyplot(fig2)
 
     # ============================================================
-    # TAB 3: FLOW NETS (FIXED)
+    # TAB 3: FLOW NETS (FIXED SPACING)
     # ============================================================
     with tab3:
         st.markdown("### 2D Flow Net Analysis")
@@ -390,8 +391,9 @@ def app():
                 pile_x = st.number_input("Pile X Position [m]", value=0.0)
 
             st.markdown("---")
-            Nf = st.slider("Number of Flow Channels (Nf)", 3, 10, 4)
-            Nd = st.slider("Number of Equipotential Drops (Nd)", 6, 20, 12)
+            # Increased defaults slightly for better visuals
+            Nf = st.slider("Number of Flow Channels (Nf)", 3, 12, 5) 
+            Nd = st.slider("Number of Equipotential Drops (Nd)", 6, 24, 14)
             
             st.markdown("---")
             st.markdown("**Check Pore Pressure**")
@@ -399,62 +401,51 @@ def app():
             py = st.number_input("Y Coord [m]", value=-4.0, max_value=0.0)
 
         with col_gr:
-            # 1. SETUP SIMULATION
-            # We simulate a WIDE area (±40m) to allow proper decay
-            nx, ny = 120, 60 
-            lx_sim = 80.0 
+            # 1. SETUP SIMULATION (Wide Domain)
+            # We use a 120m wide domain to ensure the physics are accurate
+            nx, ny = 150, 70 
+            lx_sim = 120.0 
             
             x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx_sim, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
             X, Y = np.meshgrid(x, y)
             
-            # 2. INTELLIGENT LEVEL SELECTION
-            # The visual window is approx -12 to +12.
-            # We want to find the lowest Psi value that touches the surface at x=±12.
-            # Any streamline with a value lower than this is "deep flow" and enters from the side.
-            # We want to prioritize the "surface connected" lines.
+            # 2. LEVEL SELECTION (THE FIX)
+            # Instead of cropping levels, we plot the Full Range from 0.0 to 1.0.
+            # This ensures the deep, wide flow lines (near 0.1, 0.2) are drawn,
+            # filling the gap between the pile and the bottom.
             
-            # Find index of x ~ 12
-            idx_edge = np.abs(x - 12.0).argmin()
-            # Value of Psi at surface at edge
-            psi_edge = psi[-1, idx_edge]
+            levels_psi = np.linspace(0, 1.0, Nf + 1)
             
-            # Generate levels: Start slightly above the edge value to ensure they are "inside"
-            # Range: [Psi_edge, 1.0]
-            # We allow a tiny buffer so the outermost line clearly starts at surface
-            levels_psi = np.linspace(psi_edge + 0.02, 1.0, Nf)
-            
-            # Always force the "Bottom" line (0.0) to be drawn, as requested "Last flow line"
-            levels_psi = np.insert(levels_psi, 0, 0.0)
-
             # 3. PLOTTING
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(10, 7)) # Slightly larger figure
             ax.set_aspect('equal')
             ax.set_facecolor('#fdf6e3')
             
-            # Streamlines (Blue)
-            # Use 'sorted' and 'unique' to handle cases where insert duplicates 0
-            levels_psi = np.unique(levels_psi)
-            ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2)
+            # Streamlines (Blue) - Thicker
+            ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2.5, alpha=0.9)
             
             # Equipotentials (Red)
             levels_phi = np.linspace(h_down, h_up, Nd + 1)
-            ax.contour(X, Y, phi, levels=levels_phi, colors='red', linestyles='--', linewidths=1)
+            ax.contour(X, Y, phi, levels=levels_phi, colors='red', linestyles='--', linewidths=1.5)
             
-            # Geometry
-            ax.axhline(0, color='saddlebrown', lw=3) 
-            ax.axhline(-soil_d, color='black', lw=3) 
-            
+            # Geometry - Structures
             if "Dam" in mode:
                 rect = patches.Rectangle((-dam_w/2, 0), dam_w, h_up/2, facecolor='gray', hatch='//', edgecolor='k')
                 ax.add_patch(rect)
             if "Pile" in mode:
-                ax.plot([pile_x, pile_x], [0, -pile_d], 'k-', lw=5) 
+                # Draw pile as a physical object to mask the singularity
+                ax.plot([pile_x, pile_x], [0, -pile_d], 'k-', lw=6) 
                 ax.plot([pile_x, pile_x], [0, -pile_d], 'y--', lw=1)
                 
+            # Geometry - Boundaries
+            ax.axhline(0, color='saddlebrown', lw=3) 
+            ax.axhline(-soil_d, color='black', lw=4) 
+            ax.text(0, -soil_d + 0.5, "Impervious Boundary (Ψ=0)", ha='center', fontsize=9, fontstyle='italic')
+
             # Water Bodies
-            vis_limit = 12.0
-            ax.fill_between([-vis_limit, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.3)
-            ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), vis_limit], 0, h_down, color='lightblue', alpha=0.3)
+            vis_limit = 14.0 # Viewport width
+            ax.fill_between([-vis_limit, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.4)
+            ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), vis_limit], 0, h_down, color='lightblue', alpha=0.4)
             
             # Pore Pressure Point
             try:
@@ -467,12 +458,14 @@ def app():
                 if "Pile" in mode and abs(px - pile_x) < 0.2 and py > -pile_d: valid = False
                 
                 if valid and py <= 0:
-                    ax.scatter(px, py, c='red', s=100, edgecolors='white', zorder=10)
+                    ax.scatter(px, py, c='red', s=120, edgecolors='black', zorder=10)
                     st.success(f"**Pore Pressure at ({px}, {py}):** {u_val:.2f} kPa")
             except: pass
                 
+            # Crop view to the relevant center area
             ax.set_ylim(-soil_d - 1, h_up + 1)
             ax.set_xlim(-vis_limit, vis_limit)
+            
             st.pyplot(fig)
 
 if __name__ == "__main__":
