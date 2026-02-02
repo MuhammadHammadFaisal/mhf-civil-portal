@@ -114,8 +114,7 @@ def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
 # MAIN APP
 # =========================================================
 def app():
-    st.title("Retaining Wall Analysis")
-    st.markdown("---")
+
     
     tab_rankine, tab_coulomb = st.tabs(["1. Rankine's Theory (Wall Profile)", "2. Coulomb's Wedge Theory"])
 
@@ -136,6 +135,7 @@ def app():
             with st.container(border=True):
                 st.caption(" Left Side (Passive / Excavated)")
                 left_wt = st.number_input("Left WT Depth (m)", 0.0, 20.0, 1.5)
+                # Ensure default is deep enough, but user can change
                 def_left = [{'H': 1.5, 'g': 18.0, 'p': 38.0, 'c': 0.0}, {'H': 3.0, 'g': 20.0, 'p': 28.0, 'c': 10.0}]
                 left_layers = render_layers_input("L", "Passive Layers", def_left)
             
@@ -156,14 +156,15 @@ def app():
             fig_profile, ax_p = plt.subplots(figsize=(8, 6))
             wall_width = 1.0
             
-            # Wall
+            # Draw Wall (Hatched)
+            # Wall goes from 0 down to wall_height
             rect_wall = patches.Rectangle((-wall_width/2, 0), wall_width, wall_height, facecolor='lightgrey', edgecolor='black', hatch='//')
             ax_p.add_patch(rect_wall)
             
             Y_top = wall_height
             Y_exc = wall_height - excavation_depth 
             
-            # Draw Right Side Layers (Active)
+            # --- DRAW RIGHT SIDE LAYERS (ACTIVE) ---
             current_y = Y_top
             for l in right_layers:
                 h = l['H']
@@ -173,7 +174,14 @@ def app():
                 ax_p.text(wall_width/2 + 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
                 current_y -= h
             
-            # Draw Left Side Layers (Passive)
+            # [FIX] Right Side Extrapolation (Fill to bottom)
+            if current_y > -2:
+                last_l = right_layers[-1] if right_layers else {'type': 'Sand', 'gamma': 18.0}
+                color = '#E6D690' if last_l['type'] == "Sand" else ('#B0A494' if last_l['type'] == "Clay" else '#C1B088')
+                rect = patches.Rectangle((wall_width/2, -2), 6, current_y - (-2), facecolor=color, edgecolor='gray', alpha=0.4)
+                ax_p.add_patch(rect)
+
+            # --- DRAW LEFT SIDE LAYERS (PASSIVE) ---
             current_y = Y_exc
             for l in left_layers:
                 h = l['H']
@@ -182,6 +190,20 @@ def app():
                 ax_p.add_patch(rect)
                 ax_p.text(-wall_width/2 - 3, current_y - h/2, f"{l['type']}\n$\\gamma={l['gamma']}$", ha='center', va='center', fontsize=9)
                 current_y -= h
+                
+            # [FIX] Left Side Extrapolation (Mandatory touch bottom)
+            # If the user-defined layers don't reach y=0 (bottom of wall) or y=-2 (plot limit), fill it.
+            if current_y > -2:
+                # Use last layer properties
+                last_l = left_layers[-1] if left_layers else {'type': 'Sand', 'gamma': 18.0}
+                color = '#E6D690' if last_l['type'] == "Sand" else ('#B0A494' if last_l['type'] == "Clay" else '#C1B088')
+                
+                # Draw filling rectangle
+                rect = patches.Rectangle((-wall_width/2 - 6, -2), 6, current_y - (-2), facecolor=color, edgecolor='gray', alpha=0.6)
+                ax_p.add_patch(rect)
+                # Label it clearly
+                ax_p.text(-wall_width/2 - 3, (current_y + 0)/2, f"(Extrapolated)\n{last_l['type']}", ha='center', va='center', fontsize=8, style='italic', color='#333')
+
             
             # Surcharge Arrows
             if right_q > 0:
@@ -356,7 +378,7 @@ def app():
 
             # --- CALCULATION PANEL ---
             if c_calc_btn:
-                with st.expander("📝 Detailed Calculation Steps", expanded=True):
+                with st.expander(" Detailed Calculation Steps", expanded=True):
                     # Calculation of Ka (Coulomb)
                     term1 = np.sqrt(np.sin(phi_r + del_r) * np.sin(phi_r - bet_r))
                     term2 = np.sqrt(np.cos(alp_r + del_r) * np.cos(alp_r - bet_r))
