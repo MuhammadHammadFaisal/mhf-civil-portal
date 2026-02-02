@@ -131,7 +131,7 @@ def main():
         cols = st.columns(3)
 
         for idx, (file, title) in enumerate(modules):
-            with cols[i % 3]:
+            with cols[idx % 3]:
                 st.page_link(
                     f"pages/{file}",
                     label=title,
@@ -203,4 +203,5 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
