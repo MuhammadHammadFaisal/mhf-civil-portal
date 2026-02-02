@@ -45,8 +45,7 @@ def calculate_infinite_slope(beta, phi, c, gamma, gamma_sat, z, u, case):
 # MAIN APP
 # =========================================================
 def app():
-    st.title("Slope Stability Calculator ⛰️")
-    st.markdown("Based on **Chapter 8** of Soil Mechanics Notes.")
+
     
     tab_trans, tab_rot, tab_comp = st.tabs([
         "1. Translational (Infinite)", 
@@ -58,8 +57,7 @@ def app():
     # TAB 1: TRANSLATIONAL (INFINITE SLOPE)
     # ---------------------------------------------------------
     with tab_trans:
-        st.header("Infinite Slope Analysis")
-        st.info("Assumes failure plane is parallel to the ground surface. Best for long natural slopes.")
+
         
         col_t1, col_t2 = st.columns([0.4, 0.6], gap="medium")
         
