@@ -50,7 +50,7 @@ def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up
         psi[i, :] = i / (ny - 1)
 
     # 4. Iterative Solver (SOR Method)
-    iterations = 3000  # High iteration count for convergence
+    iterations = 4000  # High iteration count for convergence
     for k in range(iterations):
         # Laplace Equation
         psi_new = 0.25 * (psi[0:-2, 1:-1] + psi[2:, 1:-1] + psi[1:-1, 0:-2] + psi[1:-1, 2:])
@@ -406,10 +406,13 @@ def app():
             py = st.number_input("Y Coord [m]", value=-4.0, max_value=0.0)
 
         with col_gr:
-            # Run Solver
-            nx, ny = 70, 50 # Grid Resolution
-            lx = 24.0 # Domain Width
-            x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
+            # --- THE FIX: WIDER DOMAIN for calculation ---
+            # We calculate flow for ±30m, but only plot ±12m.
+            # This moves the "side effects" off-screen.
+            nx, ny = 120, 50 
+            lx_sim = 60.0  # WIDE simulation width
+            
+            x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx_sim, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
             X, Y = np.meshgrid(x, y)
             
             # Plotting
@@ -418,7 +421,6 @@ def app():
             ax.set_facecolor('#fdf6e3')
             
             # 1. Plot STREAMLINES (Blue)
-            # We explicitly include 0.0 (Bottom) and 1.0 (Structure) in the levels
             levels_psi = np.linspace(0, 1.0, Nf + 1)
             ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2)
             
@@ -438,19 +440,16 @@ def app():
                 ax.plot([pile_x, pile_x], [0, -pile_d], 'y--', lw=1)
                 
             # Water
-            ax.fill_between([-12, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.3)
-            ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), 12], 0, h_down, color='lightblue', alpha=0.3)
+            ax.fill_between([-lx_sim, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.3)
+            ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), lx_sim], 0, h_down, color='lightblue', alpha=0.3)
             
             # Pore Pressure Calculation Point
-            # Interpolate Phi at (px, py)
             try:
-                # Simple nearest neighbor for robustness
                 ix = np.abs(x - px).argmin()
                 iy = np.abs(y - py).argmin()
                 h_val = phi[iy, ix]
                 u_val = (h_val - py) * 9.81
                 
-                # Check if point is in soil
                 valid = True
                 if "Pile" in mode and abs(px - pile_x) < 0.2 and py > -pile_d: valid = False
                 
@@ -462,8 +461,9 @@ def app():
             except:
                 pass
                 
+            # --- THE FIX: CROP VIEW to center ---
             ax.set_ylim(-soil_d - 1, h_up + 1)
-            ax.set_xlim(-12, 12)
+            ax.set_xlim(-12, 12) # Only show the center 24m
             st.pyplot(fig)
 
 if __name__ == "__main__":
