@@ -74,8 +74,6 @@ def calculate_stress(z_local, layers, wt_depth, surcharge, mode="Active"):
 # MAIN APP
 # =========================================================
 def app():
-    st.title("Lateral Earth Pressure Calculator 🧱")
-    st.markdown("---")
     
     tab_rankine, tab_coulomb = st.tabs(["1. Rankine's Theory (Wall Profile)", "2. Coulomb's Wedge Theory"])
 
