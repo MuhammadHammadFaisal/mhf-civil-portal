@@ -8,13 +8,11 @@ def app():
     # 1. SELECT MODE
     mode = st.radio("Select Solver Mode:", ["Numeric Calculation", "Symbolic / Formula Finder"], horizontal=True)
 
-    # ==========================================
-    # MODE A: NUMERIC CALCULATION (Calculator)
-    # ==========================================
+    # Numeric Calculation Mode
     if "Numeric" in mode:
         st.caption("Enter parameters. The INPUT diagram (top) updates live. The RESULT diagram (bottom) appears after solving.")
         
-        # --- CLASS DEFINITION (Numeric Logic) ---
+
         class SoilState:
             def __init__(self):
                 self.params = {
@@ -25,8 +23,8 @@ def app():
                 }
                 self.rho_w = 1.0
                 self.gamma_w = 9.81
-                self.log = [] 
-                self.inputs = [] # Track what user typed
+                self.log = []
+                self.inputs = []
 
                 self.latex_map = {
                     'w': 'w', 'Gs': 'G_s', 'e': 'e', 'n': 'n', 'Sr': 'S_r',
@@ -55,7 +53,7 @@ def app():
                 while changed and iterations < 15:
                     changed = False
                     
-                    # 1. Basic n <-> e
+           
                     if known('n') and not known('e'):
                         p['e'] = p['n'] / (1 - p['n'])
                         sub = r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}'
@@ -70,25 +68,21 @@ def app():
                     # 2. Se = wGs
                     if known('w') and known('Gs') and known('e') and not known('Sr'):
                         p['Sr'] = (p['w'] * p['Gs']) / p['e']
-                        # FIX: Used \\cdot instead of \cdot inside f-string
                         sub = r'\frac{' + f"{p['w']:.3f} \\cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}'
                         self.add_log('Sr', r'\frac{w G_s}{e}', sub, p['Sr'])
                         changed = True
                     if known('w') and known('Gs') and known('Sr') and not known('e') and p['Sr'] != 0:
                         p['e'] = (p['w'] * p['Gs']) / p['Sr']
-                        # FIX: Used \\cdot
                         sub = r'\frac{' + f"{p['w']:.3f} \\cdot {p['Gs']:.2f}" + r'}{' + f"{p['Sr']:.3f}" + r'}'
                         self.add_log('e', r'\frac{w G_s}{S_r}', sub, p['e'])
                         changed = True
                     if known('Sr') and known('e') and known('Gs') and not known('w'):
                         p['w'] = (p['Sr'] * p['e']) / p['Gs']
-                        # FIX: Used \\cdot
                         sub = r'\frac{' + f"{p['Sr']:.3f} \\cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}'
                         self.add_log('w', r'\frac{S_r e}{G_s}', sub, p['w'])
                         changed = True
                     if known('Sr') and known('e') and known('w') and not known('Gs') and p['w'] != 0:
                         p['Gs'] = (p['Sr'] * p['e']) / p['w']
-                        # FIX: Used \\cdot
                         sub = r'\frac{' + f"{p['Sr']:.3f} \\cdot {p['e']:.3f}" + r'}{' + f"{p['w']:.3f}" + r'}'
                         self.add_log('Gs', r'\frac{S_r e}{w}', sub, p['Gs'])
                         changed = True
@@ -96,13 +90,11 @@ def app():
                     # 3. Unit Weights
                     if known('Gs') and known('e') and not known('gamma_dry'):
                         p['gamma_dry'] = (p['Gs'] * self.gamma_w) / (1 + p['e'])
-                        # FIX: Used \\cdot
                         sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
                         self.add_log('gamma_dry', r'\frac{G_s \gamma_w}{1 + e}', sub, p['gamma_dry'])
                         changed = True
                     if known('Gs') and known('e') and known('w') and not known('gamma_bulk'):
                         p['gamma_bulk'] = (p['Gs'] * self.gamma_w * (1 + p['w'])) / (1 + p['e'])
-                        # FIX: Used \\cdot
                         sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81 (1 + {p['w']:.3f})" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
                         self.add_log('gamma_bulk', r'\frac{G_s \gamma_w (1+w)}{1+e}', sub, p['gamma_bulk'])
                         changed = True
@@ -117,7 +109,6 @@ def app():
                     if known('gamma_dry') and known('Gs') and not known('e'):
                         val = (p['Gs'] * self.gamma_w) / p['gamma_dry']
                         p['e'] = val - 1
-                        # FIX: Used \\cdot
                         sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81" + r'}{' + f"{p['gamma_dry']:.2f}" + r'} - 1'
                         self.add_log('e', r'\frac{G_s \gamma_w}{\gamma_{dry}} - 1', sub, p['e'])
                         changed = True
@@ -299,7 +290,6 @@ def app():
         # --- RELATIVE DENSITY ---
         st.markdown("---")
         st.markdown("")
-        st.markdown("")
         with st.container(border=True):
             st.subheader("Relative Density ($D_r$) Calculator")
             rc1, rc2, rc3 = st.columns(3)
@@ -318,7 +308,7 @@ def app():
     # MODE B: SYMBOLIC / FORMULA FINDER
     # ==========================================
     elif "Symbolic" in mode:
-        st.subheader("Formula Finder ")
+        st.subheader("Formula Finder")
         st.caption("Select the variables you **KNOW** to find the formula for the variable you **WANT**.")
 
         col1, col2 = st.columns(2)
