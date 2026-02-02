@@ -6,9 +6,7 @@ import numpy as np
 def app():
     # =================================================================
     # 1. HEADER & MODE
-    # =================================================================
-    st.header("Consolidation Analysis")
-    st.markdown("---")
+    
 
     calc_mode = st.radio(
         "**Calculation Goal:**",
