@@ -64,20 +64,20 @@ def app():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- HEADER SECTION ---
-    # 1. Use vertical_alignment="center" to keep image and text aligned
-    col_logo, col_text = st.columns([1, 5], vertical_alignment="center")
+    # --- PROFESSIONAL HEADER SECTION ---
+    # Adjusted column ratio to give the bigger logo enough space
+    col_logo, col_text = st.columns([1.2, 5], vertical_alignment="center")
 
     with col_logo:
-        st.image("assets/logo.png", width=150)
+        # Increased logo width slightly to make it "a little big"
+        st.image("assets/logo.png", width=180)
 
     with col_text:
-        # 2. Increased font-size to 80px to match logo height
-        # Removed padding-top so centering works naturally
+        # Font size set to 55px (Professional look: smaller than logo, but distinct)
         st.markdown(
             """
-            <div style="padding-left: 10px;">
-                <h1 style='font-size: 80px; margin: 0; line-height: 1.0;'>Soil Mechanics</h1>
+            <div style="padding-left: 15px;">
+                <h1 style='font-size: 55px; margin: 0; line-height: 1.0; font-weight: 700;'>Soil Mechanics</h1>
             </div>
             """, 
             unsafe_allow_html=True
@@ -111,7 +111,6 @@ def app():
     elif topic == "Consolidation Theory":
         consolidation.app()
         
-    # Corrected typo: "Soils" to match list
     elif topic == "Shear Strength of Soils":
         shear_strength.app()
         
