@@ -96,6 +96,11 @@ def solve_flow_net_finite_difference(nx, ny, lx, ly, pile_d, pile_x, dam_w, h_up
         # Re-enforce Fixed Heads
         phi[-1, :mid_ix] = h_up
         phi[-1, end_ix+1:] = h_down
+        if "Dam" in mode:
+            phi[-1, dam_left_ix:dam_right_ix+1] = phi[-2, dam_left_ix:dam_right_ix+1]
+        if "Pile" in mode:
+            phi[pile_iy_tip:, pile_ix] = phi[pile_iy_tip:, pile_ix - 1]
+            phi[pile_iy_tip:, pile_ix + 1] = phi[pile_iy_tip:, pile_ix]
         
         # Impervious Boundaries (Neumann)
         phi[0, :] = phi[1, :]
@@ -372,7 +377,17 @@ def app():
     # ============================================================
     with tab3:
         st.markdown("### 2D Flow Net Analysis")
-        st.caption("**Principles:** Streamlines (Blue) start at upstream surface, loop under structure, end at downstream surface.")
+        st.caption("Use the flow net principles below to interpret the plot. The solver enforces Laplace flow in soil only.")
+        st.markdown(
+            "- **Impervious boundaries are flow lines**: soil bottom, pile, dam base.\n"
+            "- **Soil–water interfaces are equipotential lines** where total head is constant.\n"
+            "- **Equipotential lines never cross each other** and **flow lines never cross each other**.\n"
+            "- Equipotential lines and flow lines are **smooth, approximately parallel curves**.\n"
+            "- Equipotential lines intersect flow lines at **90° angles** and form **approximate squares**.\n"
+            "- **First flow line**: impervious boundary of sheet pile or dam base.\n"
+            "- **Last flow line**: bottom of soil boundary.\n"
+            "- Equipotential lines **start at the first flow line and end at the last flow line** without cutting boundaries."
+        )
         
         col_in, col_gr = st.columns([1, 1.4])
 
@@ -408,6 +423,22 @@ def app():
             
             x, y, phi, psi = solve_flow_net_finite_difference(nx, ny, lx_sim, soil_d, pile_d, pile_x, dam_w, h_up, h_down, mode)
             X, Y = np.meshgrid(x, y)
+            pile_thickness = max(lx_sim / nx, 0.35)
+            dam_left = -dam_w / 2
+            dam_right = dam_w / 2
+
+            soil_mask = (Y > 0) | (Y < -soil_d)
+            pile_mask = np.zeros_like(soil_mask)
+            dam_mask = np.zeros_like(soil_mask)
+            if "Pile" in mode:
+                pile_mask = (np.abs(X - pile_x) <= pile_thickness / 2) & (Y <= 0) & (Y >= -pile_d)
+            if "Dam" in mode:
+                dam_mask = (X >= dam_left) & (X <= dam_right) & (Y >= 0)
+
+            flow_mask = soil_mask | pile_mask
+            equip_mask = soil_mask | pile_mask | dam_mask
+            psi_plot = np.ma.array(psi, mask=flow_mask)
+            phi_plot = np.ma.array(phi, mask=equip_mask)
             
             # 2. LEVEL SELECTION (THE FIX)
             # Instead of cropping levels, we plot the Full Range from 0.0 to 1.0.
@@ -421,31 +452,38 @@ def app():
             ax.set_aspect('equal')
             ax.set_facecolor('#fdf6e3')
             
-            # Streamlines (Blue) - Thicker
-            ax.contour(X, Y, psi, levels=levels_psi, colors='blue', linewidths=2.5, alpha=0.9)
-            
+            # Streamlines (Blue) - Flow lines only in soil domain
+            ax.contour(X, Y, psi_plot, levels=levels_psi, colors='blue', linewidths=2.5, alpha=0.9)
+
             # Equipotentials (Red)
             levels_phi = np.linspace(h_down, h_up, Nd + 1)
-            ax.contour(X, Y, phi, levels=levels_phi, colors='red', linestyles='--', linewidths=1.5)
+            ax.contour(X, Y, phi_plot, levels=levels_phi, colors='red', linestyles='--', linewidths=1.5)
+            
+            vis_limit = 14.0 # Viewport width
             
             # Geometry - Structures
             if "Dam" in mode:
-                rect = patches.Rectangle((-dam_w/2, 0), dam_w, h_up/2, facecolor='gray', hatch='//', edgecolor='k')
+                rect = patches.Rectangle((dam_left, 0), dam_w, h_up/2, facecolor='gray', hatch='//', edgecolor='k')
                 ax.add_patch(rect)
+                ax.plot([dam_left, dam_right], [0, 0], color='blue', lw=3)
             if "Pile" in mode:
                 # Draw pile as a physical object to mask the singularity
                 ax.plot([pile_x, pile_x], [0, -pile_d], 'k-', lw=6) 
                 ax.plot([pile_x, pile_x], [0, -pile_d], 'y--', lw=1)
+                ax.plot([pile_x, pile_x], [0, -pile_d], color='blue', lw=3)
                 
             # Geometry - Boundaries
             ax.axhline(0, color='saddlebrown', lw=3) 
             ax.axhline(-soil_d, color='black', lw=4) 
             ax.text(0, -soil_d + 0.5, "Impervious Boundary (Ψ=0)", ha='center', fontsize=9, fontstyle='italic')
+            ax.plot([-vis_limit, vis_limit], [-soil_d, -soil_d], color='blue', lw=3)
+            if "Pile" in mode or "Dam" in mode:
+                ax.text(0, -0.6, "First Flow Line (Impervious Boundary)", ha='center', fontsize=9, fontstyle='italic')
+                ax.text(0, -soil_d - 0.6, "Last Flow Line (Soil Bottom)", ha='center', fontsize=9, fontstyle='italic')
 
             # Water Bodies
-            vis_limit = 14.0 # Viewport width
-            ax.fill_between([-vis_limit, (pile_x if "Pile" in mode and "Dam" not in mode else -dam_w/2)], 0, h_up, color='lightblue', alpha=0.4)
-            ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_w/2), vis_limit], 0, h_down, color='lightblue', alpha=0.4)
+            ax.fill_between([-vis_limit, (pile_x if "Pile" in mode and "Dam" not in mode else dam_left)], 0, h_up, color='lightblue', alpha=0.4)
+            ax.fill_between([(pile_x if "Pile" in mode and "Dam" not in mode else dam_right), vis_limit], 0, h_down, color='lightblue', alpha=0.4)
             
             # Pore Pressure Point
             try:
