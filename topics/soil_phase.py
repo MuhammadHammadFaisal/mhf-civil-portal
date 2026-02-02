@@ -23,6 +23,7 @@ def app():
                 }
                 self.rho_w = 1.0
                 self.gamma_w = 9.81
+                self.tol = 1e-6
                 self.log = []
                 self.inputs = []
 
@@ -55,6 +56,7 @@ def app():
                     
            
                     if known('n') and not known('e'):
+                    if known('n') and not known('e') and p['n'] < 1:
                         p['e'] = p['n'] / (1 - p['n'])
                         sub = r'\frac{' + f"{p['n']:.3f}" + r'}{1 - ' + f"{p['n']:.3f}" + r'}'
                         self.add_log('e', r'\frac{n}{1 - n}', sub, p['e'])
@@ -67,21 +69,25 @@ def app():
 
                     # 2. Se = wGs
                     if known('w') and known('Gs') and known('e') and not known('Sr'):
+                    if known('w') and known('Gs') and known('e') and not known('Sr') and p['e'] > self.tol:
                         p['Sr'] = (p['w'] * p['Gs']) / p['e']
                         sub = r'\frac{' + f"{p['w']:.3f} \\cdot {p['Gs']:.2f}" + r'}{' + f"{p['e']:.3f}" + r'}'
                         self.add_log('Sr', r'\frac{w G_s}{e}', sub, p['Sr'])
                         changed = True
                     if known('w') and known('Gs') and known('Sr') and not known('e') and p['Sr'] != 0:
+                    if known('w') and known('Gs') and known('Sr') and not known('e') and abs(p['Sr']) > self.tol:
                         p['e'] = (p['w'] * p['Gs']) / p['Sr']
                         sub = r'\frac{' + f"{p['w']:.3f} \\cdot {p['Gs']:.2f}" + r'}{' + f"{p['Sr']:.3f}" + r'}'
                         self.add_log('e', r'\frac{w G_s}{S_r}', sub, p['e'])
                         changed = True
                     if known('Sr') and known('e') and known('Gs') and not known('w'):
+                    if known('Sr') and known('e') and known('Gs') and not known('w') and p['Gs'] > self.tol:
                         p['w'] = (p['Sr'] * p['e']) / p['Gs']
                         sub = r'\frac{' + f"{p['Sr']:.3f} \\cdot {p['e']:.3f}" + r'}{' + f"{p['Gs']:.2f}" + r'}'
                         self.add_log('w', r'\frac{S_r e}{G_s}', sub, p['w'])
                         changed = True
                     if known('Sr') and known('e') and known('w') and not known('Gs') and p['w'] != 0:
+                    if known('Sr') and known('e') and known('w') and not known('Gs') and abs(p['w']) > self.tol:
                         p['Gs'] = (p['Sr'] * p['e']) / p['w']
                         sub = r'\frac{' + f"{p['Sr']:.3f} \\cdot {p['e']:.3f}" + r'}{' + f"{p['w']:.3f}" + r'}'
                         self.add_log('Gs', r'\frac{S_r e}{w}', sub, p['Gs'])
@@ -98,6 +104,21 @@ def app():
                         sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81 (1 + {p['w']:.3f})" + r'}{1 + ' + f"{p['e']:.3f}" + r'}'
                         self.add_log('gamma_bulk', r'\frac{G_s \gamma_w (1+w)}{1+e}', sub, p['gamma_bulk'])
                         changed = True
+                    if known('Gs') and known('e') and known('Sr') and not known('gamma_bulk'):
+                        p['gamma_bulk'] = ((p['Gs'] + p['Sr'] * p['e']) * self.gamma_w) / (1 + p['e'])
+                        sub = r'\frac{(' + f"{p['Gs']:.2f} + {p['Sr']:.3f}\\cdot{p['e']:.3f}" + r')9.81}{1 + ' + f"{p['e']:.3f}" + r'}'
+                        self.add_log('gamma_bulk', r'\frac{(G_s + S_r e)\gamma_w}{1+e}', sub, p['gamma_bulk'])
+                        changed = True
+                    if known('Gs') and known('e') and not known('gamma_sat'):
+                        p['gamma_sat'] = ((p['Gs'] + p['e']) * self.gamma_w) / (1 + p['e'])
+                        sub = r'\frac{(' + f"{p['Gs']:.2f} + {p['e']:.3f}" + r')9.81}{1 + ' + f"{p['e']:.3f}" + r'}'
+                        self.add_log('gamma_sat', r'\frac{(G_s + e)\gamma_w}{1+e}', sub, p['gamma_sat'])
+                        changed = True
+                    if known('gamma_dry') and known('w') and not known('gamma_bulk'):
+                        p['gamma_bulk'] = p['gamma_dry'] * (1 + p['w'])
+                        sub = f"{p['gamma_dry']:.2f}(1 + {p['w']:.3f})"
+                        self.add_log('gamma_bulk', r'\gamma_{dry}(1+w)', sub, p['gamma_bulk'])
+                        changed = True
 
                     # 4. Reverse Calcs
                     if known('gamma_bulk') and known('Gs') and known('w') and not known('e'):
@@ -112,9 +133,38 @@ def app():
                         sub = r'\frac{' + f"{p['Gs']:.2f} \\cdot 9.81" + r'}{' + f"{p['gamma_dry']:.2f}" + r'} - 1'
                         self.add_log('e', r'\frac{G_s \gamma_w}{\gamma_{dry}} - 1', sub, p['e'])
                         changed = True
+                    if known('gamma_bulk') and known('gamma_dry') and not known('w') and p['gamma_dry'] > self.tol:
+                        p['w'] = (p['gamma_bulk'] / p['gamma_dry']) - 1
+                        sub = r'\frac{' + f"{p['gamma_bulk']:.2f}" + r'}{' + f"{p['gamma_dry']:.2f}" + r'} - 1'
+                        self.add_log('w', r'\frac{\gamma_{bulk}}{\gamma_{dry}} - 1', sub, p['w'])
+                        changed = True
+                    if known('gamma_sat') and known('Gs') and not known('e'):
+                        numerator = (p['Gs'] * self.gamma_w) - p['gamma_sat']
+                        denom = p['gamma_sat'] - self.gamma_w
+                        if abs(denom) > self.tol:
+                            p['e'] = numerator / denom
+                            sub = r'\frac{' + f"{p['Gs']:.2f}9.81 - {p['gamma_sat']:.2f}" + r'}{' + f"{p['gamma_sat']:.2f} - 9.81" + r'}'
+                            self.add_log('e', r'\frac{G_s \gamma_w - \gamma_{sat}}{\gamma_{sat} - \gamma_w}', sub, p['e'])
+                            changed = True
+                    if known('gamma_sat') and known('gamma_dry') and not known('n'):
+                        p['n'] = (p['gamma_sat'] - p['gamma_dry']) / self.gamma_w
+                        sub = r'\frac{' + f"{p['gamma_sat']:.2f} - {p['gamma_dry']:.2f}" + r'}{9.81}'
+                        self.add_log('n', r'\frac{\gamma_{sat} - \gamma_{dry}}{\gamma_w}', sub, p['n'])
+                        changed = True
+                    if known('gamma_dry') and known('n') and not known('gamma_sat'):
+                        p['gamma_sat'] = p['gamma_dry'] + p['n'] * self.gamma_w
+                        sub = f"{p['gamma_dry']:.2f} + {p['n']:.3f}\\cdot9.81"
+                        self.add_log('gamma_sat', r'\gamma_{dry} + n \gamma_w', sub, p['gamma_sat'])
+                        changed = True
 
                     # 5. Saturation
                     if known('gamma_bulk') and p['Sr'] == 1.0 and not known('gamma_sub'):
+                    if known('gamma_sat') and not known('gamma_sub'):
+                        p['gamma_sub'] = p['gamma_sat'] - self.gamma_w
+                        sub = f"{p['gamma_sat']:.2f} - 9.81"
+                        self.add_log('gamma_sub', r'\gamma_{sat} - \gamma_w', sub, p['gamma_sub'])
+                        changed = True
+                    if known('gamma_bulk') and known('Sr') and abs(p['Sr'] - 1.0) <= self.tol and not known('gamma_sub'):
                         p['gamma_sub'] = p['gamma_bulk'] - self.gamma_w
                         sub = f"{p['gamma_bulk']:.2f} - 9.81"
                         self.add_log('gamma_sub', r'\gamma_{sat} - \gamma_w', sub, p['gamma_sub'])
@@ -140,118 +190,7 @@ def app():
                 Gs = raw_Gs if raw_Gs is not None else 2.7
                 w = raw_w if raw_w is not None else 0.1
             else:
-                e = raw_e if raw_e is not None else 0.7 
-                Sr = raw_Sr if raw_Sr is not None else 0.5
-                Gs = raw_Gs if raw_Gs is not None else 2.7
-                w = raw_w if raw_w is not None else 0.2
-
-            
-            if e > 5: e = 5
-            if e < 0: e = 0.1
-
-            Vs = 1.0
-            Vv = e
-            Vw = Sr * e
-            Va = Vv - Vw
-            
-            Ms = Gs 
-            Mw = w * Ms if (w is not None and Gs is not None) else Vw * 1.0 
-
-            fig, ax = plt.subplots(figsize=(5, 3.5))
-            ax.set_xlim(-1.5, 2.5) 
-            ax.set_ylim(0, max(1.5, 1 + e + 0.3)) 
-            ax.axis('off')
-
-            def get_color(key):
-                if key in inputs_list: return 'green' 
-                if is_result_mode: return 'red'       
-                return 'red'                          
-
-            def get_label(key, val, fmt="{:.3f}"):
-                if key in inputs_list: return fmt.format(val) 
-                if is_result_mode and val is not None: return fmt.format(val)
-                return "?" 
-
-            # Rectangles
-            ax.add_patch(patches.Rectangle((0, 0), 1, Vs, linewidth=2, edgecolor='black', facecolor='#D2B48C'))
-            ax.text(0.5, Vs/2, 'S', ha='center', va='center', fontsize=10, fontweight='bold')
-
-            if Vw > 0.001:
-                ax.add_patch(patches.Rectangle((0, Vs), 1, Vw, linewidth=2, edgecolor='black', facecolor='#87CEEB'))
-                if Vw > 0.15: ax.text(0.5, Vs + Vw/2, 'W', ha='center', va='center', fontsize=10, fontweight='bold')
-
-            if Va > 0.001:
-                ax.add_patch(patches.Rectangle((0, Vs + Vw), 1, Va, linewidth=2, edgecolor='black', facecolor='#F0F8FF'))
-                if Va > 0.15: ax.text(0.5, Vs + Vw + Va/2, 'A', ha='center', va='center', fontsize=10, fontweight='bold')
-
-            # Labels
-            ax.text(-0.8, 1+e+0.1, r'$Vol$', ha='center', fontsize=10, fontweight='bold')
-            ax.text(-0.1, Vs/2, f'$V_s=1$', ha='right', va='center', fontsize=9)
-            
-            if Vv > 0:
-                brace_x = -0.6
-                ax.plot([brace_x, brace_x], [Vs, Vs+Vv], color='black', lw=1)
-                ax.plot([brace_x, brace_x+0.1], [Vs, Vs], color='black', lw=1)
-                ax.plot([brace_x, brace_x+0.1], [Vs+Vv, Vs+Vv], color='black', lw=1)
-                txt = get_label('e', raw_e)
-                col = get_color('e')
-                ax.text(brace_x-0.1, Vs+Vv/2, f'$e={txt}$', ha='right', va='center', fontsize=10, color=col, fontweight='bold')
-
-            ax.text(1.8, 1+e+0.1, r'$Mass$', ha='center', fontsize=10, fontweight='bold')
-            txt_gs = get_label('Gs', raw_Gs, "{:.2f}")
-            col_gs = get_color('Gs')
-            ax.text(1.1, Vs/2, f'$M_s$ ($G_s={txt_gs}$)', ha='left', va='center', fontsize=9, color=col_gs)
-
-            if Vw > 0.001:
-                txt_w = get_label('w', raw_w, "{:.3f}")
-                col_w = get_color('w')
-                ax.text(1.1, Vs + Vw/2, f'$M_w$ ($w={txt_w}$)', ha='left', va='center', fontsize=9, color=col_w)
-
-            txt_sr = get_label('Sr', raw_Sr, "{:.2f}")
-            col_sr = get_color('Sr')
-            ax.text(0.5, 1+e+0.15, f'$S_r={txt_sr}$', ha='center', fontsize=10, color=col_sr, fontweight='bold')
-
-            title = "Input Preview" if not is_result_mode else "Final State"
-            ax.set_title(title, fontsize=10)
-            return fig
-
-        # ==================================================
-        # LAYOUT: NUMERIC DASHBOARD
-        # ==================================================
-        
-        solver = SoilState()
-        
-        # --- TOP SECTION: INPUTS & PREVIEW ---
-        top_col1, top_col2 = st.columns([1, 1])
-        
-        with top_col1:
-            st.markdown("### 1. Inputs")
-            
-            condition = st.radio("Soil State:", ["Partially Saturated", "Fully Saturated (Sr=1)", "Dry (Sr=0)"])
-            if "Fully" in condition: solver.set_param('Sr', 1.0)
-            elif "Dry" in condition: solver.set_param('Sr', 0.0)
-
-            c1, c2 = st.columns(2)
-            with c1:
-                w_in = st.number_input("Water Content (w)", 0.0, step=0.01, format="%.3f")
-                Gs_in = st.number_input("Specific Gravity (Gs)", 0.0, step=0.01, format="%.2f")
-                e_in = st.number_input("Void Ratio (e)", 0.0, step=0.01)
-            with c2:
-                n_in = st.number_input("Porosity (n)", 0.0, step=0.01)
-                Sr_in = st.number_input("Saturation (Sr)", 0.0, 1.0, step=0.01)
-                gamma_b_in = st.number_input("Bulk Unit Wt", 0.0, step=0.1)
-                gamma_d_in = st.number_input("Dry Unit Wt", 0.0, step=0.1)
-
-            if w_in > 0: solver.set_param('w', w_in)
-            if Gs_in > 0: solver.set_param('Gs', Gs_in)
-            if e_in > 0: solver.set_param('e', e_in)
-            if n_in > 0: solver.set_param('n', n_in)
-            if "Partially" in condition and Sr_in > 0: solver.set_param('Sr', Sr_in)
-            if gamma_b_in > 0: solver.set_param('gamma_bulk', gamma_b_in)
-            if gamma_d_in > 0: solver.set_param('gamma_dry', gamma_d_in)
-
-        with top_col2:
-            st.markdown("### Input Monitor")
+@@ -255,50 +299,52 @@ def app():
             fig_preview = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=False)
             st.pyplot(fig_preview)
             plt.close(fig_preview) 
@@ -277,6 +216,8 @@ def app():
                     if p['Sr'] is not None: st.latex(f"S_r = {p['Sr']:.4f}")
                     if p['gamma_bulk']: st.latex(r"\gamma_{bulk} = " + f"{p['gamma_bulk']:.2f}")
                     if p['gamma_dry']: st.latex(r"\gamma_{dry} = " + f"{p['gamma_dry']:.2f}")
+                    if p['gamma_sat']: st.latex(r"\gamma_{sat} = " + f"{p['gamma_sat']:.2f}")
+                    if p['gamma_sub']: st.latex(r"\gamma' = " + f"{p['gamma_sub']:.2f}")
 
                 with bot_col2:
                     fig_final = draw_phase_diagram(solver.params, solver.inputs, is_result_mode=True)
@@ -302,22 +243,7 @@ def app():
                     Dr = (e_max - e_curr) / (e_max - e_min)
                     st.latex(r"D_r = \frac{e_{max} - e}{e_{max} - e_{min}} = " + f"{Dr*100:.1f}\\%")
                 else:
-                    st.error("e_max must be > e_min")
-
-    # ==========================================
-    # MODE B: SYMBOLIC / FORMULA FINDER
-    # ==========================================
-    elif "Symbolic" in mode:
-        st.subheader("Formula Finder")
-        st.caption("Select the variables you **KNOW** to find the formula for the variable you **WANT**.")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            known_vars = st.multiselect(
-                "I have these variables (Inputs):",
-                options=[
-                    "w (Water Content)", "Gs (Specific Gravity)", "e (Void Ratio)", 
-                    "n (Porosity)", "Sr (Saturation)", "gamma_bulk (Bulk Unit Wt)", 
+@@ -321,70 +367,72 @@ def app():
                     "gamma_dry (Dry Unit Wt)", "gamma_sat (Saturated Unit Wt)"
                 ],
                 default=["Gs (Specific Gravity)", "e (Void Ratio)"]
@@ -344,6 +270,8 @@ def app():
             'gamma_bulk': [
                 ({'Gs', 'e', 'w'}, r"\gamma_{bulk} = \frac{G_s \gamma_w (1 + w)}{1 + e}", "The general relationship for unit weight."),
                 ({'Gs', 'e', 'Sr'}, r"\gamma_{bulk} = \frac{(G_s + S_r e)\gamma_w}{1 + e}", "Using Saturation instead of Water Content.")
+                ({'Gs', 'e', 'Sr'}, r"\gamma_{bulk} = \frac{(G_s + S_r e)\gamma_w}{1 + e}", "Using Saturation instead of Water Content."),
+                ({'gamma_dry', 'w'}, r"\gamma_{bulk} = \gamma_{dry}(1 + w)", "From dry unit weight and water content.")
             ],
             'gamma_sat': [
                 ({'Gs', 'e'}, r"\gamma_{sat} = \frac{(G_s + e)\gamma_w}{1 + e}", "Assumes Sr = 1 (Fully Saturated)."),
@@ -368,6 +296,8 @@ def app():
             ],
             'w': [
                 ({'Sr', 'e', 'Gs'}, r"w = \frac{S_r e}{G_s}", "Rearranged from Se = wGs.")
+                ({'Sr', 'e', 'Gs'}, r"w = \frac{S_r e}{G_s}", "Rearranged from Se = wGs."),
+                ({'gamma_bulk', 'gamma_dry'}, r"w = \frac{\gamma_{bulk}}{\gamma_{dry}} - 1", "From bulk and dry unit weights.")
             ]
         }
 
