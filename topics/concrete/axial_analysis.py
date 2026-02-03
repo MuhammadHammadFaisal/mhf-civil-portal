@@ -19,46 +19,72 @@ def draw_cross_section(shape, dims, num_bars, bar_dia):
     if shape == "Rectangular":
         b, h = dims
         ax.add_patch(patches.Rectangle((0, 0), b, h, fill=False, linewidth=2))
-        cx, cy = b / 2, h / 2
-        r = min(b, h) / 2 - cover
         ax.set_xlim(-20, b + 20)
         ax.set_ylim(-20, h + 20)
+
+        # Bar positions along perimeter
+        bars_per_side = num_bars // 4
+        rem = num_bars % 4
+
+        x_left = cover
+        x_right = b - cover
+        y_bot = cover
+        y_top = h - cover
+
+        xs = np.linspace(x_left, x_right, bars_per_side + 2)[1:-1]
+        ys = np.linspace(y_bot, y_top, bars_per_side + 2)[1:-1]
+
+        positions = []
+
+        positions += [(x, y_bot) for x in xs]        # bottom
+        positions += [(x_right, y) for y in ys]      # right
+        positions += [(x, y_top) for x in xs[::-1]]  # top
+        positions += [(x_left, y) for y in ys[::-1]] # left
+
+        positions = positions[:num_bars]
 
     elif shape == "Square":
         a = dims[0]
         ax.add_patch(patches.Rectangle((0, 0), a, a, fill=False, linewidth=2))
-        cx, cy = a / 2, a / 2
-        r = a / 2 - cover
         ax.set_xlim(-20, a + 20)
         ax.set_ylim(-20, a + 20)
+
+        bars_per_side = num_bars // 4
+        x1, x2 = cover, a - cover
+
+        xs = np.linspace(x1, x2, bars_per_side + 2)[1:-1]
+
+        positions = []
+        positions += [(x, x1) for x in xs]
+        positions += [(x2, x) for x in xs]
+        positions += [(x, x2) for x in xs[::-1]]
+        positions += [(x1, x) for x in xs[::-1]]
+
+        positions = positions[:num_bars]
 
     else:  # Circular
         D = dims[0]
         ax.add_patch(patches.Circle((D / 2, D / 2), D / 2, fill=False, linewidth=2))
-        cx, cy = D / 2, D / 2
-        r = D / 2 - cover
         ax.set_xlim(-20, D + 20)
         ax.set_ylim(-20, D + 20)
 
-    # ----------------------------
-    # Longitudinal bars (plan)
-    # ----------------------------
-    angles = np.linspace(0, 2 * np.pi, num_bars, endpoint=False)
+        cx, cy = D / 2, D / 2
+        r = D / 2 - cover
 
-    for ang in angles:
-        x = cx + r * np.cos(ang)
-        y = cy + r * np.sin(ang)
-        ax.add_patch(
-            patches.Circle((x, y), bar_r, color="black")
-        )
+        angles = np.linspace(0, 2 * np.pi, num_bars, endpoint=False)
+        positions = [(cx + r * np.cos(a), cy + r * np.sin(a)) for a in angles]
+
+    # ----------------------------
+    # Draw bars
+    # ----------------------------
+    for x, y in positions:
+        ax.add_patch(patches.Circle((x, y), bar_r, color="black"))
 
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title("Cross-Section (Transverse Reinforcement)")
+    ax.set_title("Cross-Section (Longitudinal Reinforcement)")
 
     return fig
-
-
 
 def draw_side_view(num_bars, bar_dia, tie_spacing=150):
     fig, ax = plt.subplots(figsize=(3, 6))
