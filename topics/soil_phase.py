@@ -3,163 +3,343 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 # =========================================================
-# SOIL PHASE RELATIONSHIPS – VIRTUAL TUTOR VERSION
+# MAIN APP
 # =========================================================
-# This version adds:
-# - Physical sanity checks
-# - Tutor-style reasoning ("why this formula")
-# - Soil state classification
-# - Controlled calculations (no blind overwriting)
-# =========================================================
-
 def app():
     st.markdown("---")
-    st.title("Soil Phase Relationships – Virtual Tutor")
 
-    mode = st.radio("Select Solver Mode:", ["Numeric Calculation", "Symbolic / Formula Finder"], horizontal=True)
+    # =====================================================
+    # MODE SELECT
+    # =====================================================
+    mode = st.radio(
+        "Select Solver Mode:",
+        ["Numeric Calculation", "Symbolic / Formula Finder"],
+        horizontal=True
+    )
 
-    # ======================================================
+    # =====================================================
     # NUMERIC MODE
-    # ======================================================
+    # =====================================================
     if "Numeric" in mode:
+        st.caption(
+            "Enter parameters. The INPUT diagram updates live. "
+            "The RESULT diagram appears after solving."
+        )
 
+        # =================================================
+        # SOLVER CLASS
+        # =================================================
         class SoilState:
             def __init__(self):
-                self.p = {
+                self.params = {
                     'w': None, 'Gs': None, 'e': None, 'n': None, 'Sr': None,
+                    'rho_bulk': None, 'rho_dry': None,
                     'gamma_bulk': None, 'gamma_dry': None,
-                    'gamma_sat': None, 'gamma_sub': None
+                    'gamma_sat': None, 'gamma_sub': None, 'na': None
                 }
+
                 self.gamma_w = 9.81
+                self.tol = 1e-6
                 self.log = []
                 self.inputs = []
-                self.tol = 1e-6
 
-            def set(self, k, v):
-                if v is not None:
-                    self.p[k] = float(v)
-                    self.inputs.append(k)
+                self.latex_map = {
+                    'w': 'w', 'Gs': 'G_s', 'e': 'e', 'n': 'n', 'Sr': 'S_r',
+                    'rho_bulk': r'\rho_{bulk}', 'rho_dry': r'\rho_{dry}',
+                    'gamma_bulk': r'\gamma_{bulk}', 'gamma_dry': r'\gamma_{dry}',
+                    'gamma_sat': r'\gamma_{sat}', 'gamma_sub': r"\gamma'",
+                    'na': r'n_a'
+                }
 
-            def known(self, k):
-                return self.p[k] is not None
+            def set_param(self, key, value):
+                if value is not None and value >= 0:
+                    self.params[key] = float(value)
+                    self.inputs.append(key)
 
-            def step(self, var, formula, reason, result):
+            def add_log(self, key, formula, sub, result):
+                sym = self.latex_map.get(key, key)
                 self.log.append({
-                    'var': var,
-                    'formula': formula,
-                    'reason': reason,
-                    'result': result
+                    "Variable": sym,
+                    "Formula": formula,
+                    "Substitution": sub,
+                    "Result": result
                 })
 
             def solve(self):
+                p = self.params
+                known = lambda k: p[k] is not None
                 changed = True
-                it = 0
+                iterations = 0
 
-                while changed and it < 15:
+                while changed and iterations < 20:
                     changed = False
-                    p = self.p
 
-                    # --- e <-> n ---
-                    if self.known('n') and not self.known('e') and p['n'] < 1:
+                    # -------------------------------
+                    # n <-> e
+                    # -------------------------------
+                    if known('n') and not known('e') and p['n'] < 1:
                         p['e'] = p['n'] / (1 - p['n'])
-                        self.step('e', r"e=\frac{n}{1-n}", "Convert porosity to void ratio", p['e'])
+                        self.add_log('e', r'\frac{n}{1-n}', f"{p['n']:.3f}", p['e'])
                         changed = True
 
-                    if self.known('e') and not self.known('n'):
+                    if known('e') and not known('n'):
                         p['n'] = p['e'] / (1 + p['e'])
-                        self.step('n', r"n=\frac{e}{1+e}", "Convert void ratio to porosity", p['n'])
+                        self.add_log('n', r'\frac{e}{1+e}', f"{p['e']:.3f}", p['n'])
                         changed = True
 
-                    # --- Se = wGs ---
-                    if self.known('w') and self.known('Gs') and self.known('e') and not self.known('Sr'):
+                    # -------------------------------
+                    # Se = wGs
+                    # -------------------------------
+                    if known('w') and known('Gs') and known('e') and not known('Sr') and p['e'] > self.tol:
                         p['Sr'] = (p['w'] * p['Gs']) / p['e']
-                        self.step('Sr', r"S_r=\frac{wG_s}{e}", "Fundamental saturation relation", p['Sr'])
+                        self.add_log('Sr', r'\frac{wG_s}{e}', "-", p['Sr'])
                         changed = True
 
-                    if self.known('Sr') and self.known('e') and self.known('Gs') and not self.known('w'):
+                    if known('Sr') and known('e') and known('Gs') and not known('w'):
                         p['w'] = (p['Sr'] * p['e']) / p['Gs']
-                        self.step('w', r"w=\frac{S_re}{G_s}", "Rearranged saturation relation", p['w'])
+                        self.add_log('w', r'\frac{S_r e}{G_s}', "-", p['w'])
                         changed = True
 
-                    # --- Unit weights ---
-                    if self.known('Gs') and self.known('e') and not self.known('gamma_dry'):
+                    # -------------------------------
+                    # Unit weights
+                    # -------------------------------
+                    if known('Gs') and known('e') and not known('gamma_dry'):
                         p['gamma_dry'] = (p['Gs'] * self.gamma_w) / (1 + p['e'])
-                        self.step('γ_d', r"\gamma_d=\frac{G_s\gamma_w}{1+e}", "Dry unit weight definition", p['gamma_dry'])
+                        self.add_log(
+                            'gamma_dry',
+                            r'\frac{G_s \gamma_w}{1+e}',
+                            "-",
+                            p['gamma_dry']
+                        )
                         changed = True
 
-                    if self.known('gamma_dry') and self.known('w') and not self.known('gamma_bulk'):
-                        p['gamma_bulk'] = p['gamma_dry'] * (1 + p['w'])
-                        self.step('γ', r"\gamma=\gamma_d(1+w)", "Bulk from dry unit weight", p['gamma_bulk'])
+                    if known('Gs') and known('e') and known('w') and not known('gamma_bulk'):
+                        p['gamma_bulk'] = (
+                            p['Gs'] * self.gamma_w * (1 + p['w'])
+                        ) / (1 + p['e'])
+                        self.add_log(
+                            'gamma_bulk',
+                            r'\frac{G_s \gamma_w (1+w)}{1+e}',
+                            "-",
+                            p['gamma_bulk']
+                        )
                         changed = True
 
-                    if self.known('Gs') and self.known('e') and self.known('w') and not self.known('gamma_bulk'):
-                        p['gamma_bulk'] = (p['Gs'] * self.gamma_w * (1 + p['w'])) / (1 + p['e'])
-                        self.step('γ', r"\gamma=\frac{G_s\gamma_w(1+w)}{1+e}", "General bulk unit weight", p['gamma_bulk'])
+                    # γ_sat ONLY if fully saturated
+                    if (
+                        known('Gs') and known('e')
+                        and known('Sr') and abs(p['Sr'] - 1.0) < self.tol
+                        and not known('gamma_sat')
+                    ):
+                        p['gamma_sat'] = (
+                            (p['Gs'] + p['e']) * self.gamma_w
+                        ) / (1 + p['e'])
+                        self.add_log(
+                            'gamma_sat',
+                            r'\frac{(G_s+e)\gamma_w}{1+e}',
+                            "Sr = 1",
+                            p['gamma_sat']
+                        )
                         changed = True
 
-                    # --- Saturated / submerged ---
-                    if self.known('Gs') and self.known('e') and self.known('Sr') and abs(p['Sr'] - 1) < self.tol and not self.known('gamma_sat'):
-                        p['gamma_sat'] = ((p['Gs'] + p['e']) * self.gamma_w) / (1 + p['e'])
-                        self.step('γ_sat', r"\gamma_{sat}=\frac{(G_s+e)\gamma_w}{1+e}", "Fully saturated soil", p['gamma_sat'])
-                        changed = True
-
-                    if self.known('gamma_sat') and not self.known('gamma_sub'):
+                    # -------------------------------
+                    # Submerged unit weight
+                    # -------------------------------
+                    if known('gamma_sat') and not known('gamma_sub'):
                         p['gamma_sub'] = p['gamma_sat'] - self.gamma_w
-                        self.step('γ′', r"\gamma'=\gamma_{sat}-\gamma_w", "Submerged unit weight", p['gamma_sub'])
+                        self.add_log(
+                            'gamma_sub',
+                            r'\gamma_{sat}-\gamma_w',
+                            "-",
+                            p['gamma_sub']
+                        )
                         changed = True
 
-                    it += 1
+                    iterations += 1
 
-        # ---------------- UI ----------------
+        # =================================================
+        # PHASE DIAGRAM
+        # =================================================
+        def draw_phase_diagram(params, inputs, is_result=False):
+            e = params.get('e', 0.7) or 0.7
+            Sr = params.get('Sr', 0.5) or 0.5
+            Gs = params.get('Gs', 2.7) or 2.7
+            w = params.get('w', 0.2) or 0.2
+
+            e = min(max(e, 0.1), 5)
+
+            Vs = 1
+            Vv = e
+            Vw = Sr * e
+            Va = Vv - Vw
+
+            fig, ax = plt.subplots(figsize=(5, 3.5))
+            ax.axis('off')
+            ax.set_xlim(-1.3, 2.4)
+            ax.set_ylim(0, 1 + e + 0.3)
+
+            ax.add_patch(patches.Rectangle((0, 0), 1, Vs, fc="#D2B48C", ec="black", lw=2))
+            ax.text(0.5, Vs / 2, "S", ha="center", va="center", weight="bold")
+
+            if Vw > 0:
+                ax.add_patch(patches.Rectangle((0, Vs), 1, Vw, fc="#87CEEB", ec="black", lw=2))
+                ax.text(0.5, Vs + Vw / 2, "W", ha="center", va="center", weight="bold")
+
+            if Va > 0:
+                ax.add_patch(patches.Rectangle((0, Vs + Vw), 1, Va, fc="#F0F8FF", ec="black", lw=2))
+                ax.text(0.5, Vs + Vw + Va / 2, "A", ha="center", va="center", weight="bold")
+
+            title = "Final State" if is_result else "Input Preview"
+            ax.set_title(title, fontsize=10)
+
+            return fig
+
+        # =================================================
+        # UI
+        # =================================================
         solver = SoilState()
 
         col1, col2 = st.columns(2)
+
         with col1:
             st.subheader("Inputs")
-            solver.set('w', st.number_input("Water Content w", 0.0, step=0.01))
-            solver.set('Gs', st.number_input("Specific Gravity Gs", 0.0, step=0.01))
-            solver.set('e', st.number_input("Void Ratio e", 0.0, step=0.01))
-            solver.set('n', st.number_input("Porosity n", 0.0, step=0.01))
-            solver.set('Sr', st.number_input("Saturation Sr", 0.0, 1.0, step=0.01))
-            solver.set('gamma_dry', st.number_input("Dry Unit Weight γ_d", 0.0, step=0.1))
-            solver.set('gamma_bulk', st.number_input("Bulk Unit Weight γ", 0.0, step=0.1))
+            w = st.number_input("w", 0.0, step=0.01)
+            Gs = st.number_input("Gs", 0.0, step=0.01)
+            e = st.number_input("e", 0.0, step=0.01)
+            Sr = st.number_input("Sr", 0.0, 1.0, step=0.01)
 
-        if st.button("Solve", type="primary"):
+            if w > 0: solver.set_param('w', w)
+            if Gs > 0: solver.set_param('Gs', Gs)
+            if e > 0: solver.set_param('e', e)
+            if Sr >= 0: solver.set_param('Sr', Sr)
+
+        with col2:
+            st.subheader("Preview")
+            fig = draw_phase_diagram(solver.params, solver.inputs)
+            st.pyplot(fig)
+            plt.close(fig)
+
+        if st.button("Solve", type="primary", use_container_width=True):
             solver.solve()
-            p = solver.p
 
-            st.subheader("Results")
+            if solver.log:
+                st.success("Solved")
 
-            # --- Soil state ---
-            if p['Sr'] is not None:
-                if abs(p['Sr']) < solver.tol:
-                    st.info("Soil State: Dry")
-                elif abs(p['Sr'] - 1) < solver.tol:
-                    st.info("Soil State: Fully Saturated")
-                else:
-                    st.info("Soil State: Partially Saturated")
+                for k, v in solver.params.items():
+                    if v is not None:
+                        st.latex(f"{solver.latex_map.get(k,k)} = {v:.4f}")
 
-            # --- Outputs ---
-            for k, v in p.items():
-                if v is not None:
-                    st.latex(f"{k} = {v:.4f}")
+                fig2 = draw_phase_diagram(solver.params, solver.inputs, True)
+                st.pyplot(fig2)
+                plt.close(fig2)
 
-            # --- Warnings ---
-            if p['Sr'] is not None and (p['Sr'] < 0 or p['Sr'] > 1):
-                st.warning("Computed Sr is outside physical range [0,1]")
-            if p['e'] is not None and p['e'] < 0:
-                st.warning("Void ratio is negative – check inputs")
-            if p['n'] is not None and p['n'] > 1:
-                st.warning("Porosity > 1 – physically impossible")
+                with st.expander("Steps", expanded=True):
+                    for s in solver.log:
+                        st.latex(
+                            f"{s['Variable']} = {s['Formula']} = \\mathbf{{{s['Result']:.4f}}}"
+                        )
+            else:
+                st.error("Insufficient data.")
 
-            with st.expander("Show Tutor Steps", expanded=True):
-                for s in solver.log:
-                    st.markdown(f"**{s['var']}** → {s['reason']}")
-                    st.latex(f"{s['formula']} = {s['result']:.4f}")
-
-    # ======================================================
-    # SYMBOLIC MODE (UNCHANGED – ALREADY CORRECT)
-    # ======================================================
-    else:
+    # ==========================================
+    # MODE B: SYMBOLIC / FORMULA FINDER
+    # ==========================================
+    elif "Symbolic" in mode:
         st.subheader("Formula Finder")
-        st.info("Symbolic mode unchanged – already consistent and correct.")
+        st.caption("Select the variables you **KNOW** to find the formula for the variable you **WANT**.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            # 100% CONSISTENT DROPDOWN OPTIONS (Using γ_subscript format)
+            known_vars = st.multiselect(
+                "I have these variables (Inputs):",
+                options=[
+                    "w (Water Content)", 
+                    "Gs (Specific Gravity)", 
+                    "e (Void Ratio)", 
+                    "n (Porosity)", 
+                    "Sr (Saturation)", 
+                    "γ_bulk (Bulk Unit Wt)", 
+                    "γ_dry (Dry Unit Wt)",   
+                    "γ_sat (Saturated Unit Wt)" 
+                ],
+                default=["Gs (Specific Gravity)", "e (Void Ratio)"]
+            )
+            # This splits the string and grabs the symbol (e.g., "γ_bulk")
+            cleaned_knowns = set([k.split(" ")[0] for k in known_vars])
+
+        with col2:
+            target_var_raw = st.selectbox(
+                "I want to find (Target):",
+                options=[
+                    "Gs (Specific Gravity)",
+                    "γ_dry (Dry Unit Wt)", 
+                    "γ_bulk (Bulk Unit Wt)",
+                    "γ_sat (Saturated Unit Wt)", 
+                    "γ' (Submerged Unit Wt)",   
+                    "e (Void Ratio)", "n (Porosity)", "Sr (Saturation)", "w (Water Content)"
+                ]
+            )
+            target = target_var_raw.split(" ")[0]
+
+        # UPDATED DICTIONARY MATCHING DROPDOWN EXACTLY
+        formulas = {
+            'Gs': [
+                ({'γ_dry', 'e'}, r"G_s = \frac{\gamma_{dry}(1+e)}{\gamma_w}", "Back-calculated from Dry Unit Weight."),
+                ({'γ_sat', 'e'}, r"G_s = \frac{\gamma_{sat}(1+e)}{\gamma_w} - e", "Back-calculated from Saturated Unit Weight."),
+                ({'w', 'Sr', 'e'}, r"G_s = \frac{S_r e}{w}", "From the fundamental relationship Se = wGs.")
+            ],
+            'γ_dry': [
+                ({'Gs', 'e'}, r"\gamma_{dry} = \frac{G_s \gamma_w}{1 + e}", "Basic definition using Void Ratio."),
+                ({'γ_bulk', 'w'}, r"\gamma_{dry} = \frac{\gamma_{bulk}}{1 + w}", "Derived from Bulk Density and Water Content."),
+                ({'Gs', 'n'}, r"\gamma_{dry} = G_s \gamma_w (1 - n)", "Using Porosity instead of Void Ratio.")
+            ],
+            'γ_bulk': [
+                ({'Gs', 'e', 'w'}, r"\gamma_{bulk} = \frac{G_s \gamma_w (1 + w)}{1 + e}", "The general relationship for unit weight."),
+                ({'Gs', 'e', 'Sr'}, r"\gamma_{bulk} = \frac{(G_s + S_r e)\gamma_w}{1 + e}", "Using Saturation instead of Water Content."),
+                ({'γ_dry', 'w'}, r"\gamma_{bulk} = \gamma_{dry}(1 + w)", "From dry unit weight and water content.")
+            ],
+            'γ_sat': [
+                ({'Gs', 'e'}, r"\gamma_{sat} = \frac{(G_s + e)\gamma_w}{1 + e}", "Assumes Sr = 1 (Fully Saturated)."),
+                ({'γ_dry', 'n'}, r"\gamma_{sat} = \gamma_{dry} + n \gamma_w", "Relation between saturated and dry states.")
+            ],
+            "γ'": [
+                ({'γ_sat'}, r"\gamma' = \gamma_{sat} - \gamma_w", "Archimedes' principle for submerged soil."),
+                ({'Gs', 'e'}, r"\gamma' = \frac{(G_s - 1)\gamma_w}{1 + e}", "Standard submerged weight formula.")
+            ],
+            'e': [
+                ({'n'}, r"e = \frac{n}{1 - n}", "Conversion from Porosity."),
+                ({'w', 'Gs', 'Sr'}, r"e = \frac{w G_s}{S_r}", "From the fundamental relationship Se = wGs."),
+                ({'γ_dry', 'Gs'}, r"e = \frac{G_s \gamma_w}{\gamma_{dry}} - 1", "Back-calculated from Dry Unit Weight."),
+                ({'γ_sat', 'Gs'}, r"e = \frac{G_s \gamma_w - \gamma_{sat}}{\gamma_{sat} - \gamma_w}", "Back-calculated from Saturated Unit Weight.")
+            ],
+            'n': [
+                ({'e'}, r"n = \frac{e}{1 + e}", "Conversion from Void Ratio."),
+                ({'γ_sat', 'γ_dry'}, r"n = \frac{\gamma_{sat} - \gamma_{dry}}{\gamma_w}", "Difference between Sat and Dry states.")
+            ],
+            'Sr': [
+                ({'w', 'Gs', 'e'}, r"S_r = \frac{w G_s}{e}", "Rearranged from Se = wGs.")
+            ],
+            'w': [
+                ({'Sr', 'e', 'Gs'}, r"w = \frac{S_r e}{G_s}", "Rearranged from Se = wGs."),
+                ({'γ_bulk', 'γ_dry'}, r"w = \frac{\gamma_{bulk}}{\gamma_{dry}} - 1", "From bulk and dry unit weights.")
+            ]
+        }
+
+        st.markdown("---")
+        found_any = False
+        
+        if target in formulas:
+            for requirements, latex, description in formulas[target]:
+                if requirements.issubset(cleaned_knowns):
+                    st.success(f"**Formula Found:** {description}")
+                    st.latex(latex)
+                    found_any = True
+        
+        if not found_any:
+            st.warning(f"No direct formula found for **{target}** with the variables you selected.")
+            if target in formulas:
+                st.markdown("**To find this variable, you typically need combinations like:**")
+                for reqs, _, _ in formulas[target]:
+                    pretty_reqs = ", ".join(list(reqs))
+                    st.markdown(f"- {pretty_reqs}")
