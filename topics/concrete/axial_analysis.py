@@ -74,7 +74,6 @@ def app():
     st.header("🏗️ Analysis of Axial Load Capacity")
     st.markdown("---")
 
-    # --- TOP LEVEL: SOLVER MODE SELECTOR ---
     solve_mode = st.radio(
         "🎯 What do you want to calculate?",
         ["Find Capacity (Standard)", "Find Steel Area (Ast)", "Find Concrete Area (Ag)"],
@@ -87,17 +86,14 @@ def app():
     with col_input:
         st.subheader("1. Design Inputs")
         
-        # --- A. SETTINGS ---
         with st.expander("⚙️ Code & Shape Settings", expanded=True):
             design_code = st.selectbox("Design Code", ["ACI 318-19 (USA/Gulf)", "Eurocode 2 (EU)", "TS 500 (Turkey)"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
-            
             if shape == "Circular":
                 trans_type = st.radio("Transverse Reinforcement", ["Circular Ties", "Spiral"])
             else:
                 trans_type = "Ties"
 
-        # --- B. MATERIALS ---
         st.markdown("**Material Properties**")
         c1, c2 = st.columns(2)
         with c1: 
@@ -107,22 +103,15 @@ def app():
             label_steel = "Steel (f_yk)" if "TS 500" in design_code or "Eurocode" in design_code else "Steel (f_y)"
             fy = st.number_input(f"{label_steel} [MPa]", value=420.0, step=10.0)
 
-        # --- C. GEOMETRY INPUT ---
         st.markdown("**Geometry (Concrete)**")
-        
-        # LOGIC: If solving for Concrete Area, we don't input dimensions (unless we assume one to find the other, but let's keep it simple)
         if solve_mode == "Find Concrete Area (Ag)":
-            st.info("💡 You are calculating the required Concrete Area. Dimensions are the output.")
+            st.info("💡 Calculating required Concrete Area ($A_g$).")
             Ag = 0 # Placeholder
-            dims = (300, 300) # Placeholder for viz
-            
+            dims = (300, 300) 
         else:
-            # OPTION: Direct Area Input
-            use_direct_area = st.checkbox("Enter Area ($A_g$) directly?", value=False)
-            
-            if use_direct_area:
+            use_direct_Ag = st.checkbox("Enter Concrete Area ($A_g$) directly?", value=False)
+            if use_direct_Ag:
                 Ag = st.number_input("Gross Concrete Area ($A_g$) [mm²]", value=90000.0, step=1000.0)
-                # Approximation for viz
                 if shape == "Circular": D = np.sqrt(4*Ag/np.pi); dims=(D,)
                 else: side = np.sqrt(Ag); dims=(side, side)
             else:
@@ -136,178 +125,198 @@ def app():
                     a = st.number_input("Side (a) [mm]", value=400.0, step=50.0)
                     Ag = a * a
                     dims = (a, a)
-                else: # Circular
+                else: 
                     D = st.number_input("Diameter (D) [mm]", value=400.0, step=50.0)
                     Ag = np.pi * D**2 / 4
                     dims = (D,)
 
-        # --- D. REINFORCEMENT / LOAD INPUT ---
-        st.markdown("**Reinforcement & Load**")
-        
-        # CASE 1: SOLVING FOR CAPACITY (Standard)
-        if solve_mode == "Find Capacity (Standard)":
-            rc1, rc2 = st.columns(2)
-            with rc1:
-                bar_dia = st.number_input("Bar Dia [mm]", value=20.0, step=2.0)
-                num_bars = st.number_input("Total Bars", value=6, min_value=4)
-            with rc2:
-                # Option to input Ast directly? Let's keep bar count for now for standard mode
-                pass
-            Ast = num_bars * np.pi * (bar_dia / 2) ** 2
-            
-            target_load = 0 # Not used
-
-        # CASE 2: SOLVING FOR UNKNOWNS (Reverse)
+        st.markdown("**Reinforcement (Steel)**")
+        if solve_mode == "Find Steel Area (Ast)":
+            st.info("💡 Calculating required Steel Area ($A_{st}$).")
+            Ast = 0 
+            num_bars = 0 
+            bar_dia = 20 
         else:
-            # We need the Load Input
+            use_direct_Ast = st.checkbox("Enter Steel Area ($A_{st}$) directly?", value=False)
+            if use_direct_Ast:
+                Ast = st.number_input("Total Steel Area ($A_{st}$) [mm²]", value=2000.0, step=100.0)
+                num_bars = 0 
+                bar_dia = 20 
+            else:
+                rc1, rc2 = st.columns(2)
+                with rc1:
+                    bar_dia = st.number_input("Bar Dia [mm]", value=20.0, step=2.0)
+                    num_bars = st.number_input("Total Bars", value=6, min_value=4)
+                Ast = num_bars * np.pi * (bar_dia / 2) ** 2
+        
+        target_load = 0
+        if solve_mode != "Find Capacity (Standard)":
+            st.markdown("**Design Load**")
             lc1, lc2 = st.columns(2)
             with lc1:
-                load_type = st.selectbox("Known Load Type", ["Design Value (Nd / Phi Pn)", "Theoretical Peak (P0 / Pn)"])
+                load_type = st.selectbox("Load Type", ["Design Value (Nd / Phi Pn)", "Nominal/Theoretical (Pn / P0)"])
             with lc2:
                 target_load = st.number_input(f"Enter Load Value [kN]", value=2000.0, step=100.0)
-            
-            if solve_mode == "Find Steel Area (Ast)":
-                st.info("💡 Calculating required Steel Area ($A_{st}$).")
-                Ast = 0 # Placeholder
-                num_bars = 0 # Placeholder
-                bar_dia = 20 # Just for viz scaling
-                
-            elif solve_mode == "Find Concrete Area (Ag)":
-                # We need Steel for this
-                sc1, sc2 = st.columns(2)
-                with sc1:
-                    st.write("Define Steel:")
-                    bar_dia = st.number_input("Bar Dia [mm]", value=20.0)
-                    num_bars = st.number_input("Total Bars", value=8)
-                Ast = num_bars * np.pi * (bar_dia / 2) ** 2
 
-    # --- VISUALIZATION BLOCK ---
     with col_viz:
         st.subheader("2. Visualization")
         if solve_mode == "Find Concrete Area (Ag)":
             st.warning("⚠️ Calculate first to see the section.")
         else:
-            fig1 = draw_cross_section(shape, dims, num_bars, bar_dia, trans_type)
+            bars_to_draw = num_bars if (solve_mode != "Find Steel Area (Ast)" and not (solve_mode != "Find Steel Area (Ast)" and 'use_direct_Ast' in locals() and locals().get('use_direct_Ast'))) else 0
+            fig1 = draw_cross_section(shape, dims, bars_to_draw, bar_dia, trans_type)
             st.pyplot(fig1)
             plt.close(fig1)
-            st.caption(f"Config: {shape} | $A_g$: {Ag:,.0f} mm²")
+            if 'Ag' in locals():
+                st.caption(f"Config: {shape} | $A_g$: {Ag:,.0f} mm²")
 
     st.markdown("---")
 
     # ======================================
-    # 4. CALCULATION LOGIC
+    # 4. CALCULATION REPORT (DETAILED)
     # ======================================
     st.subheader("3. Calculation Report")
     
     if st.button("Run Calculation", type="primary"):
+        st.markdown("#### 📝 Step-by-Step Substitution")
         
-        # --- PREPARE CONSTANTS ---
         is_aci = "ACI" in design_code
         is_ts500 = "TS 500" in design_code
         
-        # Factors
+        # --- CONSTANTS SETUP ---
         if is_aci:
             if trans_type == "Spiral": phi, alpha = 0.75, 0.85
             else: phi, alpha = 0.65, 0.80
-            safety_factor_str = f"$\\alpha={alpha}, \\phi={phi}$"
+            st.write(f"**Factors:** $\\alpha = {alpha}$ (Eccentricity), $\\phi = {phi}$ ({trans_type})")
         else:
-            # EC2 / TS500
             gamma_c, gamma_s = 1.5, 1.15
             alpha_cc = 1.0 if is_ts500 else 0.85
-            
             fcd = (alpha_cc * fc) / gamma_c
             fyd = fy / gamma_s
-            safety_factor_str = f"$f_{{cd}}={fcd:.2f}, f_{{yd}}={fyd:.2f}$"
+            
+            c1, c2 = st.columns(2)
+            with c1: 
+                st.latex(fr"f_{{cd}} = \frac{{{alpha_cc} \cdot {fc}}}{{\ {gamma_c} }} = {fcd:.2f}\ MPa")
+            with c2: 
+                st.latex(fr"f_{{yd}} = \frac{{{fy}}}{{\ {gamma_s} }} = {fyd:.2f}\ MPa")
 
         # ==========================================
-        # LOGIC BRANCH 1: FIND CAPACITY (Standard)
+        # MODE 1: FIND CAPACITY
         # ==========================================
         if solve_mode == "Find Capacity (Standard)":
             if is_aci:
                 Pn_kN = (0.85 * fc * (Ag - Ast) + fy * Ast) / 1000
                 PhiPn_kN = alpha * phi * Pn_kN
                 
-                c1, c2 = st.columns(2)
-                c1.metric("Theoretical Peak (P0)", f"{Pn_kN:,.0f} kN")
-                c2.metric("Design Capacity (Phi Pn)", f"{PhiPn_kN:,.0f} kN")
+                st.markdown("**Step 1: Nominal Strength ($P_n$)**")
+                st.latex(r"P_n = 0.85 f'_c (A_g - A_{st}) + f_y A_{st}")
+                st.latex(fr"P_n = 0.85({fc})({Ag:,.0f} - {Ast:,.0f}) + {fy}({Ast:,.0f})")
+                st.write(f"➝ $P_n$ = {Pn_kN:,.0f} kN")
                 
-                st.latex(r"\phi P_{n(max)} = \alpha \phi [0.85 f'_c (A_g - A_{st}) + f_y A_{st}]")
+                st.markdown("**Step 2: Design Strength ($\phi P_{n(max)}$)**")
+                st.latex(r"\phi P_{n(max)} = \alpha \cdot \phi \cdot P_n")
+                st.latex(fr"\phi P_{{n(max)}} = {alpha} \cdot {phi} \cdot {Pn_kN:,.0f}")
+                st.markdown(f"### ✅ Capacity: **{PhiPn_kN:,.0f} kN**")
                 
-            else: # TS500 / EC2
-                # N_d = fcd(Ag-Ast) + fyd*Ast
+            else: # TS 500
                 Nd_kN = (fcd * (Ag - Ast) + fyd * Ast) / 1000
-                st.metric("Design Axial Strength (Nd)", f"{Nd_kN:,.0f} kN")
-                st.latex(r"N_d = f_{cd}(A_g - A_s) + f_{yd}A_s")
+                
+                st.markdown("**Step 1: Calculate Design Load ($N_d$)**")
+                st.latex(r"N_d = f_{cd} A_c + f_{yd} A_s")
+                st.caption("Substitution:")
+                st.latex(fr"N_d = {fcd:.2f}({Ag:,.0f} - {Ast:,.0f}) + {fyd:.2f}({Ast:,.0f})")
+                st.markdown(f"### ✅ Capacity: **{Nd_kN:,.0f} kN**")
 
         # ==========================================
-        # LOGIC BRANCH 2: FIND STEEL AREA (Ast)
+        # MODE 2: FIND STEEL AREA
         # ==========================================
         elif solve_mode == "Find Steel Area (Ast)":
-            # 1. Determine Target Theoretical Load (P0_target)
+            # PREP LOAD
             target_P0_kN = target_load
-            
             if is_aci and "Design" in load_type:
-                # User gave PhiPn, we need Pn (P0)
-                # PhiPn = alpha * phi * P0  ->  P0 = PhiPn / (alpha * phi)
                 target_P0_kN = target_load / (alpha * phi)
-                st.write(f"Converting Design Load to Nominal: $P_0 = {target_load} / ({alpha} \\cdot {phi}) = {target_P0_kN:,.1f}$ kN")
+                st.write(f"**Step 0: Convert to Nominal Load**")
+                st.latex(fr"P_n = \frac{{P_u}}{{\alpha \phi}} = \frac{{{target_load}}}{{{alpha} \cdot {phi}}} = {target_P0_kN:,.1f}\ kN")
             
-            # 2. Solve Equation
             target_P0_N = target_P0_kN * 1000
             
             if is_aci:
-                # P0 = 0.85 fc Ag + Ast(fy - 0.85 fc)  <-- (Approximation using gross/net)
-                # Exact: P0 = 0.85 fc (Ag - Ast) + fy Ast
-                # P0 = 0.85 fc Ag - 0.85 fc Ast + fy Ast
-                # P0 - 0.85 fc Ag = Ast (fy - 0.85 fc)
-                term1 = 0.85 * fc * Ag
-                term2 = fy - 0.85 * fc
-                req_Ast = (target_P0_N - term1) / term2
+                # Solve: Pn = 0.85 fc Ag + Ast(fy - 0.85 fc)
+                term_conc = 0.85 * fc * Ag
+                term_steel_stress = fy - 0.85 * fc
+                req_Ast = (target_P0_N - term_conc) / term_steel_stress
                 
-            else: # TS500
-                # Nd = fcd Ag + Ast(fyd - fcd)
-                # If target is P0 (Theoretical), we use fck/fyk? usually TS500 reverse designs use design values.
-                # Assuming input is Nd always for TS500 reverse calc essentially.
-                term1 = fcd * Ag
-                term2 = fyd - fcd
-                req_Ast = (target_load * 1000 - term1) / term2
-            
+                st.markdown("**Step 1: Rearrange Formula for $A_{st}$**")
+                st.latex(r"P_n = 0.85 f'_c A_g + A_{st}(f_y - 0.85 f'_c)")
+                st.latex(r"A_{st} = \frac{P_n - 0.85 f'_c A_g}{f_y - 0.85 f'_c}")
+                
+                st.markdown("**Step 2: Substitute**")
+                numerator_str = fr"{target_P0_N:,.0f} - 0.85({fc})({Ag:,.0f})"
+                denom_str = fr"{fy} - 0.85({fc})"
+                st.latex(fr"A_{{st}} = \frac{{{numerator_str}}}{{{denom_str}}}")
+                
+            else: # TS 500
+                # Nd = fcd Ag + Ast(fyd - fcd) -> Ast = (Nd - fcd Ag) / (fyd - fcd)
+                load_N = target_load * 1000
+                term_conc = fcd * Ag
+                term_steel_stress = fyd - fcd
+                req_Ast = (load_N - term_conc) / term_steel_stress
+
+                st.markdown("**Step 1: Rearrange Formula for $A_s$**")
+                st.latex(r"A_s = \frac{N_d - f_{cd} A_g}{f_{yd} - f_{cd}}")
+                
+                st.markdown("**Step 2: Substitute**")
+                num_str = fr"{load_N:,.0f} - {fcd:.2f}({Ag:,.0f})"
+                den_str = fr"{fyd:.2f} - {fcd:.2f}"
+                st.latex(fr"A_s = \frac{{{num_str}}}{{{den_str}}}")
+
             if req_Ast < 0:
-                st.error("❌ Impossible! The concrete alone is stronger than the load. Use minimum reinforcement.")
+                st.error("❌ Result is negative. The concrete section alone is stronger than the load.")
             else:
-                st.success(f"✅ Required Steel Area ($A_{{st}}$): **{req_Ast:,.0f} mm²**")
-                rho_req = (req_Ast / Ag) * 100
-                st.info(f"Required Reinforcement Ratio ($\\rho$): **{rho_req:.2f}%**")
+                st.markdown(f"### ✅ Required Steel: **{req_Ast:,.0f} mm²**")
+                st.info(f"Ratio $\\rho = {(req_Ast/Ag)*100:.2f}\\%$")
 
         # ==========================================
-        # LOGIC BRANCH 3: FIND CONCRETE AREA (Ag)
+        # MODE 3: FIND CONCRETE AREA
         # ==========================================
         elif solve_mode == "Find Concrete Area (Ag)":
+            # PREP LOAD
             target_P0_kN = target_load
             if is_aci and "Design" in load_type:
                 target_P0_kN = target_load / (alpha * phi)
+                st.write(f"**Step 0: Convert to Nominal Load**")
+                st.latex(fr"P_n = \frac{{{target_load}}}{{{alpha} \cdot {phi}}} = {target_P0_kN:,.1f}\ kN")
             
             target_P0_N = target_P0_kN * 1000
             
             if is_aci:
-                # P0 = 0.85 fc Ag - 0.85 fc Ast + fy Ast
-                # P0 - Ast(fy - 0.85 fc) = 0.85 fc Ag
-                # Ag = [P0 - Ast(fy - 0.85 fc)] / 0.85 fc
                 numerator = target_P0_N - Ast * (fy - 0.85*fc)
                 denominator = 0.85 * fc
                 req_Ag = numerator / denominator
+                
+                st.markdown("**Step 1: Rearrange Formula for $A_g$**")
+                st.latex(r"A_g = \frac{P_n - A_{st}(f_y - 0.85 f'_c)}{0.85 f'_c}")
+                
+                st.markdown("**Step 2: Substitute**")
+                num_str = fr"{target_P0_N:,.0f} - {Ast:,.0f}({fy} - 0.85 \cdot {fc})"
+                den_str = fr"0.85 \cdot {fc}"
+                st.latex(fr"A_g = \frac{{{num_str}}}{{{den_str}}}")
+                
             else:
-                # Nd = fcd Ag - fcd Ast + fyd Ast
-                # Nd - Ast(fyd - fcd) = fcd Ag
                 numerator = (target_load * 1000) - Ast * (fyd - fcd)
                 denominator = fcd
                 req_Ag = numerator / denominator
                 
+                st.markdown("**Step 1: Rearrange Formula for $A_c$**")
+                st.latex(r"A_c = \frac{N_d - A_s(f_{yd} - f_{cd})}{f_{cd}}")
+                
+                st.markdown("**Step 2: Substitute**")
+                num_str = fr"{target_load*1000:,.0f} - {Ast:,.0f}({fyd:.2f} - {fcd:.2f})"
+                st.latex(fr"A_c = \frac{{{num_str}}}{{{fcd:.2f}}}")
+
             if req_Ag < 0:
-                st.error("Error in calculation inputs.")
+                st.error("❌ Calculation Error: Check inputs.")
             else:
-                st.success(f"✅ Required Gross Concrete Area ($A_g$): **{req_Ag:,.0f} mm²**")
-                # Suggest dimensions
+                st.markdown(f"### ✅ Required Concrete: **{req_Ag:,.0f} mm²**")
                 side = np.sqrt(req_Ag)
-                st.write(f"Equivalent Square Side: **{side:.0f} mm**")
-                st.write(f"Equivalent Circle Diameter: **{np.sqrt(4*req_Ag/np.pi):.0f} mm**")
+                st.write(f"➝ Equivalent Square: **{side:.0f} x {side:.0f} mm**")
