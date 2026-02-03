@@ -77,7 +77,7 @@ def app():
         st.markdown(
             """
             <div style="padding-left: 15px;">
-                <h1 style='font-size: 55px; margin: 0; line-height: 1.0; font-weight: 700;'>Soil Mechanics</h1>
+                <h1 style='font-size: 55px; margin: 0; line-height: 1.0; font-weight: 700;'>Reinforced Concrete Fundamentals</h1>
             </div>
             """, 
             unsafe_allow_html=True
