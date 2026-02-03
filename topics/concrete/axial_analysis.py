@@ -10,33 +10,47 @@ import matplotlib.patches as patches
 def draw_cross_section(shape, dims, num_bars, bar_dia):
     fig, ax = plt.subplots(figsize=(4, 4))
 
+    cover = 40  # mm
+    bar_r = bar_dia / 2
+
+    # ----------------------------
     # Concrete section
+    # ----------------------------
     if shape == "Rectangular":
         b, h = dims
         ax.add_patch(patches.Rectangle((0, 0), b, h, fill=False, linewidth=2))
         cx, cy = b / 2, h / 2
-        r = min(b, h) / 2.5
+        r = min(b, h) / 2 - cover
+        ax.set_xlim(-20, b + 20)
+        ax.set_ylim(-20, h + 20)
 
     elif shape == "Square":
         a = dims[0]
         ax.add_patch(patches.Rectangle((0, 0), a, a, fill=False, linewidth=2))
         cx, cy = a / 2, a / 2
-        r = a / 2.5
+        r = a / 2 - cover
+        ax.set_xlim(-20, a + 20)
+        ax.set_ylim(-20, a + 20)
 
     else:  # Circular
         D = dims[0]
         ax.add_patch(patches.Circle((D / 2, D / 2), D / 2, fill=False, linewidth=2))
         cx, cy = D / 2, D / 2
-        r = D / 2.5
+        r = D / 2 - cover
+        ax.set_xlim(-20, D + 20)
+        ax.set_ylim(-20, D + 20)
 
-    # Longitudinal bars (cross-section)
-    bar_r = bar_dia / 2
+    # ----------------------------
+    # Longitudinal bars (plan)
+    # ----------------------------
     angles = np.linspace(0, 2 * np.pi, num_bars, endpoint=False)
 
     for ang in angles:
         x = cx + r * np.cos(ang)
         y = cy + r * np.sin(ang)
-        ax.add_patch(patches.Circle((x, y), bar_r, color="black"))
+        ax.add_patch(
+            patches.Circle((x, y), bar_r, color="black")
+        )
 
     ax.set_aspect("equal")
     ax.axis("off")
@@ -45,34 +59,50 @@ def draw_cross_section(shape, dims, num_bars, bar_dia):
     return fig
 
 
+
 def draw_side_view(num_bars, bar_dia, tie_spacing=150):
-    fig, ax = plt.subplots(figsize=(2.5, 5))
+    fig, ax = plt.subplots(figsize=(3, 6))
 
     column_height = 3000  # mm (symbolic)
     width = 300
+    cover = 40
 
     # Column outline
-    ax.add_patch(patches.Rectangle((0, 0), width, column_height, fill=False, linewidth=2))
+    ax.add_patch(
+        patches.Rectangle((0, 0), width, column_height, fill=False, linewidth=2)
+    )
 
+    # ----------------------------
     # Longitudinal bars
-    cover = 40
+    # ----------------------------
     bar_r = bar_dia / 2
-    bar_x_positions = np.linspace(cover, width - cover, num_bars)
+    bar_x = np.linspace(cover, width - cover, num_bars)
 
-    for x in bar_x_positions:
-        ax.plot([x, x], [0, column_height], linewidth=2)
+    for x in bar_x:
+        ax.plot(
+            [x, x],
+            [0, column_height],
+            color="black",
+            linewidth=2
+        )
 
+    # ----------------------------
     # Ties (stirrups)
-    for y in np.arange(0, column_height, tie_spacing):
-        ax.plot([cover, width - cover], [y, y], linewidth=1)
+    # ----------------------------
+    for y in np.arange(0, column_height + tie_spacing, tie_spacing):
+        ax.plot(
+            [cover, width - cover],
+            [y, y],
+            color="black",
+            linewidth=1
+        )
 
-    ax.set_xlim(-20, width + 20)
+    ax.set_xlim(-30, width + 30)
     ax.set_ylim(0, column_height)
     ax.axis("off")
     ax.set_title("Side View (Longitudinal + Ties)")
 
     return fig
-
 
 # ======================================
 # MAIN APP
