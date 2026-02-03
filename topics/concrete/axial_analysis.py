@@ -34,7 +34,7 @@ def distribute_bars_rectangular(b, h, cover, num_bars):
 # ======================================
 # 2. HELPER: DRAWING FUNCTIONS
 # ======================================
-def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type):
+def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type, has_transverse):
     fig, ax = plt.subplots(figsize=(4, 4))
     cover = 40 
     bar_r = bar_dia / 2
@@ -46,10 +46,15 @@ def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type):
         ax.add_patch(patches.Rectangle((0, 0), b, h, fill=True, facecolor='#e0e0e0', edgecolor='black', linewidth=2))
         ax.set_xlim(-50, b + 50)
         ax.set_ylim(-50, h + 50)
+        
         if num_bars > 0:
             positions = distribute_bars_rectangular(b, h, cover, num_bars)
-            ax.add_patch(patches.Rectangle((cover/2, cover/2), b-cover, h-cover, fill=False, edgecolor='#555', linewidth=1.5, linestyle='--'))
+            # ONLY DRAW TIES IF HAS_TRANSVERSE IS TRUE
+            if has_transverse:
+                ax.add_patch(patches.Rectangle((cover/2, cover/2), b-cover, h-cover, fill=False, edgecolor='#555', linewidth=1.5, linestyle='--'))
+            
             for x, y in positions: ax.add_patch(patches.Circle((x, y), bar_r, color="#d32f2f", zorder=10))
+            
     else:  # Circular
         D = dims[0]
         cx, cy = D / 2, D / 2
@@ -59,8 +64,12 @@ def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type):
         if num_bars > 0:
             angles = np.linspace(0, 2 * np.pi, num_bars, endpoint=False)
             positions = [(cx + (D/2-cover) * np.cos(a), cy + (D/2-cover) * np.sin(a)) for a in angles]
-            linestyle = '-' if trans_type == "Spiral" else '--'
-            ax.add_patch(patches.Circle((cx, cy), D/2 - cover/2, fill=False, edgecolor='#555', linewidth=1.5, linestyle=linestyle))
+            
+            # ONLY DRAW SPIRAL/TIE IF HAS_TRANSVERSE IS TRUE
+            if has_transverse:
+                linestyle = '-' if trans_type == "Spiral" else '--'
+                ax.add_patch(patches.Circle((cx, cy), D/2 - cover/2, fill=False, edgecolor='#555', linewidth=1.5, linestyle=linestyle))
+            
             for x, y in positions: ax.add_patch(patches.Circle((x, y), bar_r, color="#d32f2f", zorder=10))
 
     ax.set_aspect("equal")
@@ -106,7 +115,7 @@ def app():
         st.markdown("**Geometry (Concrete)**")
         if solve_mode == "Find Concrete Area (Ag)":
             st.info("💡 Calculating required Concrete Area ($A_g$).")
-            Ag = 0 # Placeholder
+            Ag = 0 
             dims = (300, 300) 
         else:
             use_direct_Ag = st.checkbox("Enter Concrete Area ($A_g$) directly?", value=False)
@@ -131,6 +140,12 @@ def app():
                     dims = (D,)
 
         st.markdown("**Reinforcement (Steel)**")
+        
+        # --- NEW: TRANSVERSE CHECK ---
+        has_transverse = st.checkbox("✅ Is Transverse Reinforcement (Ties/Spirals) provided?", value=True)
+        if not has_transverse:
+            st.error("⚠️ Warning: Without ties, longitudinal bars will buckle. Steel contribution ($f_y A_{st}$) will be ignored!")
+
         if solve_mode == "Find Steel Area (Ast)":
             st.info("💡 Calculating required Steel Area ($A_{st}$).")
             Ast = 0 
@@ -164,10 +179,13 @@ def app():
             st.warning("⚠️ Calculate first to see the section.")
         else:
             bars_to_draw = num_bars if (solve_mode != "Find Steel Area (Ast)" and not (solve_mode != "Find Steel Area (Ast)" and 'use_direct_Ast' in locals() and locals().get('use_direct_Ast'))) else 0
-            fig1 = draw_cross_section(shape, dims, bars_to_draw, bar_dia, trans_type)
+            # Pass the check value to drawing function
+            fig1 = draw_cross_section(shape, dims, bars_to_draw, bar_dia, trans_type, has_transverse)
             st.pyplot(fig1)
             plt.close(fig1)
-            if 'Ag' in locals():
+            if not has_transverse:
+                st.caption("❌ No Confinement (Ties Hidden)")
+            elif 'Ag' in locals():
                 st.caption(f"Config: {shape} | $A_g$: {Ag:,.0f} mm²")
 
     st.markdown("---")
@@ -200,17 +218,40 @@ def app():
             with c2: 
                 st.latex(fr"f_{{yd}} = \frac{{{fy}}}{{\ {gamma_s} }} = {fyd:.2f}\ MPa")
 
+        # --- LOGIC: HANDLE NO TRANSVERSE REINFORCEMENT ---
+        # If no transverse reinforcement, Steel contribution is ZERO.
+        # Effectively, we set Ast_effective to 0 for strength calcs, but keep Ast real for Area calcs?
+        # Actually, if finding Area, we can't really find Steel Area if it does nothing.
+        
+        if not has_transverse:
+            st.warning("⚠️ **Physics Note:** Since no transverse reinforcement is provided, the longitudinal bars ($A_{st}$) are assumed to buckle and provide **0 Strength**.")
+            effective_Ast_strength = 0 # Strength contribution is zero
+        else:
+            effective_Ast_strength = 1 # Multiplier (1 = normal, 0 = ignore)
+
         # ==========================================
         # MODE 1: FIND CAPACITY
         # ==========================================
         if solve_mode == "Find Capacity (Standard)":
+            if not has_transverse:
+                # Ast term becomes 0
+                term_steel = 0
+            else:
+                term_steel = Ast # Normal behavior
+            
             if is_aci:
-                Pn_kN = (0.85 * fc * (Ag - Ast) + fy * Ast) / 1000
+                # Pn = 0.85 fc (Ag - Ast) + fy * Ast_effective
+                # Note: Ag - Ast is net concrete. Even without ties, the holes for bars exist.
+                Pn_kN = (0.85 * fc * (Ag - Ast) + fy * term_steel) / 1000
                 PhiPn_kN = alpha * phi * Pn_kN
                 
                 st.markdown("**Step 1: Nominal Strength ($P_n$)**")
-                st.latex(r"P_n = 0.85 f'_c (A_g - A_{st}) + f_y A_{st}")
-                st.latex(fr"P_n = 0.85({fc})({Ag:,.0f} - {Ast:,.0f}) + {fy}({Ast:,.0f})")
+                if not has_transverse:
+                    st.latex(r"P_n = 0.85 f'_c (A_g - A_{st}) + \cancel{f_y A_{st}}")
+                else:
+                    st.latex(r"P_n = 0.85 f'_c (A_g - A_{st}) + f_y A_{st}")
+                
+                st.latex(fr"P_n = 0.85({fc})({Ag:,.0f} - {Ast:,.0f}) + {fy}({term_steel:,.0f})")
                 st.write(f"➝ $P_n$ = {Pn_kN:,.0f} kN")
                 
                 st.markdown("**Step 2: Design Strength ($\phi P_{n(max)}$)**")
@@ -219,62 +260,65 @@ def app():
                 st.markdown(f"### ✅ Capacity: **{PhiPn_kN:,.0f} kN**")
                 
             else: # TS 500
-                Nd_kN = (fcd * (Ag - Ast) + fyd * Ast) / 1000
+                Nd_kN = (fcd * (Ag - Ast) + fyd * term_steel) / 1000
                 
                 st.markdown("**Step 1: Calculate Design Load ($N_d$)**")
-                st.latex(r"N_d = f_{cd} A_c + f_{yd} A_s")
-                st.caption("Substitution:")
-                st.latex(fr"N_d = {fcd:.2f}({Ag:,.0f} - {Ast:,.0f}) + {fyd:.2f}({Ast:,.0f})")
+                if not has_transverse:
+                    st.latex(r"N_d = f_{cd}(A_g - A_s) + \cancel{f_{yd} A_s}")
+                else:
+                    st.latex(r"N_d = f_{cd}(A_g - A_s) + f_{yd} A_s")
+                    
+                st.latex(fr"N_d = {fcd:.2f}({Ag:,.0f} - {Ast:,.0f}) + {fyd:.2f}({term_steel:,.0f})")
                 st.markdown(f"### ✅ Capacity: **{Nd_kN:,.0f} kN**")
 
         # ==========================================
         # MODE 2: FIND STEEL AREA
         # ==========================================
         elif solve_mode == "Find Steel Area (Ast)":
-            # PREP LOAD
-            target_P0_kN = target_load
-            if is_aci and "Design" in load_type:
-                target_P0_kN = target_load / (alpha * phi)
-                st.write(f"**Step 0: Convert to Nominal Load**")
-                st.latex(fr"P_n = \frac{{P_u}}{{\alpha \phi}} = \frac{{{target_load}}}{{{alpha} \cdot {phi}}} = {target_P0_kN:,.1f}\ kN")
-            
-            target_P0_N = target_P0_kN * 1000
-            
-            if is_aci:
-                # Solve: Pn = 0.85 fc Ag + Ast(fy - 0.85 fc)
-                term_conc = 0.85 * fc * Ag
-                term_steel_stress = fy - 0.85 * fc
-                req_Ast = (target_P0_N - term_conc) / term_steel_stress
-                
-                st.markdown("**Step 1: Rearrange Formula for $A_{st}$**")
-                st.latex(r"P_n = 0.85 f'_c A_g + A_{st}(f_y - 0.85 f'_c)")
-                st.latex(r"A_{st} = \frac{P_n - 0.85 f'_c A_g}{f_y - 0.85 f'_c}")
-                
-                st.markdown("**Step 2: Substitute**")
-                numerator_str = fr"{target_P0_N:,.0f} - 0.85({fc})({Ag:,.0f})"
-                denom_str = fr"{fy} - 0.85({fc})"
-                st.latex(fr"A_{{st}} = \frac{{{numerator_str}}}{{{denom_str}}}")
-                
-            else: # TS 500
-                # Nd = fcd Ag + Ast(fyd - fcd) -> Ast = (Nd - fcd Ag) / (fyd - fcd)
-                load_N = target_load * 1000
-                term_conc = fcd * Ag
-                term_steel_stress = fyd - fcd
-                req_Ast = (load_N - term_conc) / term_steel_stress
-
-                st.markdown("**Step 1: Rearrange Formula for $A_s$**")
-                st.latex(r"A_s = \frac{N_d - f_{cd} A_g}{f_{yd} - f_{cd}}")
-                
-                st.markdown("**Step 2: Substitute**")
-                num_str = fr"{load_N:,.0f} - {fcd:.2f}({Ag:,.0f})"
-                den_str = fr"{fyd:.2f} - {fcd:.2f}"
-                st.latex(fr"A_s = \frac{{{num_str}}}{{{den_str}}}")
-
-            if req_Ast < 0:
-                st.error("❌ Result is negative. The concrete section alone is stronger than the load.")
+            if not has_transverse:
+                st.error("❌ **Impossible Calculation:** You cannot calculate required steel area if there are no ties/spirals to support it. The steel would effectively do nothing.")
             else:
-                st.markdown(f"### ✅ Required Steel: **{req_Ast:,.0f} mm²**")
-                st.info(f"Ratio $\\rho = {(req_Ast/Ag)*100:.2f}\\%$")
+                # PREP LOAD
+                target_P0_kN = target_load
+                if is_aci and "Design" in load_type:
+                    target_P0_kN = target_load / (alpha * phi)
+                    st.write(f"**Step 0: Convert to Nominal Load**")
+                    st.latex(fr"P_n = \frac{{P_u}}{{\alpha \phi}} = \frac{{{target_load}}}{{{alpha} \cdot {phi}}} = {target_P0_kN:,.1f}\ kN")
+                
+                target_P0_N = target_P0_kN * 1000
+                
+                if is_aci:
+                    term_conc = 0.85 * fc * Ag
+                    term_steel_stress = fy - 0.85 * fc
+                    req_Ast = (target_P0_N - term_conc) / term_steel_stress
+                    
+                    st.markdown("**Step 1: Rearrange Formula for $A_{st}$**")
+                    st.latex(r"A_{st} = \frac{P_n - 0.85 f'_c A_g}{f_y - 0.85 f'_c}")
+                    
+                    st.markdown("**Step 2: Substitute**")
+                    numerator_str = fr"{target_P0_N:,.0f} - 0.85({fc})({Ag:,.0f})"
+                    denom_str = fr"{fy} - 0.85({fc})"
+                    st.latex(fr"A_{{st}} = \frac{{{numerator_str}}}{{{denom_str}}}")
+                    
+                else: # TS 500
+                    load_N = target_load * 1000
+                    term_conc = fcd * Ag
+                    term_steel_stress = fyd - fcd
+                    req_Ast = (load_N - term_conc) / term_steel_stress
+
+                    st.markdown("**Step 1: Rearrange Formula for $A_s$**")
+                    st.latex(r"A_s = \frac{N_d - f_{cd} A_g}{f_{yd} - f_{cd}}")
+                    
+                    st.markdown("**Step 2: Substitute**")
+                    num_str = fr"{load_N:,.0f} - {fcd:.2f}({Ag:,.0f})"
+                    den_str = fr"{fyd:.2f} - {fcd:.2f}"
+                    st.latex(fr"A_s = \frac{{{num_str}}}{{{den_str}}}")
+
+                if req_Ast < 0:
+                    st.error("❌ Result is negative. The concrete section alone is stronger than the load.")
+                else:
+                    st.markdown(f"### ✅ Required Steel: **{req_Ast:,.0f} mm²**")
+                    st.info(f"Ratio $\\rho = {(req_Ast/Ag)*100:.2f}\\%$")
 
         # ==========================================
         # MODE 3: FIND CONCRETE AREA
@@ -289,30 +333,51 @@ def app():
             
             target_P0_N = target_P0_kN * 1000
             
+            # If No Transverse, Ast term is ignored in strength
+            eff_Ast = Ast if has_transverse else 0
+            
             if is_aci:
-                numerator = target_P0_N - Ast * (fy - 0.85*fc)
+                # Pn = 0.85fc(Ag - Ast) + fy*eff_Ast
+                # Pn = 0.85fc*Ag - 0.85fc*Ast + fy*eff_Ast
+                # Ag = (Pn + 0.85fc*Ast - fy*eff_Ast) / 0.85fc
+                
+                # If has_transverse: Ag = (Pn - Ast(fy - 0.85fc)) / 0.85fc
+                # If NO transverse:  Ag = (Pn + 0.85fc*Ast) / 0.85fc  (Steel is just holes)
+                
+                if has_transverse:
+                    numerator = target_P0_N - Ast * (fy - 0.85*fc)
+                    st.markdown("**Formula (With Ties):**")
+                    st.latex(r"A_g = \frac{P_n - A_{st}(f_y - 0.85 f'_c)}{0.85 f'_c}")
+                else:
+                    numerator = target_P0_N + 0.85*fc*Ast
+                    st.markdown("**Formula (No Ties - Steel ignored):**")
+                    st.latex(r"A_g = \frac{P_n + 0.85 f'_c A_{st}}{0.85 f'_c}")
+                    
                 denominator = 0.85 * fc
                 req_Ag = numerator / denominator
                 
-                st.markdown("**Step 1: Rearrange Formula for $A_g$**")
-                st.latex(r"A_g = \frac{P_n - A_{st}(f_y - 0.85 f'_c)}{0.85 f'_c}")
+                st.markdown("**Substitution**")
+                st.latex(fr"A_g = \frac{{{numerator:,.0f}}}{{{denominator:.2f}}}")
                 
-                st.markdown("**Step 2: Substitute**")
-                num_str = fr"{target_P0_N:,.0f} - {Ast:,.0f}({fy} - 0.85 \cdot {fc})"
-                den_str = fr"0.85 \cdot {fc}"
-                st.latex(fr"A_g = \frac{{{num_str}}}{{{den_str}}}")
+            else: # TS500
+                # Nd = fcd(Ag - Ast) + fyd*eff_Ast
+                # Nd = fcd*Ag - fcd*Ast + fyd*eff_Ast
+                # Ag = (Nd + fcd*Ast - fyd*eff_Ast) / fcd
                 
-            else:
-                numerator = (target_load * 1000) - Ast * (fyd - fcd)
+                if has_transverse:
+                    numerator = (target_load * 1000) - Ast * (fyd - fcd)
+                    st.markdown("**Formula (With Ties):**")
+                    st.latex(r"A_c = \frac{N_d - A_s(f_{yd} - f_{cd})}{f_{cd}}")
+                else:
+                    numerator = (target_load * 1000) + fcd * Ast
+                    st.markdown("**Formula (No Ties - Steel ignored):**")
+                    st.latex(r"A_c = \frac{N_d + f_{cd} A_s}{f_{cd}}")
+
                 denominator = fcd
                 req_Ag = numerator / denominator
                 
-                st.markdown("**Step 1: Rearrange Formula for $A_c$**")
-                st.latex(r"A_c = \frac{N_d - A_s(f_{yd} - f_{cd})}{f_{cd}}")
-                
-                st.markdown("**Step 2: Substitute**")
-                num_str = fr"{target_load*1000:,.0f} - {Ast:,.0f}({fyd:.2f} - {fcd:.2f})"
-                st.latex(fr"A_c = \frac{{{num_str}}}{{{fcd:.2f}}}")
+                st.markdown("**Substitution**")
+                st.latex(fr"A_c = \frac{{{numerator:,.0f}}}{{{denominator:.2f}}}")
 
             if req_Ag < 0:
                 st.error("❌ Calculation Error: Check inputs.")
