@@ -109,9 +109,13 @@ def app():
             st.markdown("---")
 
             st.markdown("**Step B: Apply Safety Factors ($\phi$ and $\\alpha$)**")
+
             st.latex(r"\phi P_{n(max)} = \alpha \cdot \phi \cdot P_n")
+            
             st.write(f"For {confinement_type} columns: $\\alpha$ = {alpha}, $\phi$ = {phi}")
-            st.latex(fr"\phi P_{n(max)} = {alpha} \cdot {phi} \cdot {Pn_kN:.2f}")
+            
+
+            st.latex(fr"\phi P_{{n(max)}} = {alpha} \cdot {phi} \cdot {Pn_kN:.2f}")
             
             st.markdown(f"### ✅ Design Axial Capacity: **{PhiPn_kN:,.2f} kN**")
 
