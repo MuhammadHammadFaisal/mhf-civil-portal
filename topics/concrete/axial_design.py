@@ -105,7 +105,7 @@ def app():
     
     with col1:
         st.subheader("1. Parameters")
-        with st.expander("Standards & Shape", expanded=True):
+        with st.expander(" Standards & Shape", expanded=True):
             code = st.selectbox("Design Code", ["TS 500 (Lecture Notes)", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
@@ -182,18 +182,37 @@ def app():
             else: # EC2
                 req_Ast = (Nd * 1000 - fcd * Ag) / (fyd - fcd)
 
-            # --- OUTPUT ---
+            # --- OUTPUT & CHECKS ---
+            
+            # 1. Negative result -> Concrete strong enough -> Use Min Steel
             if req_Ast <= 0:
                 st.success(" **Concrete is strong enough!**")
-                st.write("Use Minimum Reinforcement:")
-                min_rho = 0.01 # TS500 min
-                req_Ast = min_rho * Ag
-                st.metric("Min Reinforcement ($A_{st,min}$)", f"{req_Ast:,.0f} mm²")
+                st.info("Using Minimum Reinforcement (1%):")
+                req_Ast = 0.01 * Ag
+                st.metric("Required Steel ($A_{st,min}$)", f"{req_Ast:,.0f} mm²")
+            
+            # 2. Positive Result -> Check Min/Max
             else:
-                st.error(f"**Required Steel ($A_{{st}}$): {req_Ast:,.0f} mm²**")
                 rho = req_Ast / Ag
-                if rho > 0.04: st.warning(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (High! Consider increasing section)")
-                else: st.success(f"$\\rho = {rho*100:.2f}\\%$ (OK)")
+                
+                # Check for Min Steel (1% for TS 500)
+                if rho < 0.01:
+                    st.warning(f"⚠️ Calculated $\\rho = {rho*100:.2f}\\%$ (< 1% Min).")
+                    st.info("Increasing to Minimum Reinforcement (1%):")
+                    req_Ast = 0.01 * Ag
+                    rho = 0.01 # Update for display
+                    st.metric("Required Steel ($A_{st,min}$)", f"{req_Ast:,.0f} mm²")
+                    st.success(f"Final $\\rho = {rho*100:.2f}\\%$ (OK)")
+                
+                # Check for Max Steel (4%)
+                elif rho > 0.04:
+                    st.error(f"**Required Steel ($A_{{st}}$): {req_Ast:,.0f} mm²**")
+                    st.warning(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (> 4% Max! Increase Section)")
+                
+                # OK Range
+                else:
+                    st.success(f"**Required Steel ($A_{{st}}$): {req_Ast:,.0f} mm²**")
+                    st.success(f"$\\rho = {rho*100:.2f}\\%$ (OK)")
 
             # --- BAR SUGGESTIONS ---
             st.markdown("###  Suggested Bars")
@@ -247,31 +266,39 @@ def app():
     # --- SPIRAL CHECK (TS 500) ---
     if "TS 500" in code and trans_type == "Spiral" and shape == "Circular":
         st.markdown("---")
-        st.subheader("Spiral Detailing (TS 500)")
+        st.subheader(" Spiral Detailing (TS 500)")
         
         # Need Core Diameter
         D_col = dims[0]
-        d_core = D_col - 2*cover
-        Ach = np.pi * d_core**2 / 4
+        # Use Outer Core Diameter for ratio calculation per slides
+        d_core_outer = D_col - 2*cover
+        # Use Centerline for volumetric ratio check if strictly following formula derivation,
+        # but TS 500 usually references Ack (core area).
+        # Let's stick to the Example 1d logic: Ratio = 4 * Asp / (D_core * s)
+        # where D_core is outer-to-outer (Ack diameter).
+        
+        Ach = np.pi * d_core_outer**2 / 4
         Ag_real = np.pi * D_col**2 / 4
         
-        # Min Volumetric Ratio
-        # rho_s_min = 0.45 * (fc/fy) * (Ag/Ach - 1)
+        # Min Volumetric Ratio Formula
         rho_min = 0.45 * (fc / fy) * ((Ag_real / Ach) - 1)
+        # Floor min is 0.12 * fc/fy
+        rho_min_floor = 0.12 * (fc / fy)
+        final_rho_min = max(rho_min, rho_min_floor)
         
-        st.write(f"**Minimum Spiral Ratio ($\\rho_{{s,min}}$):** {rho_min:.4f}")
+        st.write(f"**Minimum Spiral Ratio ($\\rho_{{s,min}}$):** {final_rho_min:.4f}")
         
-        # Suggest Pitch for typical spiral bars (8mm, 10mm)
         st.markdown("**Suggested Spacing ($s$) for common spiral sizes:**")
         
         c1, c2 = st.columns(2)
         for d_sp in [8, 10, 12]:
             Asp = np.pi * d_sp**2 / 4
             # rho = 4 * Asp / (d_core * s)  ->  s = 4 * Asp / (d_core * rho_min)
-            req_s = (4 * Asp) / (d_core * rho_min)
+            req_s = (4 * Asp) / (d_core_outer * final_rho_min)
             
             # Code Limit s_max
-            s_max = min(80, D_col/5) # Conservative TS500 limits or 200mm logic
+            # TS500: s <= D/5 and s <= 80mm (Conservative)
+            s_max = min(80, D_col/5) 
             
-            valid = "Valid" if req_s < s_max else "⚠️ (Too large?)"
+            valid = "Valid" if req_s < s_max else "⚠️ (Too large/impractical)"
             st.write(f"- **$\phi${d_sp} Spiral:** s $\le$ **{req_s:.0f} mm**")
