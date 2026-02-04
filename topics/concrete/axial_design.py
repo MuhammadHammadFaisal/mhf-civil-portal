@@ -6,13 +6,19 @@ import matplotlib.patches as patches
 # ======================================
 # 1. HELPER: SUGGEST BARS
 # ======================================
-def suggest_reinforcement(required_Ast, shape):
+def suggest_reinforcement(required_Ast, shape, min_db=12):
     """
     Suggests real bar configurations based on required area.
     """
-    bar_opts = [14, 16, 20, 25, 32]
+    # Define available bars based on minimum diameter rule
+    all_bars = [12, 14, 16, 20, 25, 32]
+    bar_opts = [d for d in all_bars if d >= min_db]
+    
     suggestions = []
     
+    # Enforce minimum number of bars
+    # Rectangular: 4 (1 per corner)
+    # Circular (Spiral): 6 (TS 500 rule)
     min_bars = 6 if shape == "Circular" else 4
     
     for db in bar_opts:
@@ -22,7 +28,7 @@ def suggest_reinforcement(required_Ast, shape):
         # Enforce minimums
         if n_req < min_bars: n_req = min_bars
         
-        # Enforce even numbers for rect (usually preferred)
+        # Enforce even numbers for rect (usually preferred for symmetry)
         if shape != "Circular" and n_req % 2 != 0:
             n_req += 1
             
@@ -52,7 +58,7 @@ def draw_design_section(shape, dims, n_bars, db, trans_type, cover):
         
         # Draw Bars (Simple distribution)
         if n_bars > 0:
-            # 4 Corners
+            # 4 Corners (Always strictly placed)
             bars = [(cover, cover), (b-cover, cover), (b-cover, h-cover), (cover, h-cover)]
             # Remaining
             rem = n_bars - 4
@@ -139,12 +145,14 @@ def app():
             rho_guess = st.slider("Assumed Steel Ratio ($\\rho$)", 0.01, 0.04, 0.015, format="%.3f")
 
     # --- CALCULATION LOGIC ---
-    # Factors
+    
+    # 1. Determine Factors & Rules
+    min_long_db = 12 # Default
     if "TS 500" in code:
         gamma_c, gamma_s = 1.5, 1.15
         fcd = fc / gamma_c
         fyd = fy / gamma_s
-        # factor_str is used in rendering
+        min_long_db = 14 # TS 500 Rule: Min 14mm
     elif "ACI" in code:
         phi = 0.75 if trans_type == "Spiral" else 0.65
         alpha = 0.85 if trans_type == "Spiral" else 0.80
@@ -162,7 +170,6 @@ def app():
         if st.button("Run Design Calculation", type="primary"):
             st.markdown("#### 📝 Step-by-Step Substitution")
             
-            # --- SHOW MATERIAL STRENGTHS ---
             if "ACI" in code:
                 st.write(f"**Factors:** $\\phi={phi}, \\alpha={alpha}$")
             else:
@@ -174,11 +181,9 @@ def app():
             if design_mode == "Required Reinforcement (Ast)":
                 
                 if "TS 500" in code:
-                    # Formula: Ast = (Nd - 0.85 fcd Ag) / (fyd - 0.85 fcd)
                     term_load = Nd * 1000
                     term_conc_cap = 0.85 * fcd * Ag
                     denom = fyd - 0.85 * fcd
-                    
                     calc_Ast = (term_load - term_conc_cap) / denom
                     
                     st.markdown("**1. Formula:**")
@@ -190,20 +195,16 @@ def app():
                     st.latex(fr"A_{{st}} = \frac{{{num_str}}}{{{den_str}}}")
                     
                 elif "ACI" in code:
-                    # Convert Pu to Pn
                     Pn = (Nd * 1000) / (phi * alpha)
+                    st.markdown("**1. Convert Design Load:**")
+                    st.latex(fr"P_n = \frac{{P_u}}{{\phi \alpha}} = \frac{{{Nd * 1000:.0f}}}{{{phi} \cdot {alpha}}} = {Pn:.0f}")
                     
-                    st.markdown("**1. Convert Design Load to Nominal:**")
-                    st.latex(fr"P_n = \frac{{P_u}}{{\phi \alpha}} = \frac{{{Nd * 1000:.0f}}}{{{phi} \cdot {alpha}}} = {Pn:.0f} \text{{ N}}")
-                    
-                    # Formula: Ast = (Pn - 0.85 fc Ag) / (fy - 0.85 fc)
                     term_conc_cap = 0.85 * fc * Ag
                     denom = fy - 0.85 * fc
                     calc_Ast = (Pn - term_conc_cap) / denom
                     
                     st.markdown("**2. Solve for Steel:**")
                     st.latex(r"A_{st} = \frac{P_n - 0.85 f'_c A_g}{f_y - 0.85 f'_c}")
-                    st.latex(fr"A_{{st}} = \frac{{{Pn:.0f} - 0.85({fc})({Ag:.0f})}}{{{fy} - 0.85({fc})}}")
 
                 else: # EC2
                     calc_Ast = (Nd * 1000 - fcd * Ag) / (fyd - fcd)
@@ -214,9 +215,7 @@ def app():
                     st.markdown("### Result Analysis")
                     st.info(f"Calculated $A_{{st}}$ is negative ({calc_Ast:.0f} mm²).")
                     st.write("This means **Concrete alone is stronger than the load**.")
-                    st.latex(fr"N_{{conc}} = 0.85 f_{{cd}} A_g = {0.85*fcd*Ag/1000:.0f} \text{{ kN}} > {Nd:.0f} \text{{ kN}}")
-                    
-                    st.warning("⚠️ **Action:** Use Minimum Reinforcement.")
+                    st.warning("⚠️ **Action:** Use Minimum Reinforcement (1%).")
                     req_Ast = 0.01 * Ag
                     st.metric("Min Reinforcement (1%)", f"{req_Ast:,.0f} mm²")
                     
@@ -240,7 +239,10 @@ def app():
                 # --- BAR SUGGESTIONS ---
                 st.markdown("---")
                 st.markdown("### 🛠️ Suggested Bars")
-                suggestions = suggest_reinforcement(req_Ast, shape)
+                
+                # Pass min_long_db (14 for TS500) to filter small bars
+                suggestions = suggest_reinforcement(req_Ast, shape, min_long_db)
+                
                 if suggestions:
                     best_opt = suggestions[0]
                     n_viz, db_viz, area_viz = best_opt
@@ -255,10 +257,8 @@ def app():
                 st.markdown(f"**Target:** Carry {Nd:,.0f} kN with $\\rho \\approx {rho_guess*100}\\%$")
                 
                 if "TS 500" in code:
-                    # Nd = Ag [ 0.85 fcd (1-rho) + rho fyd ]
                     bracket = 0.85 * fcd * (1 - rho_guess) + rho_guess * fyd
                     req_Ag = (Nd * 1000) / bracket
-                    
                     st.latex(r"A_g = \frac{N_d}{0.85 f_{cd} (1-\rho) + \rho f_{yd}}")
                     st.latex(fr"A_g = \frac{{{Nd*1000:.0f}}}{{0.85({fcd:.2f})(1-{rho_guess}) + {rho_guess}({fyd:.2f})}}")
                     
@@ -282,38 +282,53 @@ def app():
                     
                 st.pyplot(draw_design_section(shape, dims, 0, 0, trans_type, cover))
 
-        # --- SPIRAL CHECK (TS 500) ---
-        if "TS 500" in code and trans_type == "Spiral" and shape == "Circular":
-            st.markdown("---")
-            st.subheader("🌀 Spiral Detailing (TS 500)")
+    # --- SPIRAL CHECK (TS 500) ---
+    if "TS 500" in code and trans_type == "Spiral" and shape == "Circular":
+        st.markdown("---")
+        st.subheader("🌀 Spiral Detailing (TS 500)")
+        
+        # 1. CHECK MINIMUM DIAMETER RULE
+        st.markdown("**Rule:** Spiral diameter must be $\ge \phi_{long} / 3$")
+        
+        # Allow user to pick intended bar for this check
+        check_db = st.selectbox("Select Intended Longitudinal Bar", [14, 16, 20, 25, 32], index=1)
+        min_spiral_dia_req = check_db / 3
+        st.write(f"Min $\phi_{{spiral}} = {check_db}/3 = $ **{min_spiral_dia_req:.2f} mm**")
+
+        # 2. CALCULATE SPACING
+        D_col = dims[0]
+        if D_col > 0:
+            d_core_outer = D_col - 2*cover
+            Ach = np.pi * d_core_outer**2 / 4
+            Ag_real = np.pi * D_col**2 / 4
             
-            D_col = dims[0]
-            if D_col > 0:
-                d_core_outer = D_col - 2*cover
-                Ach = np.pi * d_core_outer**2 / 4
-                Ag_real = np.pi * D_col**2 / 4
+            rho_min = 0.45 * (fc / fy) * ((Ag_real / Ach) - 1)
+            rho_min_floor = 0.12 * (fc / fy)
+            final_rho_min = max(rho_min, rho_min_floor)
+            
+            st.latex(r"\rho_{s,min} = \max \left( 0.45 \frac{f_{ck}}{f_{yk}} (\frac{A_c}{A_{ck}}-1) , \ 0.12 \frac{f_{ck}}{f_{yk}} \right)")
+            st.write(f"**Required Volumetric Ratio:** {final_rho_min:.4f}")
+            
+            # Max Spacing Rule (TS 500)
+            s_max_code = min(200, 12 * check_db) # User rule: min(12*db, 200)
+            st.write(f"**Max Spacing ($s_{{max}}$):** $\min(12 \cdot {check_db}, 200) =$ **{s_max_code:.0f} mm**")
+            
+            st.markdown("**Suggested Spiral Spacing:**")
+            c1, c2 = st.columns(2)
+            
+            # Suggest spacing only for valid spiral diameters
+            for d_sp in [8, 10, 12]:
+                if d_sp < min_spiral_dia_req:
+                    st.write(f"- $\phi${d_sp}: ❌ Too thin (< {min_spiral_dia_req:.1f} mm)")
+                    continue
                 
-                rho_min = 0.45 * (fc / fy) * ((Ag_real / Ach) - 1)
-                rho_min_floor = 0.12 * (fc / fy)
-                final_rho_min = max(rho_min, rho_min_floor)
+                Asp = np.pi * d_sp**2 / 4
+                req_s = (4 * Asp) / (d_core_outer * final_rho_min)
                 
-                st.latex(r"\rho_{s,min} = \max \left( 0.45 \frac{f_{ck}}{f_{yk}} (\frac{A_c}{A_{ck}}-1) , \ 0.12 \frac{f_{ck}}{f_{yk}} \right)")
-                st.write(f"**Required Volumetric Ratio:** {final_rho_min:.4f}")
-                
-                st.markdown("**Max Spacing ($s_{max}$):**")
-                s_max_code = min(80, D_col/5)
-                st.write(f"Min(80mm, D/5) = **{s_max_code:.0f} mm**")
-                
-                st.markdown("**Suggested Spiral Spacing:**")
-                c1, c2 = st.columns(2)
-                for d_sp in [8, 10, 12]:
-                    Asp = np.pi * d_sp**2 / 4
-                    # s = 4 * Asp / (d_core * rho_min)
-                    req_s = (4 * Asp) / (d_core_outer * final_rho_min)
-                    
-                    if req_s < 40:
-                        st.write(f"- $\phi${d_sp}: **Too Tight (<40mm)**")
-                    elif req_s > s_max_code:
-                        st.write(f"- $\phi${d_sp}: Limit to **{s_max_code:.0f} mm**")
-                    else:
-                        st.write(f"- $\phi${d_sp}: Use **{req_s:.0f} mm**")
+                # Check limits
+                if req_s < 40:
+                    st.write(f"- $\phi${d_sp}: **Too Tight (<40mm)**")
+                elif req_s > s_max_code:
+                    st.write(f"- $\phi${d_sp}: Limit to **{s_max_code:.0f} mm** (Calc: {req_s:.0f})")
+                else:
+                    st.write(f"- $\phi${d_sp}: Use **{req_s:.0f} mm**")
