@@ -3,8 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-# --- SAFE IMPORT SECTION ---
-# We try to import PchipInterpolator which is perfect for Engineering curves (No overshoot)
 try:
     from scipy.interpolate import make_interp_spline, PchipInterpolator
     HAS_SCIPY = True
@@ -96,9 +94,7 @@ def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type, show_ties, co
 # 3. HELPER: LOAD-DEFORMATION GRAPH
 # ======================================
 def plot_load_deformation(N1, N2, trans_type):
-    """
-    Mimics the TS 500 Lecture Note First vs Second Peak graph.
-    """
+
     fig, ax = plt.subplots(figsize=(7, 4.5))
     fig.patch.set_alpha(0)
     ax.patch.set_alpha(0)
@@ -211,10 +207,10 @@ def app():
         c1, c2 = st.columns(2)
         with c1: 
             label_conc = "Concrete (f_ck)" if "TS 500" in design_code or "Eurocode" in design_code else "Concrete (f'c)"
-            fc = st.number_input(f"{label_conc} [MPa]", value=20.0, step=5.0)
+            fc = st.number_input(f"{label_conc} [MPa]", value=20.0, step=1.0)
         with c2: 
             label_steel = "Steel (f_yk)" if "TS 500" in design_code or "Eurocode" in design_code else "Steel (f_y)"
-            fy = st.number_input(f"{label_steel} [MPa]", value=420.0, step=10.0)
+            fy = st.number_input(f"{label_steel} [MPa]", value=420.0, step=5.0)
 
         st.markdown("**Geometry (Concrete)**")
         if solve_mode == "Find Concrete Area (Ag)":
