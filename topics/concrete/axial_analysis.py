@@ -314,7 +314,7 @@ def app():
             col_chk1, col_chk2 = st.columns(2)
             with col_chk1:
                 if 0.01 <= rho <= 0.04: st.success(f"$\\rho = {rho*100:.2f}\\%$ (OK)")
-                else: st.warning(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (Check Limits)")
+                else: st.warning(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (0.01<$\\rho<0.04)")
             
             with col_chk2:
                 if trans_type == "Spiral":
