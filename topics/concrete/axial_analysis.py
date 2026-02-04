@@ -2,7 +2,13 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from scipy.interpolate import make_interp_spline 
+
+# Safe import for scipy
+try:
+    from scipy.interpolate import make_interp_spline
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
 
 # ======================================
 # 1. HELPER: BAR DISTRIBUTION LOGIC
@@ -41,6 +47,8 @@ def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type, show_ties, co
     fig, ax = plt.subplots(figsize=(4, 4))
     bar_r = bar_dia / 2
     draw_cover = cover
+    
+    # Transparent background for Streamlit
     fig.patch.set_alpha(0) 
     ax.patch.set_alpha(0)
 
@@ -63,7 +71,6 @@ def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type, show_ties, co
         ax.add_patch(patches.Circle((cx, cy), D/2, fill=True, facecolor='#e0e0e0', edgecolor='black', linewidth=2))
         
         if trans_type == "Spiral" and show_ties:
-             # Core typically defined by outer dimension of spiral
              core_D = D - 2*draw_cover
              ax.add_patch(patches.Circle((cx, cy), core_D/2, fill=False, edgecolor='#999', linestyle=':', label="Core Limit"))
         
@@ -91,63 +98,84 @@ def plot_load_deformation(N1, N2, trans_type):
     """
     Mimics the TS 500 Lecture Note First vs Second Peak graph.
     """
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(7, 4.5))
     fig.patch.set_alpha(0)
     ax.patch.set_alpha(0)
     
-    # Scale X-axis (Strain/Shortening) arbitrary units
+    # --- VISIBILITY FIX: Set text/lines to white for Dark Mode ---
+    text_color = "white"
+    ax.spines['bottom'].set_color(text_color)
+    ax.spines['left'].set_color(text_color)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.tick_params(axis='x', colors=text_color)
+    ax.tick_params(axis='y', colors=text_color)
+    ax.yaxis.label.set_color(text_color)
+    ax.xaxis.label.set_color(text_color)
+
+    # Annotations styling
+    ann_props = dict(facecolor=text_color, edgecolor=text_color, arrowstyle='->')
     
     if trans_type == "Spiral":
-        # Curve Points: Start -> Peak 1 -> Dip -> Peak 2
-        
         if N2 > N1:
             # Case: Confined Strength Gain (Success)
-            x_points = np.array([0, 1.0, 2.0, 3.5])
-            y_points = np.array([0, N1,  0.80*N1, N2]) 
+            # EXTENDED: Added point at x=5.5 for plateau
+            x_points = np.array([0, 1.0, 2.0, 3.5, 5.5])
+            y_points = np.array([0, N1,  0.80*N1, N2, N2]) # Plateau at N2
             
-            color = "#1f77b4" # Blue
-            ax.annotate('First Peak\n(Cover Spalls)', xy=(1.0, N1), xytext=(0.5, N1+N1*0.1),
-                        arrowprops=dict(facecolor='black', arrowstyle='->'), ha='center')
-            ax.annotate('Second Peak\n(Confined Core)', xy=(3.5, N2), xytext=(3.5, N2-N2*0.2),
-                        arrowprops=dict(facecolor='black', arrowstyle='->'), ha='center')
+            color = "#00BFFF" # Deep Sky Blue (High contrast)
             
+            # Peak 1 Annotation
+            ax.annotate('First Peak\n(Cover Spalls)', xy=(1.0, N1), xytext=(0.5, N1+N1*0.15),
+                        arrowprops=dict(facecolor=text_color, arrowstyle='->'), ha='center', color=text_color)
+            
+            # Peak 2 Annotation
+            ax.annotate('Second Peak\n(Confined Core)', xy=(3.5, N2), xytext=(3.5, N2+N2*0.15),
+                        arrowprops=dict(facecolor=text_color, arrowstyle='->'), ha='center', color=text_color)
+            
+            # Ductility Annotation (End of graph)
+            ax.annotate('Ductile\nPlateau', xy=(5.0, N2), xytext=(5.0, N2-N2*0.15),
+                        arrowprops=dict(facecolor=text_color, arrowstyle='->'), ha='center', color=text_color)
+
             # Dashed lines for reference
-            ax.axhline(y=N1, color='gray', linestyle='--', alpha=0.5, label="Unconfined Limit")
+            ax.axhline(y=N1, color='gray', linestyle='--', alpha=0.5)
             
         else:
             # Case: Confined Strength Loss (Failure at Peak 1)
-            x_points = np.array([0, 1.0, 2.0, 3.5])
-            y_points = np.array([0, N1,  0.80*N1, N2]) 
+            # EXTENDED: Tail drops further
+            x_points = np.array([0, 1.0, 2.0, 3.5, 5.0])
+            y_points = np.array([0, N1,  0.80*N1, N2, N2*0.8]) 
             
-            color = "#d62728" # Red
-            ax.annotate('First Peak\n(Governs)', xy=(1.0, N1), xytext=(1.5, N1+N1*0.1),
-                        arrowprops=dict(facecolor='black', arrowstyle='->'))
-            ax.annotate('Second Peak\n(Spiral too weak)', xy=(3.5, N2), xytext=(2.5, N2+N2*0.1),
-                        arrowprops=dict(facecolor='red', arrowstyle='->'))
+            color = "#FF4B4B" # Streamlit Red
+            ax.annotate('First Peak\n(Governs)', xy=(1.0, N1), xytext=(1.5, N1+N1*0.15),
+                        arrowprops=dict(facecolor=text_color, arrowstyle='->'), color=text_color)
+            ax.annotate('Spiral too weak', xy=(3.5, N2), xytext=(3.5, N2+N2*0.15),
+                        arrowprops=dict(facecolor=text_color, arrowstyle='->'), color=text_color)
 
     else: # Ties
         # Standard curve: Rise then Drop
-        x_points = np.array([0, 1.0, 2.5])
-        y_points = np.array([0, N1, 0.5*N1])
-        color = "#ff7f0e" # Orange
-        ax.annotate('Failure', xy=(1.0, N1), xytext=(1.5, N1),
-                    arrowprops=dict(facecolor='black', arrowstyle='->'))
+        x_points = np.array([0, 1.0, 2.5, 4.0])
+        y_points = np.array([0, N1, 0.5*N1, 0.3*N1])
+        color = "#FFA500" # Orange
+        ax.annotate('Failure ($N_{max}$)', xy=(1.0, N1), xytext=(1.5, N1),
+                    arrowprops=dict(facecolor=text_color, arrowstyle='->'), color=text_color)
 
-    # Smooth the curve
-    try:
-        X_Y_Spline = make_interp_spline(x_points, y_points)
-        X_smooth = np.linspace(x_points.min(), x_points.max(), 200)
-        Y_smooth = X_Y_Spline(X_smooth)
-        ax.plot(X_smooth, Y_smooth, color=color, linewidth=2.5)
-    except:
-        ax.plot(x_points, y_points, color=color, linewidth=2.5)
+    # Smooth curve
+    if HAS_SCIPY:
+        try:
+            X_Y_Spline = make_interp_spline(x_points, y_points)
+            X_smooth = np.linspace(x_points.min(), x_points.max(), 300)
+            Y_smooth = X_Y_Spline(X_smooth)
+            ax.plot(X_smooth, Y_smooth, color=color, linewidth=3)
+        except:
+            ax.plot(x_points, y_points, color=color, linewidth=3)
+    else:
+        ax.plot(x_points, y_points, color=color, linewidth=3, linestyle='-')
     
     # Styling
-    ax.set_xlabel(r"Axial Shortening ($\delta$)", fontsize=10)
-    ax.set_ylabel("Axial Load (N)", fontsize=10)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.set_ylim(bottom=0)
+    ax.set_xlabel(r"Axial Shortening ($\delta$)", fontsize=11)
+    ax.set_ylabel("Axial Load (N)", fontsize=11)
+    ax.set_ylim(bottom=0, top=max(N1, N2)*1.3) # More headroom for labels
     ax.set_xlim(left=0)
     
     return fig
@@ -159,7 +187,7 @@ def app():
 
 
     solve_mode = st.radio(
-        "Calculation Mode",
+        " Calculation Mode",
         ["Find Capacity", "Find Steel Area (Ast)", "Find Concrete Area (Ag)"],
         horizontal=True
     )
@@ -170,8 +198,8 @@ def app():
     with col_input:
         st.subheader("1. Design Inputs")
         
-        with st.expander("Code & Shape Settings", expanded=True):
-            design_code = st.selectbox("Design Code", ["TS 500", "ACI 318-19", "Eurocode 2"])
+        with st.expander(" Code & Shape Settings", expanded=True):
+            design_code = st.selectbox("Design Code", ["TS 500 (Lecture Notes)", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
             trans_type = "Ties"
@@ -194,7 +222,7 @@ def app():
         else:
             use_direct_Ag = st.checkbox("Enter Concrete Area ($A_g$) directly?", value=False)
             if use_direct_Ag:
-                Ag = st.number_input("Gross Area ($A_g$) [mm²]", value=70686.0, step=100.0) # Matches Example
+                Ag = st.number_input("Gross Area ($A_g$) [mm²]", value=70686.0, step=100.0)
                 if shape == "Circular": D = np.sqrt(4*Ag/np.pi); dims=(D,)
                 else: side = np.sqrt(Ag); dims=(side, side)
             else:
@@ -252,7 +280,6 @@ def app():
             st.warning("Calculate first.")
         else:
             bars_to_draw = num_bars if (solve_mode != "Find Steel Area (Ast)" and not (solve_mode != "Find Steel Area (Ast)" and 'use_direct_Ast' in locals() and locals().get('use_direct_Ast'))) else 0
-            # Pass Actual Cover to Viz
             fig1 = draw_cross_section(shape, dims, bars_to_draw, bar_dia, trans_type, True, cover)
             st.pyplot(fig1)
             plt.close(fig1)
@@ -289,7 +316,7 @@ def app():
             st.markdown("**Design Checks:**")
             col_chk1, col_chk2 = st.columns(2)
             with col_chk1:
-                if 0.01 <= rho <= 0.04: st.success(f"$\\rho = {rho*100:.2f}\\%$ (OK)")
+                if 0.01 <= rho <= 0.04: st.success(f" $\\rho = {rho*100:.2f}\\%$ (OK)")
                 else: st.warning(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (Check Limits)")
             
             with col_chk2:
@@ -331,15 +358,19 @@ def app():
                     st.markdown("---")
                     st.markdown("### Peak 2: Confined ($N_{or2}$)")
                     
-                    # GEOMETRY FIX: USE OUTER CORE DIAMETER FOR RATIO (Per Slides)
+                    # GEOMETRY FIX (Lecture Note Standard)
                     D_col = dims[0]
-                    D_core = D_col - 2*cover
-                    Ack = np.pi * D_core**2 / 4 
+                    # Core Area (Outer dimensions)
+                    D_core_outer = D_col - 2*cover
+                    # Core Ratio (Centerline dimensions)
+                    D_core_centerline = D_col - 2*(cover + spiral_dia/2)
+                    
+                    Ack = np.pi * D_core_outer**2 / 4 
                     
                     Asp = np.pi * spiral_dia**2 / 4 
-                    rho_s = (4 * Asp) / (D_core * spiral_pitch) # Fixed Denominator
+                    rho_s = (4 * Asp) / (D_core_centerline * spiral_pitch)
                     
-                    st.write(f"**Core Diameter ($D_{{core}}$):** {D_core:.1f} mm")
+                    st.write(f"**Core Diameter ($D_{{core}}$):** {D_core_centerline:.1f} mm (Centerline)")
                     st.write(f"**Spiral Ratio ($\\rho_s$):** {rho_s:.4f}")
 
                     # Capacity Calculation
@@ -359,7 +390,7 @@ def app():
                     else:
                         st.metric("Second Peak", f"{Nor2_kN:,.0f} kN", delta=f"{delta:,.0f} kN (Loss)")
 
-                # --- PLOT GRAPH (Runs for both Spiral and Ties) ---
+                # --- PLOT GRAPH ---
                 st.markdown("### Load-Deformation Behavior")
                 fig_graph = plot_load_deformation(graph_N1, graph_N2, graph_label)
                 st.pyplot(fig_graph)
@@ -370,7 +401,6 @@ def app():
                 st.metric("Design Capacity", f"{Nd_kN:,.0f} kN")
 
         else:
-             # Reverse Solvers
              target_N = target_load * 1000
              if solve_mode == "Find Steel Area (Ast)":
                  if is_ts500:
