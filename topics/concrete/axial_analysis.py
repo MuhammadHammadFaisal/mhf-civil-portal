@@ -66,7 +66,7 @@ def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type, show_ties, co
         ax.add_patch(patches.Circle((cx, cy), D/2, fill=True, facecolor='#e0e0e0', edgecolor='black', linewidth=2))
         
         if trans_type == "Spiral" and show_ties:
-             core_D = D - 2*draw_cover
+             core_D = D - 2*(draw_cover + spiral_dia/2)
              ax.add_patch(patches.Circle((cx, cy), core_D/2, fill=False, edgecolor='#999', linestyle=':', label="Core Limit"))
         
         ax.set_xlim(-50, D + 50); ax.set_ylim(-50, D + 50)
@@ -158,7 +158,7 @@ def plot_load_deformation(N1, N2, trans_type):
         ax.plot(x, y, color=color, linewidth=3, linestyle='-')
     
     ax.set_xlabel(r"Axial Shortening ($\delta$)", fontsize=11)
-    ax.set_ylabel("Axial Load (N)", fontsize=11)
+    ax.set_ylabel("Axial Load (KN)", fontsize=11)
     ax.set_ylim(bottom=0, top=max(N1, N2)*1.3)
     ax.set_xlim(left=0)
     
@@ -251,13 +251,18 @@ def app():
         elif "ACI" in design_code:
             phi = 0.75 if trans_type == "Spiral" else 0.65
             alpha = 0.85 if trans_type == "Spiral" else 0.80
-            st.write(f"**ACI Factors:** $\\phi={phi}, \\alpha={alpha}$")
+            limit_factor = 0.85 if trans_type == "Spiral" else 0.80
+            st.write(f"**ACI Factors:** $\\phi={phi}$ , Strength Limit = {limit_factor}")
+
 
         # --- ACI ANALYSIS ---
         if "ACI" in design_code:
-            P0 = 0.85 * fc * (Ag - Ast) + fy * Ast
-            Pn_max = alpha * P0
-            PhiPn = phi * Pn_max
+          P0 = 0.85 * fc * (Ag - Ast) + fy * Ast
+            if trans_type == "Spiral":
+                PhiPn = 0.85 * phi * P0
+            else:
+                PhiPn = 0.80 * phi * P0
+
             
             st.markdown("### ACI Capacity")
             st.latex(r"\phi P_{n,max} = \phi \cdot \alpha [0.85 f'_c (A_g - A_{st}) + f_y A_{st}]")
@@ -296,8 +301,9 @@ def app():
                 
                 # 1. Geometry
                 D_col = dims[0]
-                d_core_outer = D_col - 2*cover
-                d_core_center = D_col - 2*(cover + spiral_dia/2)
+                d_core = D_col - 2*(cover + spiral_dia/2)
+                Ack = np.pi * d_core**2 / 4
+
                 
                 Ack = np.pi * d_core_outer**2 / 4 # Area uses outer dimension
                 Asp = np.pi * spiral_dia**2 / 4
@@ -324,6 +330,7 @@ def app():
                 f_cc_char = 0.85 * fc + 2 * rho_s * fy
                 f_ccd = f_cc_char / 1.5
                 
+                st.caption("Note: Confined strength calculated using simplified lecture model, not full TS500 confinement model.")
                 st.latex(r"f_{ccd} = \frac{0.85 f_{ck} + 2 \rho_s f_{yk}}{1.5}")
                 st.latex(fr"f_{{ccd}} = \frac{{0.85({fc}) + 2({rho_s:.4f})({fy})}}{{1.5}} = \mathbf{{{f_ccd:.2f} \text{{ MPa}}}}")
                 
