@@ -3,9 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-# Safe import for scipy
+# --- SAFE IMPORT SECTION ---
+# We try to import PchipInterpolator which is perfect for Engineering curves (No overshoot)
 try:
-    from scipy.interpolate import make_interp_spline
+    from scipy.interpolate import make_interp_spline, PchipInterpolator
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
@@ -102,7 +103,7 @@ def plot_load_deformation(N1, N2, trans_type):
     fig.patch.set_alpha(0)
     ax.patch.set_alpha(0)
     
-    # --- VISIBILITY FIX: Set text/lines to white for Dark Mode ---
+    # --- VISIBILITY FIX: White text for Dark Mode ---
     text_color = "white"
     ax.spines['bottom'].set_color(text_color)
     ax.spines['left'].set_color(text_color)
@@ -113,69 +114,69 @@ def plot_load_deformation(N1, N2, trans_type):
     ax.yaxis.label.set_color(text_color)
     ax.xaxis.label.set_color(text_color)
 
-    # Annotations styling
-    ann_props = dict(facecolor=text_color, edgecolor=text_color, arrowstyle='->')
-    
     if trans_type == "Spiral":
         if N2 > N1:
             # Case: Confined Strength Gain (Success)
-            # EXTENDED: Added point at x=5.5 for plateau
-            x_points = np.array([0, 1.0, 2.0, 3.5, 5.5])
-            y_points = np.array([0, N1,  0.80*N1, N2, N2]) # Plateau at N2
+            # We set explicit control points
+            x_points = np.array([0, 1.0, 2.0, 3.5, 5.0])
+            y_points = np.array([0, N1,  0.85*N1, N2, N2]) 
             
-            color = "#00BFFF" # Deep Sky Blue (High contrast)
+            color = "#00BFFF" # Deep Sky Blue
             
-            # Peak 1 Annotation
             ax.annotate('First Peak\n(Cover Spalls)', xy=(1.0, N1), xytext=(0.5, N1+N1*0.15),
                         arrowprops=dict(facecolor=text_color, arrowstyle='->'), ha='center', color=text_color)
             
-            # Peak 2 Annotation
+            # Point exactly to the start of the plateau
             ax.annotate('Second Peak\n(Confined Core)', xy=(3.5, N2), xytext=(3.5, N2+N2*0.15),
                         arrowprops=dict(facecolor=text_color, arrowstyle='->'), ha='center', color=text_color)
             
-            # Ductility Annotation (End of graph)
-            ax.annotate('Ductile\nPlateau', xy=(5.0, N2), xytext=(5.0, N2-N2*0.15),
+            ax.annotate('Ductile\nPlateau', xy=(4.8, N2), xytext=(4.8, N2-N2*0.15),
                         arrowprops=dict(facecolor=text_color, arrowstyle='->'), ha='center', color=text_color)
 
-            # Dashed lines for reference
             ax.axhline(y=N1, color='gray', linestyle='--', alpha=0.5)
             
         else:
-            # Case: Confined Strength Loss (Failure at Peak 1)
-            # EXTENDED: Tail drops further
+            # Case: Failure
             x_points = np.array([0, 1.0, 2.0, 3.5, 5.0])
             y_points = np.array([0, N1,  0.80*N1, N2, N2*0.8]) 
             
-            color = "#FF4B4B" # Streamlit Red
+            color = "#FF4B4B" # Red
             ax.annotate('First Peak\n(Governs)', xy=(1.0, N1), xytext=(1.5, N1+N1*0.15),
                         arrowprops=dict(facecolor=text_color, arrowstyle='->'), color=text_color)
             ax.annotate('Spiral too weak', xy=(3.5, N2), xytext=(3.5, N2+N2*0.15),
                         arrowprops=dict(facecolor=text_color, arrowstyle='->'), color=text_color)
 
     else: # Ties
-        # Standard curve: Rise then Drop
         x_points = np.array([0, 1.0, 2.5, 4.0])
         y_points = np.array([0, N1, 0.5*N1, 0.3*N1])
         color = "#FFA500" # Orange
         ax.annotate('Failure ($N_{max}$)', xy=(1.0, N1), xytext=(1.5, N1),
                     arrowprops=dict(facecolor=text_color, arrowstyle='->'), color=text_color)
 
-    # Smooth curve
+    # --- SMOOTHING LOGIC ---
     if HAS_SCIPY:
         try:
-            X_Y_Spline = make_interp_spline(x_points, y_points)
+            # FIX: Use PchipInterpolator (Monotonic) to prevent overshoot "Hump"
+            interpolator = PchipInterpolator(x_points, y_points)
             X_smooth = np.linspace(x_points.min(), x_points.max(), 300)
-            Y_smooth = X_Y_Spline(X_smooth)
+            Y_smooth = interpolator(X_smooth)
             ax.plot(X_smooth, Y_smooth, color=color, linewidth=3)
         except:
-            ax.plot(x_points, y_points, color=color, linewidth=3)
+            # Fallback to Spline (might overshoot) or Linear
+            try:
+                X_Y_Spline = make_interp_spline(x_points, y_points)
+                X_smooth = np.linspace(x_points.min(), x_points.max(), 300)
+                Y_smooth = X_Y_Spline(X_smooth)
+                ax.plot(X_smooth, Y_smooth, color=color, linewidth=3)
+            except:
+                ax.plot(x_points, y_points, color=color, linewidth=3)
     else:
+        # Fallback if no scipy
         ax.plot(x_points, y_points, color=color, linewidth=3, linestyle='-')
     
-    # Styling
     ax.set_xlabel(r"Axial Shortening ($\delta$)", fontsize=11)
     ax.set_ylabel("Axial Load (N)", fontsize=11)
-    ax.set_ylim(bottom=0, top=max(N1, N2)*1.3) # More headroom for labels
+    ax.set_ylim(bottom=0, top=max(N1, N2)*1.35)
     ax.set_xlim(left=0)
     
     return fig
@@ -187,7 +188,7 @@ def app():
 
 
     solve_mode = st.radio(
-        " Calculation Mode",
+        "Calculation Mode",
         ["Find Capacity", "Find Steel Area (Ast)", "Find Concrete Area (Ag)"],
         horizontal=True
     )
@@ -198,7 +199,7 @@ def app():
     with col_input:
         st.subheader("1. Design Inputs")
         
-        with st.expander(" Code & Shape Settings", expanded=True):
+        with st.expander("Code & Shape Settings", expanded=True):
             design_code = st.selectbox("Design Code", ["TS 500 (Lecture Notes)", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
@@ -316,7 +317,7 @@ def app():
             st.markdown("**Design Checks:**")
             col_chk1, col_chk2 = st.columns(2)
             with col_chk1:
-                if 0.01 <= rho <= 0.04: st.success(f" $\\rho = {rho*100:.2f}\\%$ (OK)")
+                if 0.01 <= rho <= 0.04: st.success(f"$\\rho = {rho*100:.2f}\\%$ (OK)")
                 else: st.warning(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (Check Limits)")
             
             with col_chk2:
@@ -401,6 +402,7 @@ def app():
                 st.metric("Design Capacity", f"{Nd_kN:,.0f} kN")
 
         else:
+             # Reverse Solvers
              target_N = target_load * 1000
              if solve_mode == "Find Steel Area (Ast)":
                  if is_ts500:
