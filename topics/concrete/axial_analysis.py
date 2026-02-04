@@ -156,11 +156,10 @@ def plot_load_deformation(N1, N2, trans_type):
 # 4. MAIN APP
 # ======================================
 def app():
-    st.header("🏗️ Analysis of Axial Load Capacity")
-    st.markdown("---")
+
 
     solve_mode = st.radio(
-        "🎯 Calculation Mode",
+        "Calculation Mode",
         ["Find Capacity", "Find Steel Area (Ast)", "Find Concrete Area (Ag)"],
         horizontal=True
     )
@@ -171,7 +170,7 @@ def app():
     with col_input:
         st.subheader("1. Design Inputs")
         
-        with st.expander("⚙️ Code & Shape Settings", expanded=True):
+        with st.expander("Code & Shape Settings", expanded=True):
             design_code = st.selectbox("Design Code", ["TS 500", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
@@ -220,7 +219,7 @@ def app():
         spiral_dia = 8.0
         spiral_pitch = 100.0
         if "TS 500" in design_code and trans_type == "Spiral" and solve_mode == "Find Capacity":
-            st.caption("🌀 Spiral Details (Confined Strength)")
+            st.caption("Spiral Details (Confined Strength)")
             sc1, sc2 = st.columns(2)
             with sc1: spiral_dia = st.number_input("Spiral $\phi$ [mm]", value=8.0)
             with sc2: spiral_pitch = st.number_input("Pitch (s) [mm]", value=80.0)
@@ -267,7 +266,7 @@ def app():
     st.subheader("3. Calculation Report")
     
     if st.button("Run Calculation", type="primary"):
-        st.markdown("#### 📝 Step-by-Step Substitution")
+        st.markdown("#### Step-by-Step Substitution")
         
         is_ts500 = "TS 500" in design_code
         is_aci = "ACI" in design_code
@@ -290,12 +289,12 @@ def app():
             st.markdown("**Design Checks:**")
             col_chk1, col_chk2 = st.columns(2)
             with col_chk1:
-                if 0.01 <= rho <= 0.04: st.success(f"✅ $\\rho = {rho*100:.2f}\\%$ (OK)")
+                if 0.01 <= rho <= 0.04: st.success(f"$\\rho = {rho*100:.2f}\\%$ (OK)")
                 else: st.warning(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (Check Limits)")
             
             with col_chk2:
                 if trans_type == "Spiral":
-                    if 40 <= spiral_pitch <= 100: st.success(f"✅ Pitch {spiral_pitch}mm (OK)")
+                    if 40 <= spiral_pitch <= 100: st.success(f"Pitch {spiral_pitch}mm (OK)")
                     else: st.warning(f"⚠️ Pitch {spiral_pitch}mm (Check Limits)")
 
         # ==========================================
@@ -361,7 +360,7 @@ def app():
                         st.metric("Second Peak", f"{Nor2_kN:,.0f} kN", delta=f"{delta:,.0f} kN (Loss)")
 
                 # --- PLOT GRAPH (Runs for both Spiral and Ties) ---
-                st.markdown("### 📈 Load-Deformation Behavior")
+                st.markdown("### Load-Deformation Behavior")
                 fig_graph = plot_load_deformation(graph_N1, graph_N2, graph_label)
                 st.pyplot(fig_graph)
                 plt.close(fig_graph)
