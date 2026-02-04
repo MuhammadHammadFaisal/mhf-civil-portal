@@ -100,8 +100,7 @@ def draw_design_section(shape, dims, n_bars, db, trans_type, cover):
 # 3. MAIN APP
 # ======================================
 def app():
-    st.header("📐 Design of Axial Members")
-    st.markdown("---")
+
 
     # 1. DESIGN GOAL
     design_mode = st.radio("What are you solving for?", 
@@ -111,7 +110,7 @@ def app():
     
     with col1:
         st.subheader("1. Parameters")
-        with st.expander("⚙️ Standards & Shape", expanded=True):
+        with st.expander(" Standards & Shape", expanded=True):
             code = st.selectbox("Design Code", ["TS 500 (Lecture Notes)", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
@@ -168,7 +167,7 @@ def app():
         st.subheader("2. Results")
         
         if st.button("Run Design Calculation", type="primary"):
-            st.markdown("#### 📝 Step-by-Step Substitution")
+            st.markdown("#### Step-by-Step Substitution")
             
             if "ACI" in code:
                 st.write(f"**Factors:** $\\phi={phi}, \\alpha={alpha}$")
@@ -232,7 +231,7 @@ def app():
                         st.error(f"⚠️ $\\rho = {rho*100:.2f}\\%$ (> 4% Max). Section is too small!")
                         req_Ast = calc_Ast
                     else:
-                        st.success(f"✅ $\\rho$ is within limits (1-4%).")
+                        st.success(f"$\\rho$ is within limits (1-4%).")
                         req_Ast = calc_Ast
                         st.metric("Required Steel", f"{req_Ast:,.0f} mm²")
 
@@ -285,7 +284,7 @@ def app():
     # --- SPIRAL CHECK (TS 500) ---
     if "TS 500" in code and trans_type == "Spiral" and shape == "Circular":
         st.markdown("---")
-        st.subheader("🌀 Spiral Detailing (TS 500)")
+        st.subheader(" Spiral Detailing (TS 500)")
         
         # 1. CHECK MINIMUM DIAMETER RULE
         st.markdown("**Rule:** Spiral diameter must be $\ge \phi_{long} / 3$")
