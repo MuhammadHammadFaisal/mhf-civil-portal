@@ -83,11 +83,11 @@ def draw_cross_section(shape, dims, num_bars, bar_dia, trans_type, show_ties):
 # 3. MAIN APP
 # ======================================
 def app():
-    st.header("🏗️ Analysis of Axial Load Capacity")
+    st.header("Analysis of Axial Load Capacity")
     st.markdown("---")
 
     solve_mode = st.radio(
-        "🎯 Calculation Mode",
+        " Calculation Mode",
         ["Find Capacity", "Find Steel Area (Ast)", "Find Concrete Area (Ag)"],
         horizontal=True
     )
@@ -98,7 +98,7 @@ def app():
     with col_input:
         st.subheader("1. Design Inputs")
         
-        with st.expander("⚙️ Code & Shape Settings", expanded=True):
+        with st.expander(" Code & Shape Settings", expanded=True):
             design_code = st.selectbox("Design Code", ["TS 500 (Lecture Notes)", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
@@ -146,7 +146,7 @@ def app():
         cover = 25.0 # Default
         
         if "TS 500" in design_code and trans_type == "Spiral" and solve_mode == "Find Capacity":
-            st.caption("🌀 Spiral Details (for Confined Strength)")
+            st.caption(" Spiral Details (for Confined Strength)")
             sc1, sc2, sc3 = st.columns(3)
             with sc1: spiral_dia = st.number_input("Spiral $\phi$ [mm]", value=8.0)
             with sc2: spiral_pitch = st.number_input("Pitch (s) [mm]", value=80.0)
@@ -192,7 +192,7 @@ def app():
     st.subheader("3. Calculation Report")
     
     if st.button("Run Calculation", type="primary"):
-        st.markdown("#### 📝 Step-by-Step Substitution")
+        st.markdown("####  Step-by-Step Substitution")
         
         is_ts500 = "TS 500" in design_code
         is_aci = "ACI" in design_code
@@ -261,7 +261,7 @@ def app():
                         st.write(f"**Provided $\\rho_s$:** {rho_s:.4f}")
                     with c2:
                         st.write(f"**Min $\\rho_s$:** {rho_min:.4f}")
-                        status = "✅ OK" if rho_s >= rho_min else "❌ Insufficient"
+                        status = " OK" if rho_s >= rho_min else "❌ Insufficient"
                         st.write(f"**Check:** {status}")
 
                     if rho_s >= rho_min:
