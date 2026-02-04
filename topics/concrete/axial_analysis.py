@@ -114,7 +114,7 @@ def app():
         st.subheader("1. Design Inputs")
         
         with st.expander("Code & Shape Settings", expanded=True):
-            design_code = st.selectbox("Design Code", ["TS 500 (Lecture Notes)", "ACI 318-19", "Eurocode 2"])
+            design_code = st.selectbox("Design Code", ["TS 500 ", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
             trans_type = "Ties"
