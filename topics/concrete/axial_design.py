@@ -105,7 +105,7 @@ def app():
     
     with col1:
         st.subheader("1. Parameters")
-        with st.expander("⚙️ Standards & Shape", expanded=True):
+        with st.expander("Standards & Shape", expanded=True):
             code = st.selectbox("Design Code", ["TS 500 (Lecture Notes)", "ACI 318-19", "Eurocode 2"])
             shape = st.selectbox("Column Shape", ["Rectangular", "Square", "Circular"])
             
@@ -184,7 +184,7 @@ def app():
 
             # --- OUTPUT ---
             if req_Ast <= 0:
-                st.success("✅ **Concrete is strong enough!**")
+                st.success(" **Concrete is strong enough!**")
                 st.write("Use Minimum Reinforcement:")
                 min_rho = 0.01 # TS500 min
                 req_Ast = min_rho * Ag
@@ -196,7 +196,7 @@ def app():
                 else: st.success(f"$\\rho = {rho*100:.2f}\\%$ (OK)")
 
             # --- BAR SUGGESTIONS ---
-            st.markdown("### 🛠️ Suggested Bars")
+            st.markdown("###  Suggested Bars")
             suggestions = suggest_reinforcement(req_Ast, shape)
             if suggestions:
                 # Pick the first one for visualization
@@ -247,7 +247,7 @@ def app():
     # --- SPIRAL CHECK (TS 500) ---
     if "TS 500" in code and trans_type == "Spiral" and shape == "Circular":
         st.markdown("---")
-        st.subheader("🌀 Spiral Detailing (TS 500)")
+        st.subheader("Spiral Detailing (TS 500)")
         
         # Need Core Diameter
         D_col = dims[0]
@@ -273,5 +273,5 @@ def app():
             # Code Limit s_max
             s_max = min(80, D_col/5) # Conservative TS500 limits or 200mm logic
             
-            valid = "✅" if req_s < s_max else "⚠️ (Too large?)"
+            valid = "Valid" if req_s < s_max else "⚠️ (Too large?)"
             st.write(f"- **$\phi${d_sp} Spiral:** s $\le$ **{req_s:.0f} mm**")
