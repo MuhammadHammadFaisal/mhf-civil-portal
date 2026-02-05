@@ -203,14 +203,22 @@ def app():
                         # --- PORE PRESSURE (u) ---
                         # Hydrostatic + Capillary
                         u_calc_text = "0"
-                        if z > water_depth:
+                        
+                        if z >= water_depth:
+                            # Standard hydrostatic pressure (Positive)
                             u_h = (z - water_depth) * GAMMA_W
                             u_calc_text = f"({z:.2f} - {water_depth}) \\times 9.81"
-                        elif z > (water_depth - hc):
+                        
+                        elif z >= (water_depth - hc):
+                            # Capillary zone (Negative Pressure / Suction)
+                            # At WT, u=0. At cap_top, u = -hc * gamma_w
                             u_h = -(water_depth - z) * GAMMA_W
                             u_calc_text = f"-({water_depth} - {z:.2f}) \\times 9.81"
+                        
                         else:
+                            # Above capillary zone (Dry/Damp, but u=0 for simple stress analysis)
                             u_h = 0.0
+                            u_calc_text = "0"
                             
                         # Excess Pore Pressure (Short Term)
                         # Now uses the CURRENT layer type explicitly
