@@ -202,22 +202,29 @@ def app():
                             math_logs.append(f"$\\sigma = {sigma_prev:.2f} + ({gam} \\times {dz:.2f}) = {sigma:.2f}$")
 
                         # --- PORE PRESSURE (u) ---
-                        # Hydrostatic + Capillary
+                        u_h = 0.0
                         u_calc_text = "0"
                         
-                        if z >= water_depth:
-                            # Standard hydrostatic pressure (Positive)
+                        # 1. Check for Artesian Conditions (typically starts at the bottom layer interface)
+                        # We assume 'artesian_head' is a new number_input you've added to Tab 1
+                        if layer['id'] == num_layers and z >= layer['top']:
+                            # Pressure = Hydrostatic + Artesian Extra
+                            # u = (z - water_depth + artesian_head) * gamma_w
+                            u_h = (z - water_depth + artesian_head) * GAMMA_W
+                            u_calc_text = f"(({z:.2f} - {water_depth}) + {artesian_head}) \\times 9.81"
+                        
+                        # 2. Standard Hydrostatic Zone
+                        elif z >= water_depth:
                             u_h = (z - water_depth) * GAMMA_W
                             u_calc_text = f"({z:.2f} - {water_depth}) \\times 9.81"
                         
+                        # 3. Capillary Zone (Negative Pore Pressure)
                         elif z >= (water_depth - hc):
-                            # Capillary zone (Negative Pressure / Suction)
-                            # At WT, u=0. At cap_top, u = -hc * gamma_w
                             u_h = -(water_depth - z) * GAMMA_W
                             u_calc_text = f"-({water_depth} - {z:.2f}) \\times 9.81"
                         
+                        # 4. Dry Zone
                         else:
-                            # Above capillary zone (Dry/Damp, but u=0 for simple stress analysis)
                             u_h = 0.0
                             u_calc_text = "0"
                             
