@@ -33,14 +33,15 @@ def app():
         # -------------------------------------------------
         with col_input:
             st.markdown("### A. Global Parameters")
-            c1, c2, c3 = st.columns(3)
+            c1, c2 = st.columns(2)
             with c1:
                 water_depth = st.number_input("Water Table Depth (m)", value=3.0, step=0.5)
-            with c2:
+            with c1:
                 hc = st.number_input("Capillary Rise (m)", value=0.0, step=0.1)
-            with c3:
+            with c2:
                 surcharge = st.number_input("Surcharge q (kPa)", value=50.0, step=5.0)
-
+            with c2:
+                artesian_head = st.number_input("Artesian Head (m)", value=0.0, step=0.5, help="Extra head acting from the bottom-most layer")
             st.markdown("### B. Soil Properties ")
             num_layers = st.number_input("Number of Layers", 1, 5, 2)
             layers = []
