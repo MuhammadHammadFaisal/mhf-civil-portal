@@ -15,7 +15,7 @@ st.set_page_config(page_title="MHF Soil Mechanics", layout="wide")
 def app():
 
     # --- GLOBAL SETTINGS (SIDEBAR) ---
-    st.sidebar.header("Global Settings")
+    st.caption("Global Settings")
     gamma_option = st.sidebar.radio(
         "Unit Weight of Water (γ_w)",
         [9.81, 10.0],
@@ -24,7 +24,7 @@ def app():
     )
     GAMMA_W = gamma_option
 
-    st.title("MHF Civil Calc: Stress Profiles")
+    
     st.caption(f"Current Calculation uses: γ_w = {GAMMA_W} kN/m³")
 
     tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
