@@ -13,24 +13,23 @@ st.set_page_config(page_title="MHF Soil Mechanics", layout="wide")
 # MAIN APP
 # =========================================================
 def app():
-
-
-
-
-    
-    st.caption(f"Current Calculation uses: γ_w = {GAMMA_W} kN/m³")
-
-    tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
+    # 1. Define the variable FIRST
     gamma_option = st.radio(
         "Unit Weight of Water (γ_w)",
         [9.81, 10.0],
         index=0,
+        horizontal=True, # Optional: makes it look cleaner
         help="Select 9.81 for precise calc or 10 for simplified exams."
     )
     GAMMA_W = gamma_option
 
-    
+    # 2. NOW you can use it in a caption
     st.caption(f"Current Calculation uses: γ_w = {GAMMA_W} kN/m³")
+
+    # 3. Then create your tabs
+    tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
+    
+    # ... rest of your code ...
     # =====================================================
     # TAB 1 — STRESS PROFILE
     # =====================================================
