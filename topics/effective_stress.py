@@ -16,7 +16,7 @@ def app():
 
     # --- GLOBAL SETTINGS (SIDEBAR) ---
     st.caption("Global Settings")
-    gamma_option = st.sidebar.radio(
+    gamma_option = st.radio(
         "Unit Weight of Water (γ_w)",
         [9.81, 10.0],
         index=0,
