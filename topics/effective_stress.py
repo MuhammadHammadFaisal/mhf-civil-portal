@@ -14,8 +14,13 @@ st.set_page_config(page_title="MHF Soil Mechanics", layout="wide")
 # =========================================================
 def app():
 
-    # --- GLOBAL SETTINGS (SIDEBAR) ---
-    st.caption("Global Settings")
+
+
+
+    
+    st.caption(f"Current Calculation uses: γ_w = {GAMMA_W} kN/m³")
+
+    tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
     gamma_option = st.radio(
         "Unit Weight of Water (γ_w)",
         [9.81, 10.0],
@@ -26,9 +31,6 @@ def app():
 
     
     st.caption(f"Current Calculation uses: γ_w = {GAMMA_W} kN/m³")
-
-    tab1, tab2 = st.tabs(["Stress Profile Calculator", "Heave Check"])
-
     # =====================================================
     # TAB 1 — STRESS PROFILE
     # =====================================================
