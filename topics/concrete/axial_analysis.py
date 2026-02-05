@@ -151,9 +151,6 @@ def plot_load_deformation(N1, N2, trans_type):
 # 3. MAIN APP
 # ======================================
 def app():
-    st.header("🔍 Analysis of Axial Members")
-    st.markdown("Check the capacity of a known column section.")
-    st.markdown("---")
 
     col_input, col_viz = st.columns([1.3, 1])
 
