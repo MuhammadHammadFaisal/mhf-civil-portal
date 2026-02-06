@@ -15,25 +15,30 @@ class Material:
         self.ecu = 0.003
 
         # Stress block factor (simple version)
-        if fck <= 30:
+        if fck <= 25:
             self.beta1 = 0.85
+        elif fck = 30:
+            self.beta1 = 0.82
+        elif fck = 35:
+            self.beta1 = 0.79
+        elif fck = 40:
+            self.beta1 = 0.76
+        elif fck = 45:
+            self.beta1 = 0.73
         elif fck >= 50:
-            self.beta1 = 0.65
-        else:
-            self.beta1 = 0.85 - 0.05 * ((fck - 30) / 7)
+            self.beta1 = 0.70
 
 # ==========================================================
 # SECTION GEOMETRY
 # ==========================================================
 class SectionGeometry:
-    def __init__(self, b, h, cover, bar_dia, stirrup_dia):
+    def __init__(self, b, h, cover, bar_dia, d):
         self.b = b
         self.h = h
         self.cover = cover
         self.bar_dia = bar_dia
-        self.stirrup_dia = stirrup_dia
-
-        self.d = h - cover - stirrup_dia - bar_dia / 2
+        self.d = d
+        self.d = h - cover
 
 # ==========================================================
 # FLEXURE SOLVER (CORE ENGINE)
