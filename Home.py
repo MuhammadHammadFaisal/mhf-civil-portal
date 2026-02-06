@@ -22,14 +22,14 @@ try:
     icon_img = Image.open("assets/Sticker.png").convert("RGBA")
     icon_img = prepare_icon(icon_img, 64)   # <-- IMPORTANT
 except:
-    icon_img = "📊"   # fallback emoji
+    icon_img = ""   # fallback emoji
 
 
 # =========================================================
 # APP CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="MHF Soil Mechanics",
+    page_title="MHF Civil Calc",
     layout="wide",
     page_icon=icon_img
 )
@@ -229,6 +229,7 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
 
 
