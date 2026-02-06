@@ -16,7 +16,7 @@ def get_k1_ts500(fck):
     elif fck == 40: return 0.76
     elif fck == 45: return 0.73
     elif fck >= 50: return 0.70
-    return 0.85 # Fallback
+    return 0.85 
 
 def solve_quadratic_c(b, As, Es, epsilon_cu, d, fcd, k1):
     """
