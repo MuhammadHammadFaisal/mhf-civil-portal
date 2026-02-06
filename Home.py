@@ -103,7 +103,7 @@ def main():
     col_logo, col_text = st.columns([1, 3], vertical_alignment="center")
 
     with col_logo:
-        st.image("assets/logo.png", use_container_width=True)
+        st.image("assets/Sticker.png", use_container_width=True)
 
     with col_text:
         st.markdown("""
@@ -203,6 +203,7 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
 
 
