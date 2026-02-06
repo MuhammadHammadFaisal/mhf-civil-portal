@@ -6,7 +6,7 @@ import os
 # ==================================================
 st.set_page_config(
     page_title="MHF Civil Calc",
-    page_icon="assets/logo.png",
+    page_icon="assets/Sticker.png",
     layout="wide"
 )
 
@@ -203,5 +203,6 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
 
