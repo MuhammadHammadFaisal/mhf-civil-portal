@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 # ==========================================================
 # MATERIAL MODEL
@@ -10,21 +11,20 @@ class Material:
         self.fck = fck
         self.fyk = fyk
 
-        # TS500 / Typical assumptions
         self.Es = 200000  # MPa
         self.ecu = 0.003
 
         if fck <= 25:
             self.k_1 = 0.85
-        elif fck == 30:
+        elif fck <= 30:
             self.k_1 = 0.82
-        elif fck == 35:
+        elif fck <= 35:
             self.k_1 = 0.79
-        elif fck == 40:
+        elif fck <= 40:
             self.k_1 = 0.76
-        elif fck == 45:
+        elif fck <= 45:
             self.k_1 = 0.73
-        elif fck >= 50:
+        else:
             self.k_1 = 0.70
 
 
@@ -32,16 +32,18 @@ class Material:
 # SECTION GEOMETRY
 # ==========================================================
 class SectionGeometry:
-    def __init__(self, b, h, cover, bar_dia, d):
+    def __init__(self, b, h, cover, bar_dia):
         self.b = b
         self.h = h
         self.cover = cover
         self.bar_dia = bar_dia
-        self.d = d
-        self.d = h - cover
+
+        # Effective depth
+        self.d = h - cover - bar_dia / 2
+
 
 # ==========================================================
-# FLEXURE SOLVER (CORE ENGINE)
+# FLEXURE SOLVER
 # ==========================================================
 class FlexureSolver:
     def __init__(self, section, material, As):
@@ -49,24 +51,16 @@ class FlexureSolver:
         self.mat = material
         self.As = As
 
-    # --------------------------------------
-    # Neutral Axis (Simple equilibrium)
-    # --------------------------------------
     def neutral_axis(self):
-
         fy = self.mat.fyk
         fc = self.mat.fck
         b = self.sec.b
-        k_1 = self.mat.k_1
+        k1 = self.mat.k_1
         As = self.As
 
-        c = (As * fy) / (0.85 * fc * b * k_1)
-
+        c = (As * fy) / (0.85 * fc * b * k1)
         return c
 
-    # --------------------------------------
-    # Steel Strain & Stress
-    # --------------------------------------
     def steel_strain_stress(self, c):
 
         ecu = self.mat.ecu
@@ -79,48 +73,75 @@ class FlexureSolver:
 
         return eps_s, fs
 
-    # --------------------------------------
-    # Moment Capacity
-    # --------------------------------------
     def moment_capacity(self, c, fs):
 
-        fc = self.mat.fck
         b = self.sec.b
-        k_1 = self.mat.k_1
+        k1 = self.mat.k_1
         As = self.As
         d = self.sec.d
 
-        a = k_1 * c
+        a = k1 * c
         z = d - a / 2
 
-        Mn = As * fs * z / 1e6  # convert to kNm
-
+        Mn = As * fs * z * 1e-6  # kNm
         return Mn, a, z
 
+
 # ==========================================================
-# INPUT MANAGER
+# CROSS SECTION DIAGRAM
 # ==========================================================
-def render_inputs(section_type, goal_id):
+def draw_section(b, h, cover, bar_dia):
+
+    fig, ax = plt.subplots()
+
+    # Concrete rectangle
+    rect = patches.Rectangle((0, 0), b, h, fill=False, linewidth=2)
+    ax.add_patch(rect)
+
+    # Steel bar (single layer bottom)
+    bar_y = cover + bar_dia / 2
+    bar_x = b / 2
+
+    steel = patches.Circle((bar_x, bar_y), bar_dia / 2, fill=False, linewidth=2)
+    ax.add_patch(steel)
+
+    # Effective depth line
+    d = h - cover - bar_dia / 2
+    ax.plot([0, b], [d, d], linestyle="--")
+
+    ax.set_aspect('equal')
+    ax.set_xlim(-50, b + 50)
+    ax.set_ylim(-50, h + 50)
+
+    ax.set_title("RC Cross Section")
+
+    ax.set_xlabel("Width (mm)")
+    ax.set_ylabel("Depth (mm)")
+
+    return fig
+
+
+# ==========================================================
+# INPUT MANAGER + DIAGRAM
+# ==========================================================
+def render_inputs(goal_id):
 
     data = {}
 
-    st.subheader("1. Geometry")
+    left, right = st.columns([1, 1])
 
-    c1, c2 = st.columns(2)
+    # ---------------- INPUT SIDE ----------------
+    with left:
 
-    with c1:
-        data["b"] = st.number_input("Width b [mm]", 100.0, value=300.0)
-        data["h"] = st.number_input("Height h [mm]", 200.0, value=500.0)
+        st.subheader("1. Geometry")
 
-    with c2:
-        data["cover"] = st.number_input("Clear Cover [mm]", value=30.0)
-        data["bar_dia"] = st.number_input("Bar Diameter [mm]", value=16.0)
+        data["b"] = st.number_input("Width b [mm]", min_value=100.0, value=300.0)
+        data["h"] = st.number_input("Height h [mm]", min_value=200.0, value=500.0)
+        data["cover"] = st.number_input("Cover [mm]", min_value=20.0, value=30.0)
+        data["bar_dia"] = st.number_input("Bar Diameter [mm]", min_value=8.0, value=16.0)
 
-    st.subheader("2. Material")
+        st.subheader("2. Material")
 
-    c3, c4 = st.columns(2)
-
-    with c3:
         data["fck"] = st.number_input(
             "Concrete Class (MPa)",
             min_value=16,
@@ -128,22 +149,32 @@ def render_inputs(section_type, goal_id):
             value=20,
             step=1
         )
-    with c4:
-        data["fyk"] = st.selectbox("Steel Grade (MPa)", [220,420,500], index=1)
 
-    st.subheader("3. Problem Variables")
+        data["fyk"] = st.selectbox("Steel Grade (MPa)", [220, 420, 500], index=1)
 
-    # ---------------------------
-    # GOAL BASED INPUTS
-    # ---------------------------
+        st.subheader("3. Problem Variables")
 
-    if goal_id in ["moment_capacity", "neutral_axis"]:
-        data["As"] = st.number_input("Steel Area As [mm²]", value=1257.0)
+        if goal_id in ["moment_capacity", "neutral_axis"]:
+            data["As"] = st.number_input("Steel Area As [mm²]", value=1257.0)
 
-    elif goal_id == "design_As":
-        data["Md"] = st.number_input("Design Moment Md [kNm]", value=250.0)
+        elif goal_id == "design_As":
+            data["Md"] = st.number_input("Design Moment Md [kNm]", value=250.0)
+
+    # ---------------- DIAGRAM SIDE ----------------
+    with right:
+        st.subheader("Section Diagram")
+
+        fig = draw_section(
+            data["b"],
+            data["h"],
+            data["cover"],
+            data["bar_dia"]
+        )
+
+        st.pyplot(fig)
 
     return data
+
 
 # ==========================================================
 # RESULT DISPLAY
@@ -164,6 +195,7 @@ def display_results(goal_id, results):
         st.latex(f"a = {results['a']:.2f} \\ mm")
         st.latex(f"z = {results['z']:.2f} \\ mm")
 
+
 # ==========================================================
 # GOAL OPTIONS
 # ==========================================================
@@ -173,6 +205,7 @@ GOAL_OPTIONS = {
     "Design Steel Area (As)": "design_As"
 }
 
+
 # ==========================================================
 # MAIN APP
 # ==========================================================
@@ -180,17 +213,6 @@ def app():
 
     st.title("TS500 Flexure Solver")
 
-    # -----------------------------------
-    # SECTION TYPE
-    # -----------------------------------
-    section_type = st.radio(
-        "Section Type",
-        ["Singly Reinforced", "Doubly Reinforced"]
-    )
-
-    # -----------------------------------
-    # GOAL SELECTOR
-    # -----------------------------------
     goal_label = st.selectbox(
         "What needs to be calculated?",
         list(GOAL_OPTIONS.keys())
@@ -198,22 +220,15 @@ def app():
 
     goal_id = GOAL_OPTIONS[goal_label]
 
-    # -----------------------------------
-    # INPUTS
-    # -----------------------------------
-    inputs = render_inputs(section_type, goal_id)
+    inputs = render_inputs(goal_id)
 
-    # -----------------------------------
-    # SOLVE BUTTON
-    # -----------------------------------
     if st.button("Solve", type="primary"):
 
         sec = SectionGeometry(
             inputs["b"],
             inputs["h"],
             inputs["cover"],
-            inputs["bar_dia"],
-            inputs["d"]
+            inputs["bar_dia"]
         )
 
         mat = Material(inputs["fck"], inputs["fyk"])
@@ -236,6 +251,7 @@ def app():
                 results.update({"Mn": Mn, "a": a, "z": z})
 
             display_results(goal_id, results)
+
 
 # ==========================================================
 # RUN APP
