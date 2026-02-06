@@ -1,14 +1,32 @@
 import streamlit as st
 import os
+from PIL import Image
 
-# ==================================================
-# PAGE CONFIGURATION
-# ==================================================
+# Helper function to make image square
+def make_square(im):
+    x, y = im.size
+    size = max(min(x, y), 50)
+    new_im = Image.new('RGBA', (size, size), (255, 0, 0, 0)) # Transparent background
+    new_im.paste(im, ((size - x) // 2, (size - y) // 2))
+    return new_im
+
+# Load and fix the image
+try:
+    icon_img = Image.open("assets/Sticker.png")
+    # Optional: If you want to crop it instead of padding, use proper cropping logic
+    # But usually, passing the PIL object directly helps Streamlit process it better
+except:
+    icon_img = "" # Fallback emoji if file missing
+
+# =========================================================
+# APP CONFIG
+# =========================================================
 st.set_page_config(
-    page_title="MHF Civil Calc",
-    page_icon="assets/Sticker.png",
-    layout="wide"
+    page_title="MHF Soil Mechanics", 
+    layout="wide",
+    page_icon=icon_img  
 )
+
 
 # ==================================================
 # CUSTOM CSS
@@ -203,6 +221,7 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
 
 
