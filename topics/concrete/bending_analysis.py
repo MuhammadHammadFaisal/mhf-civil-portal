@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from scipy.optimize import brentq # For reverse solving
+from scipy.optimize import brentq 
 
 # ======================================
 # 1. HELPER: TS 500 PARAMETERS & LOGIC
