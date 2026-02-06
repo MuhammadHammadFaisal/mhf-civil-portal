@@ -2,128 +2,234 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ==========================================
-# 1. INPUT MANAGER
-# ==========================================
-def render_inputs(section_type, goal):
-    """
-    Renders inputs dynamically based on the 'Professor's Question'.
-    """
+# ==========================================================
+# MATERIAL MODEL
+# ==========================================================
+class Material:
+    def __init__(self, fck, fyk):
+        self.fck = fck
+        self.fyk = fyk
+
+        # TS500 / Typical assumptions
+        self.Es = 200000  # MPa
+        self.ecu = 0.003
+
+        # Stress block factor (simple version)
+        if fck <= 30:
+            self.beta1 = 0.85
+        elif fck >= 50:
+            self.beta1 = 0.65
+        else:
+            self.beta1 = 0.85 - 0.05 * ((fck - 30) / 7)
+
+# ==========================================================
+# SECTION GEOMETRY
+# ==========================================================
+class SectionGeometry:
+    def __init__(self, b, h, cover, bar_dia, stirrup_dia):
+        self.b = b
+        self.h = h
+        self.cover = cover
+        self.bar_dia = bar_dia
+        self.stirrup_dia = stirrup_dia
+
+        self.d = h - cover - stirrup_dia - bar_dia / 2
+
+# ==========================================================
+# FLEXURE SOLVER (CORE ENGINE)
+# ==========================================================
+class FlexureSolver:
+    def __init__(self, section, material, As):
+        self.sec = section
+        self.mat = material
+        self.As = As
+
+    # --------------------------------------
+    # Neutral Axis (Simple equilibrium)
+    # --------------------------------------
+    def neutral_axis(self):
+
+        fy = self.mat.fyk
+        fc = self.mat.fck
+        b = self.sec.b
+        beta1 = self.mat.beta1
+        As = self.As
+
+        c = (As * fy) / (0.85 * fc * b * beta1)
+
+        return c
+
+    # --------------------------------------
+    # Steel Strain & Stress
+    # --------------------------------------
+    def steel_strain_stress(self, c):
+
+        ecu = self.mat.ecu
+        Es = self.mat.Es
+        fy = self.mat.fyk
+        d = self.sec.d
+
+        eps_s = ecu * (d - c) / c
+        fs = min(Es * eps_s, fy)
+
+        return eps_s, fs
+
+    # --------------------------------------
+    # Moment Capacity
+    # --------------------------------------
+    def moment_capacity(self, c, fs):
+
+        fc = self.mat.fck
+        b = self.sec.b
+        beta1 = self.mat.beta1
+        As = self.As
+        d = self.sec.d
+
+        a = beta1 * c
+        z = d - a / 2
+
+        Mn = As * fs * z / 1e6  # convert to kNm
+
+        return Mn, a, z
+
+# ==========================================================
+# INPUT MANAGER
+# ==========================================================
+def render_inputs(section_type, goal_id):
+
     data = {}
-    
-    # --- COMMON SYSTEM PROPERTIES (Always visible) ---
-    st.markdown("### 2. System Properties")
+
+    st.subheader("1. Geometry")
+
     c1, c2 = st.columns(2)
+
     with c1:
-        # If finding 'd', we don't ask for 'h' or 'd'
-        if "Depth (d)" in goal:
-            data['b'] = st.number_input("Width (b) [mm]", value=300.0)
-            data['cover'] = st.number_input("Cover [mm]", value=30.0)
-        else:
-            data['b'] = st.number_input("Width (b) [mm]", value=300.0)
-            data['h'] = st.number_input("Height (h) [mm]", value=500.0)
-            data['cover'] = st.number_input("Cover [mm]", value=30.0)
-            data['d'] = data['h'] - data['cover']
-            
+        data["b"] = st.number_input("Width b [mm]", 100.0, value=300.0)
+        data["h"] = st.number_input("Height h [mm]", 200.0, value=500.0)
+
     with c2:
-        # If finding Concrete Class, we don't ask for fck
-        if "Concrete Class" in goal:
-            data['fyk'] = st.selectbox("Steel Grade", [220, 420, 500], index=1)
-        else:
-            data['fck'] = st.selectbox("Concrete Class", [20, 25, 30, 35, 40, 50], index=2)
-            data['fyk'] = st.selectbox("Steel Grade", [220, 420, 500], index=1)
+        data["cover"] = st.number_input("Cover [mm]", value=30.0)
+        data["bar_dia"] = st.number_input("Bar Diameter [mm]", value=16.0)
+        data["stirrup_dia"] = st.number_input("Stirrup Diameter [mm]", value=8.0)
 
-    st.markdown("---")
-    st.markdown(f"### 3. Problem Variables")
+    st.subheader("2. Material")
 
-    # --- SPECIFIC VARIABLES ---
-    
-    # === SINGLY REINFORCED ===
-    if section_type == "Singly Reinforced":
-        
-        if goal == "Find Moment Capacity (Mr)":
-            st.info("Input the reinforcement to find the max moment.")
-            data['As'] = st.number_input("Tension Steel (As) [mm²]", value=1257.0)
-            
-        elif goal == "Find Neutral Axis (c) & Strain":
-            st.info("Calculate c, εs, and check ductility.")
-            data['As'] = st.number_input("Tension Steel (As) [mm²]", value=1257.0)
-            
-        elif goal == "Design Steel Area (As)":
-            st.info("Input the Load (Moment) to find required Steel.")
-            data['Md'] = st.number_input("Design Moment (Md) [kNm]", value=250.0)
-            
-        elif goal == "Find Minimum Depth (d)":
-            st.info("Input Load and Steel Ratio to find Beam Size.")
-            data['Md'] = st.number_input("Design Moment (Md) [kNm]", value=250.0)
-            data['rho'] = st.slider("Target Steel Ratio (ρ)", 0.005, 0.020, 0.010, format="%.3f")
-            
-        elif goal == "Find Concrete Class (fck)":
-            st.info("What concrete grade is needed for this load?")
-            data['Md'] = st.number_input("Target Moment (Md) [kNm]", value=300.0)
-            data['As'] = st.number_input("Provided Steel (As) [mm²]", value=2000.0)
+    c3, c4 = st.columns(2)
 
-    # === DOUBLY REINFORCED ===
-    elif section_type == "Doubly Reinforced":
-        data['As_comp'] = st.number_input("Compression Steel (As') [mm²]", value=400.0)
-        
-        if "Capacity" in goal:
-            data['As'] = st.number_input("Tension Steel (As) [mm²]", value=1800.0)
-        elif "Tension Steel" in goal:
-            data['Md'] = st.number_input("Design Moment (Md) [kNm]", value=450.0)
+    with c3:
+        data["fck"] = st.selectbox("Concrete Class (MPa)", [20,25,30,35,40,50], index=2)
+
+    with c4:
+        data["fyk"] = st.selectbox("Steel Grade (MPa)", [220,420,500], index=1)
+
+    st.subheader("3. Problem Variables")
+
+    # ---------------------------
+    # GOAL BASED INPUTS
+    # ---------------------------
+
+    if goal_id in ["moment_capacity", "neutral_axis"]:
+        data["As"] = st.number_input("Steel Area As [mm²]", value=1257.0)
+
+    elif goal_id == "design_As":
+        data["Md"] = st.number_input("Design Moment Md [kNm]", value=250.0)
 
     return data
 
-# ==========================================
-# 2. MAIN APP
-# ==========================================
+# ==========================================================
+# RESULT DISPLAY
+# ==========================================================
+def display_results(goal_id, results):
+
+    st.subheader("Results")
+
+    if goal_id == "neutral_axis":
+
+        st.latex(f"c = {results['c']:.2f} \\ mm")
+        st.latex(f"\\varepsilon_s = {results['eps_s']:.5f}")
+        st.latex(f"f_s = {results['fs']:.2f} \\ MPa")
+
+    elif goal_id == "moment_capacity":
+
+        st.latex(f"M_n = {results['Mn']:.2f} \\ kNm")
+        st.latex(f"a = {results['a']:.2f} \\ mm")
+        st.latex(f"z = {results['z']:.2f} \\ mm")
+
+# ==========================================================
+# GOAL OPTIONS
+# ==========================================================
+GOAL_OPTIONS = {
+    "Find Moment Capacity (Mr)": "moment_capacity",
+    "Find Neutral Axis & Strain": "neutral_axis",
+    "Design Steel Area (As)": "design_As"
+}
+
+# ==========================================================
+# MAIN APP
+# ==========================================================
 def app():
-    st.title("TS 500 Flexure Solver")
-    st.markdown("Select the variable the professor is asking you to solve for.")
 
-    # STEP 1: WIZARD SETUP
-    col_type, col_goal = st.columns(2)
-    
-    with col_type:
-        section_type = st.radio("Section Type", ["Singly Reinforced", "Doubly Reinforced", "Multi-Layer"])
-    
-    with col_goal:
-        # These match the Professor's likely exam questions
-        if section_type == "Singly Reinforced":
-            options = [
-                "Find Moment Capacity (Mr)",
-                "Find Neutral Axis (c) & Strain",
-                "Design Steel Area (As)",
-                "Find Minimum Depth (d)",
-                "Find Concrete Class (fck)"
-            ]
-        elif section_type == "Doubly Reinforced":
-            options = [
-                "Find Moment Capacity (Mr)",
-                "Find Tension Steel (As)"
-            ]
-        else:
-            options = ["Find Moment Capacity (Mr)"]
-            
-        goal = st.selectbox("What needs to be calculated?", options)
+    st.title("TS500 Flexure Solver")
 
-    # STEP 2: RENDER
-    inputs = render_inputs(section_type, goal)
+    # -----------------------------------
+    # SECTION TYPE
+    # -----------------------------------
+    section_type = st.radio(
+        "Section Type",
+        ["Singly Reinforced", "Doubly Reinforced"]
+    )
 
-    # STEP 3: SOLVE
+    # -----------------------------------
+    # GOAL SELECTOR
+    # -----------------------------------
+    goal_label = st.selectbox(
+        "What needs to be calculated?",
+        list(GOAL_OPTIONS.keys())
+    )
+
+    goal_id = GOAL_OPTIONS[goal_label]
+
+    # -----------------------------------
+    # INPUTS
+    # -----------------------------------
+    inputs = render_inputs(section_type, goal_id)
+
+    # -----------------------------------
+    # SOLVE BUTTON
+    # -----------------------------------
     if st.button("Solve", type="primary"):
-        st.divider()
-        st.subheader("Solution")
-        
-        # Placeholder for Logic Integration
-        # We will connect the logic file here in the next step
-        st.success(f"Solving for **{goal}**...")
-        st.write("Parameters:", inputs)
-        
-        # Example of what the output will look like (Hardcoded for Demo)
-        if "Neutral Axis" in goal:
-            st.latex(r"c = \frac{A_s f_{yd}}{0.85 f_{cd} b} = \dots \text{ mm}")
-            st.pyplot(plt.figure(figsize=(4,2))) # Placeholder graph
 
+        sec = SectionGeometry(
+            inputs["b"],
+            inputs["h"],
+            inputs["cover"],
+            inputs["bar_dia"],
+            inputs["stirrup_dia"]
+        )
+
+        mat = Material(inputs["fck"], inputs["fyk"])
+
+        if goal_id in ["moment_capacity", "neutral_axis"]:
+
+            solver = FlexureSolver(sec, mat, inputs["As"])
+
+            c = solver.neutral_axis()
+            eps_s, fs = solver.steel_strain_stress(c)
+
+            results = {
+                "c": c,
+                "eps_s": eps_s,
+                "fs": fs
+            }
+
+            if goal_id == "moment_capacity":
+                Mn, a, z = solver.moment_capacity(c, fs)
+                results.update({"Mn": Mn, "a": a, "z": z})
+
+            display_results(goal_id, results)
+
+# ==========================================================
+# RUN APP
+# ==========================================================
 if __name__ == "__main__":
     app()
