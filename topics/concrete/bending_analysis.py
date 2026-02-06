@@ -14,19 +14,19 @@ class Material:
         self.Es = 200000  # MPa
         self.ecu = 0.003
 
-        # Stress block factor (simple version)
         if fck <= 25:
             self.beta1 = 0.85
-        elif fck = 30:
+        elif fck == 30:
             self.beta1 = 0.82
-        elif fck = 35:
+        elif fck == 35:
             self.beta1 = 0.79
-        elif fck = 40:
+        elif fck == 40:
             self.beta1 = 0.76
-        elif fck = 45:
+        elif fck == 45:
             self.beta1 = 0.73
         elif fck >= 50:
             self.beta1 = 0.70
+
 
 # ==========================================================
 # SECTION GEOMETRY
