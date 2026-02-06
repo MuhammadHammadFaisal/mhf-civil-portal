@@ -1,31 +1,38 @@
 import streamlit as st
-import os
 from PIL import Image
 
-# Helper function to make image square
-def make_square(im):
+# Helper function to make image square and resize
+def prepare_icon(im, final_size=64):
     x, y = im.size
-    size = max(min(x, y), 50)
-    new_im = Image.new('RGBA', (size, size), (255, 0, 0, 0)) # Transparent background
+    size = max(x, y)
+
+    # Create square transparent canvas
+    new_im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     new_im.paste(im, ((size - x) // 2, (size - y) // 2))
+
+    # Resize to favicon friendly size
+    new_im = new_im.resize((final_size, final_size), Image.LANCZOS)
+
     return new_im
+
 
 # Load and fix the image
 try:
-    icon_img = Image.open("assets/Sticker.png")
-    # Optional: If you want to crop it instead of padding, use proper cropping logic
-    # But usually, passing the PIL object directly helps Streamlit process it better
+    icon_img = Image.open("assets/Sticker.png").convert("RGBA")
+    icon_img = prepare_icon(icon_img, 64)   # <-- IMPORTANT
 except:
-    icon_img = "" # Fallback emoji if file missing
+    icon_img = "📊"   # fallback emoji
+
 
 # =========================================================
 # APP CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="MHF Soil Mechanics", 
+    page_title="MHF Soil Mechanics",
     layout="wide",
-    page_icon=icon_img  
+    page_icon=icon_img
 )
+
 
 
 # ==================================================
@@ -221,6 +228,7 @@ def main():
 # ==================================================
 if __name__ == "__main__":
     main()
+
 
 
 
