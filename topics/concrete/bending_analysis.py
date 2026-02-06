@@ -213,6 +213,7 @@ def app():
             inputs["h"],
             inputs["cover"],
             inputs["bar_dia"],
+            inputs["d"]
         )
 
         mat = Material(inputs["fck"], inputs["fyk"])
