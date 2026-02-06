@@ -15,17 +15,17 @@ class Material:
         self.ecu = 0.003
 
         if fck <= 25:
-            self.beta1 = 0.85
+            self.k_1 = 0.85
         elif fck == 30:
-            self.beta1 = 0.82
+            self.k_1 = 0.82
         elif fck == 35:
-            self.beta1 = 0.79
+            self.k_1 = 0.79
         elif fck == 40:
-            self.beta1 = 0.76
+            self.k_1 = 0.76
         elif fck == 45:
-            self.beta1 = 0.73
+            self.k_1 = 0.73
         elif fck >= 50:
-            self.beta1 = 0.70
+            self.k_1 = 0.70
 
 
 # ==========================================================
@@ -57,10 +57,10 @@ class FlexureSolver:
         fy = self.mat.fyk
         fc = self.mat.fck
         b = self.sec.b
-        beta1 = self.mat.beta1
+        k_1 = self.mat.k_1
         As = self.As
 
-        c = (As * fy) / (0.85 * fc * b * beta1)
+        c = (As * fy) / (0.85 * fc * b * k_1)
 
         return c
 
@@ -86,11 +86,11 @@ class FlexureSolver:
 
         fc = self.mat.fck
         b = self.sec.b
-        beta1 = self.mat.beta1
+        k_1 = self.mat.k_1
         As = self.As
         d = self.sec.d
 
-        a = beta1 * c
+        a = k_1 * c
         z = d - a / 2
 
         Mn = As * fs * z / 1e6  # convert to kNm
@@ -113,16 +113,15 @@ def render_inputs(section_type, goal_id):
         data["h"] = st.number_input("Height h [mm]", 200.0, value=500.0)
 
     with c2:
-        data["cover"] = st.number_input("Cover [mm]", value=30.0)
+        data["cover"] = st.number_input("Clear Cover [mm]", value=30.0)
         data["bar_dia"] = st.number_input("Bar Diameter [mm]", value=16.0)
-        data["stirrup_dia"] = st.number_input("Stirrup Diameter [mm]", value=8.0)
 
     st.subheader("2. Material")
 
     c3, c4 = st.columns(2)
 
     with c3:
-        data["fck"] = st.selectbox("Concrete Class (MPa)", [20,25,30,35,40,50], index=2)
+        data["fck"] = st.number_input("Concrete Class (MPa)", value=30.0)
 
     with c4:
         data["fyk"] = st.selectbox("Steel Grade (MPa)", [220,420,500], index=1)
