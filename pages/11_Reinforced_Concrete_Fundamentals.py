@@ -66,7 +66,7 @@ def app():
 
     # --- PROFESSIONAL HEADER SECTION ---
     # Adjusted column ratio to give the bigger logo enough space
-    col_logo, col_text = st.columns([2, 5], vertical_alignment="center")
+    col_logo, col_text = st.columns([1, 5], vertical_alignment="center")
 
     with col_logo:
         # Increased logo width slightly to make it "a little big"
