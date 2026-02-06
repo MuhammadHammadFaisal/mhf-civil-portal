@@ -44,53 +44,6 @@ st.set_page_config(
 
 
 def app():
-    # CUSTOM CSS
-    st.markdown("""
-    <style>
-    /* Main dropdown box */
-    div[data-baseweb="select"] > div {
-        background-color: #3b3f4d !important;
-        border: 2px solid #5a5f70 !important; 
-        color: white !important;
-        border-radius: 8px !important;
-    }
-
-   /* Dropdown menu background */
-    ul[data-baseweb="menu"] {
-        background-color: #262730 !important;
-        border: 1px solid #5a5f70 !important;
-        padding: 10px !important;
-    }
-
-    /* Menu options */
-    li[data-baseweb="option"] {
-        color: white !important;
-    }
-
-    /* Hover state */
-    li[data-baseweb="option"]:hover {
-        background-color: #ff4b4b !important;
-        color: white !important;
-    }
-    
-    /* Fix the Arrow Icon color */
-    div[data-baseweb="select"] span {
-        color: white !important;
-    }
-    
-    /* Fix the Arrow Icon color */
-    div[data-baseweb="select"] svg {
-        fill: white !important;
-    }
-
-    /* Image Styling */
-    div[data-testid="stImage"] > img {
-        border-radius: 15px;
-        border: 2px solid #444;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.3);
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
     # --- PROFESSIONAL HEADER SECTION ---
     # Adjusted column ratio to give the bigger logo enough space
