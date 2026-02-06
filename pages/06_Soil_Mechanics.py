@@ -97,7 +97,7 @@ def app():
 
     with col_logo:
         # Increased logo width slightly to make it "a little big"
-        st.image("assets/logo.png", width=180)
+        st.image(icon_img)
 
     with col_text:
         # Font size set to 55px (Professional look: smaller than logo, but distinct)
