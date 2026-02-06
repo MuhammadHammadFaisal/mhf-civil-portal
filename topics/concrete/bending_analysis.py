@@ -2,170 +2,195 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from scipy.optimize import brentq # For reverse solving
 
 # ======================================
 # 1. HELPER: TS 500 PARAMETERS & LOGIC
 # ======================================
 def get_k1_ts500(fck):
-    """
-    Returns equivalent stress block depth factor k1 per TS 500 (Slide 26).
-    """
+    """Returns k1 factor per TS 500."""
     if fck <= 25: return 0.85
     elif fck == 30: return 0.82
     elif fck == 35: return 0.79
     elif fck == 40: return 0.76
     elif fck == 45: return 0.73
     elif fck >= 50: return 0.70
-    return 0.85 
+    return 0.85
 
-def solve_quadratic_c(b, As, Es, epsilon_cu, d, fcd, k1):
+def get_material_properties(fck, fyk):
+    fcd = fck / 1.5
+    fyd = fyk / 1.15
+    Es = 200000.0
+    epsilon_cu = 0.003
+    epsilon_sy = fyd / Es
+    return fcd, fyd, Es, epsilon_cu, epsilon_sy
+
+# --- CORE SOLVER: SINGLY REINFORCED ANALYSIS ---
+def analyze_singly(b, d, As, fcd, fyd, Es, epsilon_cu, k1, epsilon_sy):
     """
-    Solves for c when steel does NOT yield (Slide 59).
-    Equilibrium: Fc - Fs = 0 
-    => 0.85 * fcd * b * k1 * c = As * Es * epsilon_cu * (d - c) / c
-    Rearranging gives: A*c^2 + B*c + C = 0
+    Standard Analysis: Returns (Mr, c, status, rho)
     """
-    # A * c^2 + B * c - D = 0
-    A = 0.85 * fcd * b * k1
-    B = As * Es * epsilon_cu
-    C = - (As * Es * epsilon_cu * d)
+    # 1. Force Equilibrium (Assume Yield)
+    # 0.85 * fcd * b * k1 * c = As * fyd
+    c_calc = (As * fyd) / (0.85 * fcd * b * k1)
     
-    # Quadratic formula: (-B + sqrt(B^2 - 4AC)) / 2A
-    delta = B**2 - 4 * A * C
-    if delta < 0: return d/2 # Fallback safety
-    c_sol = (-B + np.sqrt(delta)) / (2 * A)
-    return c_sol
+    # 2. Check Strain
+    eps_s = epsilon_cu * (d - c_calc) / c_calc
+    
+    status = "Yielded (Under-reinforced)"
+    fs = fyd
+    
+    if eps_s < epsilon_sy:
+        status = "Not Yielded (Over-reinforced)"
+        # Quadratic Solve
+        # A*c^2 + B*c + C = 0
+        A_q = 0.85 * fcd * b * k1
+        B_q = As * Es * epsilon_cu
+        C_q = - (As * Es * epsilon_cu * d)
+        
+        delta = B_q**2 - 4 * A_q * C_q
+        c_calc = (-B_q + np.sqrt(delta)) / (2 * A_q)
+        
+        # Recalc stress
+        eps_s = epsilon_cu * (d - c_calc) / c_calc
+        fs = eps_s * Es
+        
+    a = k1 * c_calc
+    Mr = As * fs * (d - a/2) * 1e-6 # kNm
+    return Mr, c_calc, eps_s, status
+
+# --- SOLVER: DESIGN STEEL (As) ---
+def design_singly_As(Md_target, b, d, fcd, fyd, k1):
+    """
+    Finds required As for a given Moment Md (kNm).
+    Approximation using lever arm z ~ 0.9d then refining.
+    """
+    Md_Nmm = Md_target * 1e6
+    
+    # Initial Guess: z = 0.9d
+    # As = M / (fyd * 0.9d)
+    As_try = Md_Nmm / (fyd * 0.9 * d)
+    
+    # Iterate 5 times to converge lever arm
+    for _ in range(10):
+        a = (As_try * fyd) / (0.85 * fcd * b) # Force equilibrium
+        z = d - a/2
+        As_new = Md_Nmm / (fyd * z)
+        if abs(As_new - As_try) < 1.0: break
+        As_try = As_new
+        
+    return As_try
+
+# --- SOLVER: REVERSE CONCRETE (fck) ---
+def find_required_fck(Md_target, b, d, As, fyk):
+    """
+    Finds minimum fck required to support Md with given geometry/steel.
+    Uses Bisection method.
+    """
+    def capacity_gap(fck_try):
+        # Calc properties for this fck
+        k1 = get_k1_ts500(fck_try)
+        fcd = fck_try / 1.5
+        fyd = fyk / 1.15
+        Es = 200000.0
+        eps_cu = 0.003
+        eps_sy = fyd/Es
+        
+        Mr, _, _, _ = analyze_singly(b, d, As, fcd, fyd, Es, eps_cu, k1, eps_sy)
+        return Mr - Md_target
+
+    # Search range C10 to C100
+    try:
+        fck_sol = brentq(capacity_gap, 10, 150)
+        return fck_sol
+    except:
+        return None # No solution in reasonable range
+
+# --- SOLVER: DOUBLY REINFORCED (Quadratic) ---
+def solve_doubly_quadratic(b, As, As_prime, d, d_prime, fcd, fyd, Es, epsilon_cu, k1):
+    A_quad = 0.85 * fcd * b * k1
+    B_quad = (As_prime * Es * epsilon_cu) - (As * fyd)
+    C_quad = - (As_prime * Es * epsilon_cu * d_prime)
+    
+    delta = B_quad**2 - 4 * A_quad * C_quad
+    if delta < 0: return d/2 
+    c = (-B_quad + np.sqrt(delta)) / (2 * A_quad)
+    return c
+
+# --- SOLVER: MULTI-LAYER (Iterative) ---
+def solve_multilayer_iterative(layers, b, h, fcd, fyd, Es, epsilon_cu, k1):
+    def sum_forces(c_try):
+        if c_try <= 0.1: return 1e9
+        a = k1 * c_try
+        if a > h: a = h
+        Fc = 0.85 * fcd * b * a
+        F_net = Fc 
+        for layer in layers:
+            d_i = layer['d']
+            As_i = layer['As']
+            eps = epsilon_cu * (d_i - c_try) / c_try
+            sigma = min(max(eps * Es, -fyd), fyd)
+            F_layer = As_i * sigma
+            F_net -= F_layer 
+        return F_net
+
+    c_min, c_max = 1.0, h * 1.5
+    for _ in range(100): 
+        c_mid = (c_min + c_max) / 2
+        f_mid = sum_forces(c_mid)
+        if abs(f_mid) < 10: return c_mid
+        if f_mid > 0: c_max = c_mid
+        else: c_min = c_mid
+    return (c_min + c_max) / 2
 
 # ======================================
 # 2. HELPER: DRAWING FUNCTIONS
 # ======================================
-def draw_beam_section(b, h, d, cover, num_bars, bar_dia):
-    """Draws the physical cross-section of the beam"""
-    fig, ax = plt.subplots(figsize=(4, 4))
-    fig.patch.set_alpha(0)
-    ax.patch.set_alpha(0)
+def draw_stress_strain_general(c, h, layers, epsilon_cu, fcd, k1, Es, fyd):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+    fig.patch.set_alpha(0); ax1.patch.set_alpha(0); ax2.patch.set_alpha(0)
     
-    # Concrete section
-    ax.add_patch(patches.Rectangle((0, 0), b, h, fill=True, facecolor='#e0e0e0', edgecolor='black', linewidth=2))
-    
-    # Rebar visualization
-    padding = cover + bar_dia/2
-    width_avail = b - 2*padding
-    
-    if num_bars == 1:
-        x_positions = [b/2]
-    else:
-        gap = width_avail / (num_bars - 1)
-        x_positions = [padding + i*gap for i in range(num_bars)]
-        
-    y_bar = cover + bar_dia/2 
-    for x in x_positions:
-        ax.add_patch(patches.Circle((x, y_bar), bar_dia/2, color="#d32f2f", zorder=10))
-        
-    # Markers
-    ax.annotate(r"$b$", xy=(b/2, h+10), ha='center', color='black')
-    ax.annotate(r"$h$", xy=(-10, h/2), ha='right', color='black')
-    ax.annotate(r"$d$", xy=(b+20, y_bar), xytext=(b+20, h), arrowprops=dict(arrowstyle='<->'), ha='center')
-    
-    ax.set_xlim(-50, b + 50)
-    ax.set_ylim(-50, h + 50)
-    ax.axis('off')
-    ax.set_aspect('equal')
-    return fig
+    for ax in [ax1, ax2]:
+        ax.axhline(y=h, color='k', lw=1); ax.axhline(y=0, color='k', lw=1)
+        ax.axvline(x=0, color='gray', alpha=0.5, lw=0.5)
+        ax.axis('off'); ax.set_ylim(-0.1*h, 1.1*h)
 
-def draw_stress_strain_ts500(c, d, h, epsilon_s, epsilon_cu, fcd, k1, fs_final):
-    """
-    Draws 3 panels: Strain, Actual Stress (Parabolic), Equivalent Block (Rectangular).
-    Ref: TS 500 Slide 26.
-    """
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 4))
-    fig.patch.set_alpha(0)
-    for ax in [ax1, ax2, ax3]: ax.patch.set_alpha(0)
-
-    # Common Axis Setup
-    for ax in [ax1, ax2, ax3]:
-        ax.axvline(x=0, color='gray', linewidth=0.8) # Reference line
-        ax.axhline(y=h, color='black', linewidth=1)  # Top of beam
-        ax.axhline(y=0, color='black', linewidth=1)  # Bottom of beam
-        ax.set_ylim(-0.1*h, 1.1*h)
-        ax.axis('off')
-
-    # --- 1. STRAIN PROFILE ---
-    ax1.set_title("1. Strain", color="white", fontsize=10)
+    # 1. Strain
+    ax1.set_title("Strain Profile", color="white")
     y_na = h - c
+    ax1.axhline(y=y_na, color='red', linestyle=':')
+    ax1.text(0.1, y_na, f"c={c:.1f}", color='red', fontsize=8)
     
-    # Scale x-values for visibility
-    scale_factor = 0.8 / max(epsilon_cu, abs(epsilon_s) + 1e-9)
-    x_top = -epsilon_cu * scale_factor
-    x_bot = epsilon_s * scale_factor
+    d_max = max([l['d'] for l in layers])
+    eps_bot = epsilon_cu * (d_max - c) / c
+    scale = 0.8 / max(epsilon_cu, abs(eps_bot) + 0.0001)
     
-    ax1.plot([x_top, x_bot], [h, h-d], color='#2196F3', linewidth=2, marker='o', markersize=4)
-    ax1.plot([x_top, 0], [h, h], color='#2196F3', linestyle='--')
-    
-    # Neutral Axis
-    ax1.axhline(y=y_na, color='red', linestyle=':', linewidth=1)
-    ax1.text(0, y_na + 5, f"NA (c={c:.0f})", color='red', fontsize=8)
-    
-    ax1.text(x_top, h+15, f"$\\epsilon_{{cu}}$\n{epsilon_cu}", ha='center', color='white', fontsize=8)
-    ax1.text(x_bot, h-d-35, f"$\\epsilon_s$\n{epsilon_s:.4f}", ha='center', color='white', fontsize=8)
+    ax1.plot([-epsilon_cu*scale, eps_bot*scale], [h, h-d_max], 'b-o', linewidth=2)
+    ax1.text(-epsilon_cu*scale, h+10, f"{epsilon_cu}", color='white', ha='center', fontsize=8)
 
-    # --- 2. ACTUAL STRESS PROFILE (Parabolic-Rectangular) ---
-    ax2.set_title("2. Actual Stress", color="white", fontsize=10)
-    
-    # Generate points for the stress curve
-    y_vals = np.linspace(h - c, h, 100)
-    stress_vals = []
-    
-    # Concrete Model: Parabolic up to eps_c0 (0.002), then constant
-    eps_c0 = 0.002
-    
-    for y in y_vals:
-        dist_from_na = y - (h - c)
-        eps_y = (dist_from_na / c) * epsilon_cu
-        
-        if eps_y < 0: 
-            sigma = 0
-        elif eps_y < eps_c0:
-            sigma = fcd * (1 - (1 - eps_y/eps_c0)**2)
-        else:
-            sigma = fcd
-        stress_vals.append(-sigma) 
-
-    # Scale stress for plotting
-    max_stress_display = 0.8
-    stress_scale = max_stress_display / fcd
-    x_stress = [s * stress_scale for s in stress_vals]
-    
-    # Fill the curve
-    ax2.fill_betweenx(y_vals, x_stress, 0, facecolor='#90CAF9', alpha=0.6, edgecolor='#1565C0')
-    ax2.text(-max_stress_display, h+15, f"$f_{{cd}}$\n{fcd:.1f} MPa", ha='center', color='white', fontsize=8)
-    
-    # Tension Steel Force Arrow
-    ax2.arrow(0, h-d, 0.4, 0, head_width=15, head_length=0.1, color='#F44336', linewidth=2)
-
-    # --- 3. EQUIVALENT BLOCK (Whitney) ---
-    ax3.set_title("3. Equiv. Block", color="white", fontsize=10)
-    
+    # 2. Forces
+    ax2.set_title("Internal Forces", color="white")
     a = k1 * c
-    y_block_bot = h - a
+    Fc_rect = patches.Rectangle((-0.5, h-a), 0.5, a, facecolor='#ffcccc', edgecolor='red')
+    ax2.add_patch(Fc_rect)
+    ax2.arrow(-0.25, h-a/2, 0.25, 0, color='red', head_width=15, length_includes_head=True)
+    ax2.text(-0.6, h-a/2, "Fc", color='red', va='center')
     
-    # Rectangular Block
-    rect_width = 0.85 * fcd * stress_scale # Scaled visually
-    rect = patches.Rectangle((-rect_width, y_block_bot), rect_width, a, 
-                             facecolor='#EF9A9A', edgecolor='#D32F2F', alpha=0.7)
-    ax3.add_patch(rect)
-    
-    # Force Vector Fc
-    ax3.arrow(-rect_width/2, h - a/2, rect_width/2, 0, head_width=20, head_length=0.1, color='red', linewidth=2)
-    ax3.text(-rect_width/2, h - a/2 + 10, "$F_c$", color='red', fontweight='bold', ha='center')
-    
-    # Force Vector Fs
-    ax3.arrow(0, h-d, 0.5, 0, head_width=20, head_length=0.1, color='#F44336', linewidth=2)
-    ax3.text(0.5, h-d+10, "$F_s$", color='#F44336', fontweight='bold', ha='center')
-    
-    # Dimension 'a'
-    ax3.annotate(f"a={a:.0f}", xy=(0.1, h-a/2), xytext=(0.3, h-a/2),
-                 arrowprops=dict(arrowstyle='-[, widthB=1.5', color='white'), color='white', fontsize=8)
+    max_force = 0
+    for l in layers:
+        eps = epsilon_cu * (l['d'] - c) / c
+        sigma = min(max(eps*Es, -fyd), fyd)
+        force = abs(l['As'] * sigma)
+        if force > max_force: max_force = force
+        
+    for i, layer in enumerate(layers):
+        y_pos = h - layer['d']
+        eps = epsilon_cu * (layer['d'] - c) / c
+        sigma = min(max(eps*Es, -fyd), fyd)
+        col = 'blue' if sigma > 0 else 'orange'
+        direction = 1 if sigma > 0 else -1
+        arrow_len = 0.4 * (abs(layer['As']*sigma) / (max_force+1)) + 0.1
+        ax2.arrow(0, y_pos, direction*arrow_len, 0, color=col, head_width=15, width=2, length_includes_head=True)
 
     return fig
 
@@ -173,145 +198,216 @@ def draw_stress_strain_ts500(c, d, h, epsilon_s, epsilon_cu, fcd, k1, fs_final):
 # 3. MAIN APP
 # ======================================
 def app():
-    st.markdown("## TS 500: Flexural Analysis of Beams")
-    st.caption("Singly Reinforced Rectangular Section Analysis")
-    
-    # --- INPUTS ---
-    col1, col2 = st.columns([1, 1.5])
-    
-    with col1:
-        st.subheader("1. Material Properties")
-        st.caption("Partial Safety Factors: $\gamma_c=1.5, \gamma_s=1.15$")
-        
-        fck = st.selectbox("Concrete Class ($C$)", [20, 25, 30, 35, 40, 45, 50], index=2)
-        fyk = st.selectbox("Steel Grade ($S$)", [220, 420, 500], index=1)
-        
-        # Design Strengths (TS 500)
-        fcd = fck / 1.5
-        fyd = fyk / 1.15
-        
-        st.info(f"**Design Values:**\n\n$f_{{cd}} = {fcd:.2f}$ MPa\n\n$f_{{yd}} = {fyd:.2f}$ MPa")
+    st.markdown("## TS 500: Flexural Analysis")
+    st.caption("Calculate Capacity, Design Steel, or Find required Concrete Strength.")
 
-    with col2:
-        st.subheader("2. Geometry")
-        c1, c2 = st.columns(2)
-        with c1:
-            bw = st.number_input("Width ($b_w$) [mm]", value=300.0, step=50.0)
-            h = st.number_input("Height ($h$) [mm]", value=500.0, step=50.0)
-        with c2:
-            cover = st.number_input("Effective Cover ($d'$)", value=40.0, step=5.0)
-            d = h - cover
-            st.write(f"Effective depth $d = {d:.1f}$ mm")
+    # --- SIDEBAR INPUTS ---
+    with st.sidebar:
+        st.header("Section Parameters")
+        bw = st.number_input("Width (b) [mm]", 300.0)
+        h = st.number_input("Height (h) [mm]", 500.0)
+        cover = st.number_input("Cover [mm]", 40.0)
+        d = h - cover
+
+    # --- TABS ---
+    tab1, tab2, tab3 = st.tabs(["1. Singly Reinforced", "2. Doubly Reinforced", "3. Multi-Layer"])
+
+    # === TAB 1: SINGLY REINFORCED ===
+    with tab1:
+        st.subheader("Singly Reinforced Section")
+        
+        # Calculation Goal Selector
+        calc_mode = st.radio(
+            "What do you want to calculate?",
+            ["Moment Capacity ($M_r$)", "Steel Requirement ($A_s$)", "Concrete Strength ($f_{ck}$)", "Section Depth ($d$)"],
+            horizontal=True
+        )
+
+        st.markdown("---")
+        
+        # DYNAMIC INPUTS BASED ON SELECTION
+        col_in1, col_in2 = st.columns(2)
+        
+        # Default placeholders
+        As_input = 0.0
+        Md_input = 0.0
+        fck_input = 30
+        fyk_input = 420
+        d_input = d
+
+        with col_in1:
+            if calc_mode == "Concrete Strength ($f_{ck}$)":
+                 st.info("Finding required Concrete Class")
+            else:
+                fck_input = st.selectbox("Concrete Class (C)", [20, 25, 30, 35, 40, 45, 50], index=2, key="s_fck")
             
-        st.subheader("3. Reinforcement")
-        # Direct Area Input or Bar Selection
-        input_method = st.radio("Input Method", ["Total Area ($A_s$)", "Bar Selection"], horizontal=True)
-        if input_method == "Total Area ($A_s$)":
-            As = st.number_input("Steel Area ($A_s$) [mm²]", value=1257.0) # approx 4phi20
-            bar_dia = 20 # default for drawing
-            num_bars = 4
-        else:
-            bar_dia = st.selectbox("Bar Diameter", [12, 14, 16, 20, 24, 28, 32], index=3)
-            num_bars = st.number_input("Number of Bars", value=4, min_value=1)
-            As = num_bars * np.pi * (bar_dia/2)**2
-            st.write(f"Calculated $A_s = {As:.0f}$ mm²")
+            fyk_input = st.selectbox("Steel Grade (S)", [220, 420, 500], index=1, key="s_fyk")
 
-    st.markdown("---")
+        with col_in2:
+            if calc_mode == "Moment Capacity ($M_r$)":
+                As_input = st.number_input("Steel Area ($A_s$) [mm²]", value=1500.0)
+            elif calc_mode == "Steel Requirement ($A_s$)":
+                Md_input = st.number_input("Design Moment ($M_d$) [kNm]", value=250.0)
+            elif calc_mode == "Concrete Strength ($f_{ck}$)":
+                Md_input = st.number_input("Target Moment ($M_d$) [kNm]", value=300.0)
+                As_input = st.number_input("Steel Area ($A_s$) [mm²]", value=2000.0)
+            elif calc_mode == "Section Depth ($d$)":
+                Md_input = st.number_input("Target Moment ($M_d$) [kNm]", value=250.0)
+                rho_target = st.slider("Target Steel Ratio ($\\rho$)", 0.005, 0.02, 0.01)
 
-    # ======================================
-    # 4. CALCULATIONS (TS 500 Logic)
-    # ======================================
-    
-    # 1. Determine Parameters
-    k1 = get_k1_ts500(fck)
-    Es = 200000.0 # MPa
-    epsilon_cu = 0.003
-    epsilon_sy = fyd / Es
-    
-    # 2. Assume Yielding (Step 1 from Slide 48/59)
-    # Force Equilibrium: Fc = Fs => 0.85 * fcd * bw * k1 * c = As * fyd
-    c_yield = (As * fyd) / (0.85 * fcd * bw * k1)
-    
-    # 3. Check Assumption
-    epsilon_s = epsilon_cu * (d - c_yield) / c_yield
-    
-    is_yielded = epsilon_s >= epsilon_sy
-    
-    # 4. Final Calculation based on state
-    if is_yielded:
-        c_final = c_yield
-        fs_final = fyd
-        calculation_mode = "Yielded (Ductile)"
-    else:
-        # Solve quadratic (Slide 59 Example 5 Logic)
-        c_final = solve_quadratic_c(bw, As, Es, epsilon_cu, d, fcd, k1)
-        epsilon_s = epsilon_cu * (d - c_final) / c_final
-        fs_final = epsilon_s * Es
-        calculation_mode = "Not Yielded (Brittle/Elastic)"
-
-    # 5. Moment Capacity
-    a_final = k1 * c_final
-    # Mr = Fs * (d - a/2)  (Slide 48)
-    Mr = (As * fs_final * (d - a_final/2)) * 1e-6 # kNm
-
-    # ======================================
-    # 5. VISUALIZATION & REPORT
-    # ======================================
-    col_viz, col_res = st.columns([1.2, 1])
-    
-    with col_viz:
-        st.subheader("Section Status")
-        tab1, tab2 = st.tabs(["Forces & Stresses", "Cross Section"])
-        
-        with tab1:
-            fig_stress = draw_stress_strain_ts500(c_final, d, h, epsilon_s, epsilon_cu, fcd, k1, fs_final)
-            st.pyplot(fig_stress)
-            plt.close(fig_stress)
+        # --- EXECUTE CALCULATION ---
+        if st.button("Calculate", type="primary"):
             
-        with tab2:
-            fig_sec = draw_beam_section(bw, h, d, cover, num_bars, bar_dia)
-            st.pyplot(fig_sec)
-            plt.close(fig_sec)
-        
-        st.success(f"**Moment Capacity ($M_r$): {Mr:.1f} kNm**")
-        st.caption(f"Neutral Axis Depth $c = {c_final:.1f}$ mm")
+            # Common Material props
+            fcd, fyd, Es, epsilon_cu, epsilon_sy = get_material_properties(fck_input, fyk_input)
+            k1 = get_k1_ts500(fck_input)
 
-    with col_res:
-        st.subheader("Calculation Report")
-        
-        # Step 1: Material Constants
-        st.markdown("**1. Design Constants**")
-        st.latex(fr"f_{{cd}} = {fcd:.2f} \text{{ MPa}}, \quad f_{{yd}} = {fyd:.2f} \text{{ MPa}}")
-        st.latex(fr"k_1 = {k1} \quad (\text{{for }} C{fck})")
-        st.latex(fr"\epsilon_{{sy}} = {epsilon_sy:.5f}")
+            # MODE 1: MOMENT CAPACITY
+            if calc_mode == "Moment Capacity ($M_r$)":
+                Mr, c, eps, status = analyze_singly(bw, d, As_input, fcd, fyd, Es, epsilon_cu, k1, epsilon_sy)
+                
+                st.metric("Moment Capacity ($M_r$)", f"{Mr:.1f} kNm")
+                st.caption(f"Neutral Axis c = {c:.1f} mm | {status}")
+                
+                # Plot
+                fig = draw_stress_strain_general(c, h, [{'As':As_input, 'd':d}], epsilon_cu, fcd, k1, Es, fyd)
+                st.pyplot(fig)
 
-        # Step 2: Assumption Check
-        st.markdown("**2. Force Equilibrium Check**")
-        st.write(f"Assuming yield, calculated $c = {c_yield:.1f}$ mm.")
-        
-        st.markdown("**3. Strain Compatibility**")
-        st.latex(fr"\epsilon_s = 0.003 \frac{{{d}-{c_yield:.1f}}}{{{c_yield:.1f}}} = \mathbf{{{epsilon_s:.5f}}}")
-        
-        if is_yielded:
-            st.success(f"✅ $\epsilon_s \ge \epsilon_{{sy}}$")
-            st.write("Assumption Correct: **Tension Steel Yields**.")
-        else:
-            st.error(f"⚠️ $\epsilon_s < \epsilon_{{sy}}$")
-            st.write("Assumption Incorrect: **Compression Failure**.")
-            st.write("Recalculating $c$ using quadratic equation...")
-            st.latex(fr"c_{{new}} = {c_final:.1f} \text{{ mm}}")
-            st.latex(fr"f_s = E_s \epsilon_s = {fs_final:.1f} \text{{ MPa}}")
+            # MODE 2: STEEL REQUIREMENT
+            elif calc_mode == "Steel Requirement ($A_s$)":
+                As_req = design_singly_As(Md_input, bw, d, fcd, fyd, k1)
+                
+                # Check if this As creates valid section
+                Mr, c, eps, status = analyze_singly(bw, d, As_req, fcd, fyd, Es, epsilon_cu, k1, epsilon_sy)
+                
+                st.success(f"**Required Steel ($A_s$): {As_req:.0f} mm²**")
+                
+                col_r1, col_r2 = st.columns(2)
+                col_r1.metric("Provided Capacity", f"{Mr:.1f} kNm")
+                col_r1.caption(f"Target: {Md_input:.1f} kNm")
+                col_r2.metric("Steel Ratio", f"{(As_req/(bw*d))*100:.2f}%")
+                
+                # Suggest Bars
+                n_20 = np.ceil(As_req / 314)
+                col_r2.info(f"Try: {int(n_20)} $\phi$ 20")
 
-        # Step 4: Moment
-        st.markdown("**4. Final Moment ($M_r$)**")
-        st.latex(fr"M_r = A_s f_s (d - \frac{{k_1 c}}{{2}})")
-        st.latex(fr"M_r = {As:.0f} \cdot {fs_final:.1f} \cdot ({d} - \frac{{{k1}\cdot{c_final:.1f}}}{{2}}) \cdot 10^{{-6}}")
-        st.latex(fr"M_r = \mathbf{{{Mr:.1f} \text{{ kNm}}}}")
-        
-        # K check
-        K = (bw * d**2) / (Mr * 1e6)
-        st.caption(f"K-value check: $K = bd^2/M_r = {K:.0f}$ mm²/N")
+            # MODE 3: CONCRETE STRENGTH
+            elif calc_mode == "Concrete Strength ($f_{ck}$)":
+                req_fck = find_required_fck(Md_input, bw, d, As_input, fyk_input)
+                
+                if req_fck:
+                    st.success(f"**Required Concrete Strength ($f_{{ck}}$): {req_fck:.1f} MPa**")
+                    st.info(f"Select standard grade higher than C{int(np.ceil(req_fck))}")
+                else:
+                    st.error("Cannot achieve this moment with the given steel/geometry even with very high strength concrete. Increase dimensions or steel.")
 
-# Run
+            # MODE 4: SECTION DEPTH
+            elif calc_mode == "Section Depth ($d$)":
+                # K = bd^2 / M
+                # Approximate design using K tables or simple formula: As = rho * b * d
+                # Mr = rho * b * d * fy * (d - 0.59 * rho * d * fy/fc)
+                # Mr = b * d^2 * [rho * fy * (1 - 0.59 rho fy/fc)]
+                
+                term = (rho_target * fyd * (1 - 0.59 * rho_target * fyd / fcd))
+                # Md = b * d^2 * term
+                d_req = np.sqrt( (Md_input * 1e6) / (bw * term) )
+                
+                st.success(f"**Required Effective Depth ($d$): {d_req:.1f} mm**")
+                st.metric("Total Height ($h$)", f"{d_req + cover:.0f} mm")
+                st.caption(f"Assuming $\\rho = {rho_target:.1%}$")
+
+    # === TAB 2: DOUBLY REINFORCED ===
+    with tab2:
+        st.subheader("Doubly Reinforced Section")
+        d_mode = st.radio("Goal", ["Analyze Capacity ($M_r$)", "Find Tension Steel ($A_s$)"], horizontal=True, key="d_mode")
+        
+        fck_d = st.selectbox("Concrete (C)", [20, 25, 30, 35, 40], index=2, key="d_fck")
+        fyk_d = st.selectbox("Steel (S)", [420, 500], index=0, key="d_fyk")
+        fcd, fyd, Es, epsilon_cu, epsilon_sy = get_material_properties(fck_d, fyk_d)
+        k1 = get_k1_ts500(fck_d)
+
+        col_d1, col_d2 = st.columns(2)
+        with col_d1: As_comp = st.number_input("Compression Steel ($A_s'$) [mm²]", value=400.0)
+        d_comp = cover
+        d_tens = d
+        
+        if d_mode == "Analyze Capacity ($M_r$)":
+            with col_d2: As_tens = st.number_input("Tension Steel ($A_s$) [mm²]", value=1800.0, key="d_as_tens")
+            
+            if st.button("Analyze Doubly", type="primary"):
+                # Analysis Logic
+                c_assume = ((As_tens - As_comp) * fyd) / (0.85 * fcd * bw * k1)
+                eps_comp = epsilon_cu * (c_assume - d_comp) / c_assume
+                
+                c_final = c_assume
+                fs_prime = fyd
+                if eps_comp < epsilon_sy:
+                    c_final = solve_doubly_quadratic(bw, As_tens, As_comp, d_tens, d_comp, fcd, fyd, Es, epsilon_cu, k1)
+                    eps_comp = epsilon_cu * (c_final - d_comp) / c_final
+                    fs_prime = eps_comp * Es
+                
+                a = k1 * c_final
+                Cc = 0.85 * fcd * bw * a
+                Cs = As_comp * fs_prime
+                Mr = (Cc * (d_tens - a/2) + Cs * (d_tens - d_comp)) * 1e-6
+                
+                st.metric("Moment Capacity", f"{Mr:.1f} kNm")
+                st.caption(f"c={c_final:.1f}mm")
+                fig = draw_stress_strain_general(c_final, h, [{'As':As_tens, 'd':d_tens}, {'As':As_comp, 'd':d_comp}], epsilon_cu, fcd, k1, Es, fyd)
+                st.pyplot(fig)
+
+        else: # Find Tension Steel
+            with col_d2: Md_target = st.number_input("Target Moment ($M_d$) [kNm]", value=400.0)
+            
+            if st.button("Design Tension Steel", type="primary"):
+                # Approximate Design
+                # M_total = M_singly + M_couple
+                # M_couple = As' * fyd * (d - d') (Assume comp steel yields)
+                M_couple = (As_comp * fyd * (d_tens - d_comp)) * 1e-6
+                
+                M_remain = Md_target - M_couple
+                
+                # Design remaining as singly reinforced
+                As_singly = design_singly_As(M_remain, bw, d_tens, fcd, fyd, k1)
+                As_total = As_singly + As_comp
+                
+                st.success(f"**Required Tension Steel ($A_s$): {As_total:.0f} mm²**")
+                st.write(f"This assumes compression steel yields. The simplified breakdown is:")
+                st.write(f"- Couple ($A_s'$): {M_couple:.1f} kNm")
+                st.write(f"- Singly Part: {M_remain:.1f} kNm")
+
+
+    # === TAB 3: MULTI-LAYER ===
+    with tab3:
+        st.subheader("Multi-Layer Analysis")
+        n_layers = st.number_input("Layers", 1, 10, 3)
+        layers = []
+        for i in range(int(n_layers)):
+            c1, c2 = st.columns([1, 2])
+            with c1: l_d = st.number_input(f"Depth L{i+1}", value=float(cover + (d-cover)*(i/(n_layers-1) if n_layers>1 else 1)), key=f"md_{i}")
+            with c2: l_as = st.number_input(f"Area L{i+1}", value=500.0 if i==n_layers-1 else 0.0, key=f"mas_{i}")
+            layers.append({'As': l_as, 'd': l_d})
+
+        if st.button("Analyze Multi-Layer", type="primary"):
+            fcd_m, fyd_m, Es_m, eps_cu_m, _ = get_material_properties(30, 420) # Default mat for multi
+            k1_m = get_k1_ts500(30)
+            c_iter = solve_multilayer_iterative(layers, bw, h, fcd_m, fyd_m, Es_m, eps_cu_m, k1_m)
+            
+            # Moment Sum about Geometric Center (h/2)
+            a = k1_m * c_iter
+            if a > h: a = h
+            Fc = 0.85 * fcd_m * bw * a
+            M_total = Fc * (h/2 - a/2) 
+            
+            for l in layers:
+                eps = eps_cu_m * (l['d'] - c_iter) / c_iter
+                sigma = min(max(eps * Es_m, -fyd_m), fyd_m)
+                M_total += l['As'] * sigma * (l['d'] - h/2)
+            
+            st.metric("Moment Capacity", f"{M_total/1e6:.1f} kNm")
+            st.caption(f"c = {c_iter:.1f} mm")
+            fig = draw_stress_strain_general(c_iter, h, layers, eps_cu_m, fcd_m, k1_m, Es_m, fyd_m)
+            st.pyplot(fig)
+
 if __name__ == "__main__":
     app()
