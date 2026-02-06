@@ -121,7 +121,7 @@ def render_inputs(section_type, goal_id):
     c3, c4 = st.columns(2)
 
     with c3:
-        data["fck"] = st.number_input("Concrete Class (MPa)", value=30.0)
+        data["fck"] = st.number_input("Concrete Class (MPa)", value=20.0, step=1)
 
     with c4:
         data["fyk"] = st.selectbox("Steel Grade (MPa)", [220,420,500], index=1)
@@ -208,7 +208,6 @@ def app():
             inputs["h"],
             inputs["cover"],
             inputs["bar_dia"],
-            inputs["stirrup_dia"]
         )
 
         mat = Material(inputs["fck"], inputs["fyk"])
